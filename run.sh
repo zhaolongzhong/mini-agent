@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-python main.py
+python -m main
