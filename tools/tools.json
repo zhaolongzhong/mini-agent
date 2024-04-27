@@ -51,5 +51,24 @@
                 ]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_python_script",
+            "description": "Execute a Python script in a subprocess.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "script_name": {
+                        "type": "string",
+                        "description": "The name with path of the script to be executed."
+                    }
+                },
+                "required": [
+                    "script_name"
+                ]
+            }
+        }
     }
 ]

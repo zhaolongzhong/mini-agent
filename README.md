@@ -21,3 +21,33 @@ Update the API keys in the `.env` file
 ```bash
 ./run.sh
 ```
+
+## Prompt Examples
+
+Promot: read file
+
+```
+Can you check run.sh?
+```
+
+Prompt: write file
+
+```
+Can you write a short story about AGI into story.txt?
+```
+
+Prompt: execute python
+
+```
+Can you write hello_world.py and print out 'welcome to the future' and run it?
+```
+
+```
+Can you run tests/test_hello_world.py?
+```
+
+Prompt: read, write, execute python script
+
+```
+Can you write a fibonacci function to fibo.py and write a test for it? Make sure the test pass?
+```

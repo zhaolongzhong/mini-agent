@@ -1,9 +1,10 @@
 import json
-from tools.tools import read_file, write_to_file
+from tools.tools import read_file, write_to_file, run_python_script
 
 available_tools = {
     "read_file": read_file,
     "write_to_file": write_to_file,
+    "run_python_script": run_python_script,
 }
 
 
