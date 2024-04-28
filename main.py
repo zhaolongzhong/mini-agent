@@ -1,5 +1,6 @@
 from chat_completion import send_completion_request
 from models.message import Message
+from planning import make_plan
 from tools.available_tools import tools_list
 from utils.logs import logger as log
 
@@ -8,6 +9,9 @@ messages = [Message(role="system", content="You are a helpful assistant.")]
 
 def send_prompt(content: str):
     messages.append(Message(role="user", content=content))
+    response = make_plan(content)
+    if response:
+        log.debug(f"[Planning] response: {response.choices[0].message}")
     return send_completion_request(messages, tools_list)
 
 
