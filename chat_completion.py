@@ -1,36 +1,20 @@
 import json
 
-import httpx
+from core.chat_base import ChatBase
 from models.message import Message
-from openai import OpenAI
-
-from tools.available_tools import available_tools
-from config import settings
 from models.tool_call import ToolResponseMessage, convert_to_tool_call_message
+from tools.available_tools import available_tools, tools_list
 from utils.logs import logger as log
 
-client = OpenAI(
-    api_key=settings.api_key,
-    # https://github.com/openai/openai-python#retries
-    # https://github.com/openai/openai-python#timeouts
-    # requests that time out are retried twice by default.
-    timeout=httpx.Timeout(60.0, read=60.0, write=10.0, connect=2.0),
-)
+chat_base = ChatBase(tools=tools_list)
 
 
-def send_completion_request(messages: list = None, tools: list = None) -> dict:
+def send_completion_request(messages: list = None) -> dict:
     if messages is None:
         messages = [Message(role="system", content="You are a helpful assistant.")]
 
-    if tools is None:
-        response = client.chat.completions.create(
-            model="gpt-4-turbo", messages=messages
-        )
-        return response
+    response = chat_base.send_request(messages, use_tools=True)
 
-    response = client.chat.completions.create(
-        model="gpt-4-turbo", messages=messages, tools=tools, tool_choice="auto"
-    )
     tool_calls = response.choices[0].message.tool_calls
     if tool_calls is None:
         return response
@@ -39,7 +23,7 @@ def send_completion_request(messages: list = None, tools: list = None) -> dict:
     messages.append(tool_call_message)
     tool_responses = process_tool_calls(tool_calls)
     messages.extend(tool_responses)
-    return send_completion_request(messages, tools)
+    return chat_base.send_request(messages, use_tools=True)
 
 
 def process_tool_calls(tool_calls):

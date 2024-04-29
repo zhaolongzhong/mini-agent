@@ -1,7 +1,9 @@
-from chat_completion import send_completion_request
+from core.chat_base import ChatBase
 from models.message import Message
 from tools.available_tools import tools_list
 from utils.logs import logger as log
+
+chat_base = ChatBase(tools=tools_list)
 
 
 def evaluate_input(content: str):
@@ -16,7 +18,7 @@ def evaluate_input(content: str):
             role="assistant", content="Here is the task (problem or request):" + content
         )
     )
-    return send_completion_request(messages, tools=tools_list)
+    return chat_base.send_request(messages, use_tools=True)
 
 
 def make_plan(content: str):
@@ -38,4 +40,4 @@ def make_plan(content: str):
                 role="assistant", content="Make a plan for the user request: " + content
             )
         )
-        return send_completion_request(messages)
+        return chat_base.send_request(messages)
