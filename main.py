@@ -1,6 +1,6 @@
 from chat_completion import send_completion_request
 from models.message import Message
-from planning import make_plan
+from planning.planning import make_plan
 
 from utils.logs import logger as log
 
