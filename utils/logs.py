@@ -1,12 +1,14 @@
 import os
 import logging
 
-logger: logging.Logger = logging.getLogger("mini-agent")
+from utils.console import clear_line
+
+_logger: logging.Logger = logging.getLogger("mini-agent")
 
 
 def _basic_config() -> None:
     logging.basicConfig(
-        format="[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s",
+        format="[%(asctime)s - %(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
@@ -15,7 +17,32 @@ def setup_logging() -> None:
     env = os.environ.get("LOG_LEVEL", "info")
     if env == "debug":
         _basic_config()
-        logger.setLevel(logging.DEBUG)
+        _logger.setLevel(logging.DEBUG)
     elif env == "info":
         _basic_config()
-        logger.setLevel(logging.INFO)
+        _logger.setLevel(logging.INFO)
+
+
+class Logger:
+    def __init__(self, name: str) -> None:
+        self.logger = _logger
+        self.name = name
+
+    def debug(self, msg, *args, **kwargs):
+        clear_line()
+        self.logger.debug(msg, *args, **kwargs)
+
+    def info(self, msg, *args, **kwargs):
+        clear_line()
+        self.logger.info(msg, *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        clear_line()
+        self.logger.warning(msg, *args, **kwargs)
+
+    def error(self, msg, *args, **kwargs):
+        clear_line()
+        self.logger.error(msg, *args, **kwargs)
+
+
+log = Logger("mini-agent")

@@ -8,9 +8,9 @@ class ChatBase:
         self.client = create_openai_client(settings.api_key)
         self.tools = tools
 
-    def send_request(self, messages: list = [], use_tools=False):
+    async def send_request(self, messages: list = [], use_tools=False):
         if not use_tools:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.mode, messages=messages
             )
             return response
@@ -18,7 +18,7 @@ class ChatBase:
         if len(self.tools) == 0:
             raise Exception("No tools provided")
 
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=self.mode,
             messages=messages,
             tools=self.tools,

@@ -1,9 +1,9 @@
 import httpx
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 
 def create_openai_client(api_key: str):
-    client = OpenAI(
+    client = AsyncOpenAI(
         api_key=api_key,
         # https://github.com/openai/openai-python#retries
         # https://github.com/openai/openai-python#timeouts

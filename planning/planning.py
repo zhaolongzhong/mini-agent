@@ -1,12 +1,12 @@
 from core.chat_base import ChatBase
 from models.message import Message
 from tools.available_tools import tools_list
-from utils.logs import logger as log
+from utils.logs import log
 
 chat_base = ChatBase(tools=tools_list)
 
 
-def evaluate_input(content: str):
+async def evaluate_input(content: str):
     messages = [
         Message(
             role="system",
@@ -18,11 +18,11 @@ def evaluate_input(content: str):
             role="assistant", content="Here is the task (problem or request):" + content
         )
     )
-    return chat_base.send_request(messages, use_tools=True)
+    return await chat_base.send_request(messages, use_tools=True)
 
 
-def make_plan(content: str):
-    response = evaluate_input(content)
+async def make_plan(content: str):
+    response = await evaluate_input(content)
     chat_completion_message = response.choices[0].message
     log.debug(f"[Planning] evaluation response: {chat_completion_message}")
     if (
@@ -40,4 +40,4 @@ def make_plan(content: str):
                 role="assistant", content="Make a plan for the user request: " + content
             )
         )
-        return chat_base.send_request(messages)
+        return await chat_base.send_request(messages)

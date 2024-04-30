@@ -4,16 +4,16 @@ from core.chat_base import ChatBase
 from models.message import Message
 from models.tool_call import ToolResponseMessage, convert_to_tool_call_message
 from tools.available_tools import available_tools, tools_list
-from utils.logs import logger as log
+from utils.logs import log
 
 chat_base = ChatBase(tools=tools_list)
 
 
-def send_completion_request(messages: list = None) -> dict:
+async def send_completion_request(messages: list = None) -> dict:
     if messages is None:
         messages = [Message(role="system", content="You are a helpful assistant.")]
 
-    response = chat_base.send_request(messages, use_tools=True)
+    response = await chat_base.send_request(messages, use_tools=True)
 
     tool_calls = response.choices[0].message.tool_calls
     if tool_calls is None:
@@ -23,11 +23,11 @@ def send_completion_request(messages: list = None) -> dict:
     messages.append(tool_call_message)
     tool_responses = process_tool_calls(tool_calls)
     messages.extend(tool_responses)
-    return chat_base.send_request(messages, use_tools=True)
+    return await chat_base.send_request(messages, use_tools=True)
 
 
 def process_tool_calls(tool_calls):
-    log.debug("process tool calls")
+    log.debug("[chat_completion] process tool calls")
     tool_call_responses: list[str] = []
     for _index, tool_call in enumerate(tool_calls):
         tool_call_id = tool_call.id
