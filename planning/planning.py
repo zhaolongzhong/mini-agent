@@ -1,4 +1,5 @@
 from core.chat_base import ChatBase
+from models.error import ErrorResponse
 from models.message import Message
 from tools.available_tools import tools_list
 from utils.logs import log
@@ -23,6 +24,8 @@ async def evaluate_input(content: str):
 
 async def make_plan(content: str):
     response = await evaluate_input(content)
+    if isinstance(response, ErrorResponse):
+        return response
     chat_completion_message = response.choices[0].message
     log.debug(f"[Planning] evaluation response: {chat_completion_message}")
     if (

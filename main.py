@@ -3,6 +3,7 @@ import itertools
 import sys
 
 from chat_completion import send_completion_request
+from models.error import ErrorResponse
 from models.message import Message
 from planning.planning import make_plan
 from utils.console import clear_line
@@ -14,9 +15,15 @@ messages = [Message(role="system", content="You are a helpful assistant.")]
 async def send_prompt(content: str):
     messages.append(Message(role="user", content=content))
     response = await make_plan(content)
-    if response:
+    if not isinstance(response, ErrorResponse):
         log.debug(f"Planning] response: {response.choices[0].message}")
-    return await send_completion_request(messages=messages)
+    response = await send_completion_request(messages=messages)
+    if isinstance(response, ErrorResponse):
+        return response
+    else:
+        message = Message(**response.choices[0].message.model_dump())
+        messages.append(message)
+        return message
 
 
 async def progress_indicator():
@@ -38,9 +45,13 @@ async def main():
             try:
                 response = await send_prompt(user_input)
                 indicator.cancel()
-                log.debug(f"[main] {response.choices[0].message}")
-                message = Message(**response.choices[0].message.model_dump())
-                print(f"[Agent]: {message.content}")
+                log.debug(f"[main] {response}")
+                if isinstance(response, ErrorResponse):
+                    print(
+                        f"[Agent]: There is an error. Error: {response.model_dump_json()}"
+                    )
+                else:
+                    print(f"[Agent]: {response.content}")
             finally:
                 try:
                     await indicator

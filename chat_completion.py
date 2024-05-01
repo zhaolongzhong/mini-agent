@@ -1,6 +1,7 @@
 import json
 
 from core.chat_base import ChatBase
+from models.error import ErrorResponse
 from models.message import Message
 from models.tool_call import ToolResponseMessage, convert_to_tool_call_message
 from tools.available_tools import available_tools, tools_list
@@ -14,6 +15,8 @@ async def send_completion_request(messages: list = None) -> dict:
         messages = [Message(role="system", content="You are a helpful assistant.")]
 
     response = await chat_base.send_request(messages, use_tools=True)
+    if isinstance(response, ErrorResponse):
+        return response
 
     tool_calls = response.choices[0].message.tool_calls
     if tool_calls is None:
