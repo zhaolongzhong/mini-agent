@@ -3,6 +3,7 @@ import json
 from core.chat_base import ChatBase
 from models.error import ErrorResponse
 from models.message import Message
+from models.request_metadata import Metadata
 from models.tool_call import ToolResponseMessage, convert_to_tool_call_message
 from tools.available_tools import available_tools, tools_list
 from utils.logs import log
@@ -10,9 +11,23 @@ from utils.logs import log
 chat_base = ChatBase(tools=tools_list)
 
 
-async def send_completion_request(messages: list = None) -> dict:
+async def send_completion_request(
+    messages: list = None, metadata: Metadata = None
+) -> dict:
     if messages is None:
         messages = [Message(role="system", content="You are a helpful assistant.")]
+
+    if metadata is None:
+        metadata = Metadata()
+
+    if metadata.current_depth >= metadata.max_depth:
+        response = input(
+            f"Maximum depth of {metadata.max_depth} reached. Continue?" " (y/n): "
+        )
+        if response.lower() in ["y", "yes"]:
+            metadata.current_depth = 0
+        else:
+            return None
 
     response = await chat_base.send_request(messages, use_tools=True)
     if isinstance(response, ErrorResponse):
@@ -26,7 +41,14 @@ async def send_completion_request(messages: list = None) -> dict:
     messages.append(tool_call_message)
     tool_responses = process_tool_calls(tool_calls)
     messages.extend(tool_responses)
-    return await send_completion_request(messages=messages)
+
+    metadata = Metadata(
+        last_user_message=metadata.last_user_message,
+        current_depth=metadata.current_depth + 1,
+        total_depth=metadata.total_depth + 1,
+    )
+
+    return await send_completion_request(messages=messages, metadata=metadata)
 
 
 def process_tool_calls(tool_calls):

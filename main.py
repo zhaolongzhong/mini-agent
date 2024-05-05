@@ -5,7 +5,7 @@ import sys
 from chat_completion import send_completion_request
 from models.error import ErrorResponse
 from models.message import Message
-from planning.planning import make_plan
+from models.request_metadata import Metadata
 from utils.console import clear_line
 from utils.logs import log
 
@@ -17,7 +17,9 @@ async def send_prompt(content: str):
     # response = await make_plan(content)
     # if response and not isinstance(response, ErrorResponse):
     #     log.debug(f"Planning] response: {response.choices[0].message}")
-    response = await send_completion_request(messages=messages)
+    response = await send_completion_request(
+        messages=messages, metadata=Metadata(last_user_message=content)
+    )
     if isinstance(response, ErrorResponse):
         return response
     else:
