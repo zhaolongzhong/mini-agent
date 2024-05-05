@@ -26,7 +26,7 @@ async def send_completion_request(messages: list = None) -> dict:
     messages.append(tool_call_message)
     tool_responses = process_tool_calls(tool_calls)
     messages.extend(tool_responses)
-    return await chat_base.send_request(messages, use_tools=True)
+    return await send_completion_request(messages=messages)
 
 
 def process_tool_calls(tool_calls):

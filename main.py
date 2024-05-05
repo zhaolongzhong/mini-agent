@@ -14,9 +14,9 @@ messages = [Message(role="system", content="You are a helpful assistant.")]
 
 async def send_prompt(content: str):
     messages.append(Message(role="user", content=content))
-    response = await make_plan(content)
-    if not isinstance(response, ErrorResponse):
-        log.debug(f"Planning] response: {response.choices[0].message}")
+    # response = await make_plan(content)
+    # if response and not isinstance(response, ErrorResponse):
+    #     log.debug(f"Planning] response: {response.choices[0].message}")
     response = await send_completion_request(messages=messages)
     if isinstance(response, ErrorResponse):
         return response
