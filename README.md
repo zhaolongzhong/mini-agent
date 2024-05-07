@@ -51,3 +51,9 @@ Prompt: read, write, execute python script
 ```
 Can you write a fibonacci function to fibo.py and write a test for it? Make sure the test pass?
 ```
+
+Prompt: gain context
+
+```
+Can you check what is this project (./) about?
+```
