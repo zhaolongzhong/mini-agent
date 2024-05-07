@@ -1,19 +1,19 @@
 import openai
-from core.client import create_openai_client
+from core.client import ChatClientWrapper
 from config import settings
 from models.error import ErrorResponse
 
 
 class ChatBase:
-    def __init__(self, mode: str = "gpt-4-turbo", tools: list = []):
-        self.mode = mode
-        self.client = create_openai_client(settings.api_key)
+    def __init__(self, model: str = "gpt-4-turbo", tools: list = []):
+        self.model = model
+        self.client_wrapper = ChatClientWrapper(settings.api_key)
         self.tools = tools
 
     async def send_request(self, messages: list = [], use_tools=False):
         try:
             if not use_tools:
-                response = await self.client.chat.completions.create(
+                response = await self.client_wrapper.send_request(
                     model=self.mode, messages=messages
                 )
                 return response
@@ -22,8 +22,8 @@ class ChatBase:
                 return ErrorResponse(
                     message="No tools provided",
                 )
-            response = await self.client.chat.completions.create(
-                model=self.mode,
+            response = await self.client_wrapper.send_request(
+                model=self.model,
                 messages=messages,
                 tools=self.tools,
                 tool_choice="auto",

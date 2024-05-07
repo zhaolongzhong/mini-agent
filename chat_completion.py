@@ -2,7 +2,6 @@ import json
 
 from core.chat_base import ChatBase
 from models.error import ErrorResponse
-from models.message import Message
 from models.request_metadata import Metadata
 from models.tool_call import ToolResponseMessage, convert_to_tool_call_message
 from tools.available_tools import available_tools, tools_list
@@ -14,9 +13,6 @@ chat_base = ChatBase(tools=tools_list)
 async def send_completion_request(
     messages: list = None, metadata: Metadata = None
 ) -> dict:
-    if messages is None:
-        messages = [Message(role="system", content="You are a helpful assistant.")]
-
     if metadata is None:
         metadata = Metadata()
 
