@@ -13,6 +13,7 @@ api_key = os.getenv("OPENAI_API_KEY")
 
 class Settings:
     api_key = api_key
+    chat_model = "gpt-4o-2024-05-13"
 
 
 settings = Settings()

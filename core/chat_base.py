@@ -5,7 +5,7 @@ from models.error import ErrorResponse
 
 
 class ChatBase:
-    def __init__(self, model: str = "gpt-4-turbo", tools: list = []):
+    def __init__(self, model: str = settings.chat_model, tools: list = []):
         self.model = model
         self.client_wrapper = ChatClientWrapper(settings.api_key)
         self.tools = tools

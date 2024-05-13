@@ -54,6 +54,7 @@ def process_tool_calls(tool_calls):
         tool_call_id = tool_call.id
         function_name = tool_call.function.name
         function_args = json.loads(tool_call.function.arguments)
+        log.debug(f"[chat_completion] process tool call <{function_name}>")
 
         function_to_call = available_tools.get(function_name)
 
