@@ -5,10 +5,11 @@ from memory.memory import MemoryInterface
 from models.error import ErrorResponse
 from models.request_metadata import Metadata
 from models.tool_call import ToolMessage, convert_to_tool_call_message
-from tools.available_tools import available_tools, tools_list
+from tools.tool_manager import ToolManager
 from utils.logs import log
 
-chat_base = ChatBase(tools=tools_list)
+tools_mananger = ToolManager()
+chat_base = ChatBase(tools=tools_mananger.get_tools_json())
 
 
 async def send_completion_request_simple(
@@ -94,7 +95,7 @@ def process_tool_calls(tool_calls):
         function_args = json.loads(tool_call.function.arguments)
         log.debug(f"[chat_completion] process tool call <{function_name}>")
 
-        function_to_call = available_tools.get(function_name)
+        function_to_call = tools_mananger.tools.get(function_name)
 
         function_response: str | None = None
         try:

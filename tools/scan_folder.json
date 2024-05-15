@@ -1,0 +1,20 @@
+{
+    "type": "function",
+    "function": {
+        "name": "scan_folder",
+        "description": "Scan a directory recursively for files with path with depth 2. You can also use this function to understand the folder structure in a given folder path.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "folder_path": {
+                    "type": "string",
+                    "description": "The folder path to scan."
+                }
+            },
+            "required": [
+                "folder_path"
+            ]
+        },
+        "return_type": "list: A list of file paths str with the given extension, or all files if no extension is specified."
+    }
+}

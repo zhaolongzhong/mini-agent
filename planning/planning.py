@@ -1,10 +1,12 @@
 from core.chat_base import ChatBase
 from models.error import ErrorResponse
 from models.message import Message
-from tools.available_tools import tools_list
+
+from tools.tool_manager import ToolManager
 from utils.logs import log
 
-chat_base = ChatBase(tools=tools_list)
+tool_mananger = ToolManager()
+chat_base = ChatBase(tools=tool_mananger.get_tools_json())
 
 
 async def evaluate_input(content: str):
