@@ -1,7 +1,7 @@
 import os
 import logging
 
-from utils.console import clear_line
+from utils.cli_utils import clear_line
 
 _logger: logging.Logger = logging.getLogger("mini-agent")
 

@@ -1,16 +1,17 @@
 import json
 
 from core.chat_base import ChatBase
+from memory.memory import MemoryInterface
 from models.error import ErrorResponse
 from models.request_metadata import Metadata
-from models.tool_call import ToolResponseMessage, convert_to_tool_call_message
+from models.tool_call import ToolMessage, convert_to_tool_call_message
 from tools.available_tools import available_tools, tools_list
 from utils.logs import log
 
 chat_base = ChatBase(tools=tools_list)
 
 
-async def send_completion_request(
+async def send_completion_request_simple(
     messages: list = None, metadata: Metadata = None
 ) -> dict:
     if metadata is None:
@@ -44,7 +45,44 @@ async def send_completion_request(
         total_depth=metadata.total_depth + 1,
     )
 
-    return await send_completion_request(messages=messages, metadata=metadata)
+    return await send_completion_request_simple(messages=messages, metadata=metadata)
+
+
+async def send_completion_request(
+    memory: MemoryInterface = None, metadata: Metadata = None
+) -> dict:
+    if metadata is None:
+        metadata = Metadata()
+
+    if metadata.current_depth >= metadata.max_depth:
+        response = input(
+            f"Maximum depth of {metadata.max_depth} reached. Continue?" " (y/n): "
+        )
+        if response.lower() in ["y", "yes"]:
+            metadata.current_depth = 0
+        else:
+            return None
+
+    schema_messages = memory.get_message_params()
+    response = await chat_base.send_request(schema_messages, use_tools=True)
+    if isinstance(response, ErrorResponse):
+        return response
+
+    tool_calls = response.choices[0].message.tool_calls
+    if tool_calls is None:
+        return response
+    tool_call_message = convert_to_tool_call_message(response.choices[0].message)
+    await memory.save(tool_call_message)
+    tool_responses = process_tool_calls(tool_calls)
+    await memory.saveList(tool_responses)
+
+    metadata = Metadata(
+        last_user_message=metadata.last_user_message,
+        current_depth=metadata.current_depth + 1,
+        total_depth=metadata.total_depth + 1,
+    )
+
+    return await send_completion_request(memory=memory, metadata=metadata)
 
 
 def process_tool_calls(tool_calls):
@@ -61,7 +99,7 @@ def process_tool_calls(tool_calls):
         function_response: str | None = None
         try:
             function_response = function_to_call(**function_args)
-            tool_response_message = ToolResponseMessage(
+            tool_response_message = ToolMessage(
                 tool_call_id=tool_call_id,
                 role="tool",
                 name=function_name,
