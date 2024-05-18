@@ -1,5 +1,6 @@
 import os
 
+
 def scan_folder(folder_path, depth=2):
     """
     Scan a directory up to a certain depth, ignoring folders that start with a dot.

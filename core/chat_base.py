@@ -1,13 +1,13 @@
 import openai
-from core.client import ChatClientWrapper
 from config import settings
+from llm_client import LLMClient
 from models.error import ErrorResponse
 
 
 class ChatBase:
     def __init__(self, model: str = settings.chat_model, tools: list = []):
         self.model = model
-        self.client_wrapper = ChatClientWrapper(settings.api_key)
+        self.client_wrapper = LLMClient(settings.api_key)
         self.tools = tools
 
     async def send_request(self, messages: list = [], use_tools=False):
