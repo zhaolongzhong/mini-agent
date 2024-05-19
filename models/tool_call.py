@@ -53,7 +53,7 @@ class ToolMessage(BaseModel):
         return value
 
 
-def convert_to_tool_call_message(chat_message: any) -> AssistantMessage:
+def convert_to_assistant_message(chat_message: any) -> AssistantMessage:
     tool_calls = [
         ToolCall(id=call.id, function=call.function, type=call.type)
         for call in chat_message.tool_calls

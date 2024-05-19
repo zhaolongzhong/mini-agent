@@ -4,7 +4,7 @@ from core.chat_base import ChatBase
 from memory.memory import MemoryInterface
 from models.error import ErrorResponse
 from models.request_metadata import Metadata
-from models.tool_call import ToolMessage, convert_to_tool_call_message
+from models.tool_call import ToolMessage, convert_to_assistant_message
 from tools.tool_manager import ToolManager
 from utils.logs import log
 
@@ -35,7 +35,7 @@ async def send_completion_request_simple(
     if tool_calls is None:
         return response
 
-    tool_call_message = convert_to_tool_call_message(response.choices[0].message)
+    tool_call_message = convert_to_assistant_message(response.choices[0].message)
     messages.append(tool_call_message)
     tool_responses = process_tool_calls(tool_calls)
     messages.extend(tool_responses)
@@ -72,7 +72,7 @@ async def send_completion_request(
     tool_calls = response.choices[0].message.tool_calls
     if tool_calls is None:
         return response
-    tool_call_message = convert_to_tool_call_message(response.choices[0].message)
+    tool_call_message = convert_to_assistant_message(response.choices[0].message)
     await memory.save(tool_call_message)
     tool_responses = process_tool_calls(tool_calls)
     await memory.saveList(tool_responses)

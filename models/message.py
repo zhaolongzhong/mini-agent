@@ -20,21 +20,3 @@ class MessageBase(BaseModel):
 
 class Message(MessageBase):
     pass
-
-
-def toChatCompletionMessage(chat_completion_message: any) -> Message:
-    """
-    Convert choices[0].message to local ChatCompletionMessage object
-    """
-    if chat_completion_message:
-        message_dict = (
-            chat_completion_message.model_dump()
-            if isinstance(chat_completion_message, BaseModel)
-            else chat_completion_message
-        )
-        try:
-            return Message(**message_dict)
-        except Exception as e:
-            print(f"parse error. {e}")
-    else:
-        print(f"chat_completion_message :\n{chat_completion_message}")
