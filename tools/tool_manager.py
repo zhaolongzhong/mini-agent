@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from tools.execute_shell_command import execute_shell_command
 from tools.read_file import read_file
 from tools.run_python_script import run_python_script
 from tools.write_to_file import write_to_file
@@ -14,6 +15,7 @@ class ToolManager:
             "write_to_file": write_to_file,
             "scan_folder": scan_folder,
             "run_python_script": run_python_script,
+            "execute_shell_command": execute_shell_command,
         }
 
     def get_tool_config(self, tool_name: str) -> dict:
