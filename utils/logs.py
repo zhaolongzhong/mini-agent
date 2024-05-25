@@ -45,4 +45,4 @@ class Logger:
         self.logger.error(msg, *args, **kwargs)
 
 
-log = Logger("mini-agent")
+logger = Logger("mini-agent")

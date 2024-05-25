@@ -1,7 +1,11 @@
+import logging
 import openai
 from config import settings
 from llm_client import LLMClient
 from models.error import ErrorResponse
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class ChatBase:
@@ -39,8 +43,10 @@ class ChatBase:
                 code=str(e.status_code),
             )
         except openai.APIStatusError as e:
+            message = f"Another non-200-range status code was received. {e.response}"
+            logger.error(f"{message} Request messages: {messages}")
             return ErrorResponse(
-                message=f"Another non-200-range status code was received. {e.response}",
+                message=message,
                 code=str(e.status_code),
             )
         except Exception as e:

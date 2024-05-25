@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 
 import json
+from pathlib import Path
 from typing import List
 
+from memory.load_file_memory import load_from_memory
 from memory.messages_operations import MessageOperations
 from models.message import Message as SchemaMessage
 from models.message_param import MessageLike
@@ -64,6 +66,43 @@ class InMemoryStorage(MemoryInterface):
 
     async def saveList(self, messages: List[MessageLike]):
         self.messages.extend(messages)
+
+    async def get_message(self, id):
+        pass
+
+    async def set_message(self, id, message):
+        pass
+
+    async def delete_message(self, message):
+        pass
+
+    def get_message_params(self):
+        return self.messages
+
+
+class FileStorage(MemoryInterface):
+    def __init__(self):
+        super().__init__()
+        self.file_path = Path("./memory/memory.jsonl")
+        self.file_path.touch(exist_ok=True)
+        messages = load_from_memory(self.file_path)
+        self.messages = messages
+
+    async def init_messages(self, limit=20):
+        system_message = SchemaMessage(
+            role="system", content="Hello! I am a helpful assistant."
+        )
+        self.messages.append(system_message)
+        return self.messages
+
+    async def save(self, message: MessageLike):
+        self.messages.append(message)
+        with self.file_path.open("a", encoding="utf-8") as file:
+            file.write(json.dumps(message.model_dump()) + "\n")
+
+    async def saveList(self, messages: List[MessageLike]):
+        for message in messages:
+            await self.save(message)
 
     async def get_message(self, id):
         pass

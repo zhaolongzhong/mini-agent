@@ -4,49 +4,12 @@ from core.chat_base import ChatBase
 from memory.memory import MemoryInterface
 from models.error import ErrorResponse
 from models.request_metadata import Metadata
-from models.tool_call import ToolMessage, convert_to_assistant_message
+from models.tool_call import AssistantMessage, ToolMessage, convert_to_assistant_message
 from tools.tool_manager import ToolManager
-from utils.logs import log
+from utils.logs import logger
 
 tools_mananger = ToolManager()
 chat_base = ChatBase(tools=tools_mananger.get_tools_json())
-
-
-async def send_completion_request_simple(
-    messages: list = None, metadata: Metadata = None
-) -> dict:
-    if metadata is None:
-        metadata = Metadata()
-
-    if metadata.current_depth >= metadata.max_depth:
-        response = input(
-            f"Maximum depth of {metadata.max_depth} reached. Continue?" " (y/n): "
-        )
-        if response.lower() in ["y", "yes"]:
-            metadata.current_depth = 0
-        else:
-            return None
-
-    response = await chat_base.send_request(messages, use_tools=True)
-    if isinstance(response, ErrorResponse):
-        return response
-
-    tool_calls = response.choices[0].message.tool_calls
-    if tool_calls is None:
-        return response
-
-    tool_call_message = convert_to_assistant_message(response.choices[0].message)
-    messages.append(tool_call_message)
-    tool_responses = process_tool_calls(tool_calls)
-    messages.extend(tool_responses)
-
-    metadata = Metadata(
-        last_user_message=metadata.last_user_message,
-        current_depth=metadata.current_depth + 1,
-        total_depth=metadata.total_depth + 1,
-    )
-
-    return await send_completion_request_simple(messages=messages, metadata=metadata)
 
 
 async def send_completion_request(
@@ -54,6 +17,8 @@ async def send_completion_request(
 ) -> dict:
     if metadata is None:
         metadata = Metadata()
+    else:
+        logger.debug(f"Metadata: {metadata.model_dump_json()}")
 
     if metadata.current_depth >= metadata.max_depth:
         response = input(
@@ -71,7 +36,9 @@ async def send_completion_request(
 
     tool_calls = response.choices[0].message.tool_calls
     if tool_calls is None:
-        return response
+        message = AssistantMessage(**response.choices[0].message.model_dump())
+        await memory.save(message)
+        return response  # return original response
     tool_call_message = convert_to_assistant_message(response.choices[0].message)
     await memory.save(tool_call_message)
     tool_responses = process_tool_calls(tool_calls)
@@ -87,13 +54,15 @@ async def send_completion_request(
 
 
 def process_tool_calls(tool_calls):
-    log.debug("[chat_completion] process tool calls")
+    logger.debug(f"[chat_completion] process tool calls count: {len(tool_calls)}")
     tool_call_responses: list[str] = []
     for _index, tool_call in enumerate(tool_calls):
         tool_call_id = tool_call.id
         function_name = tool_call.function.name
         function_args = json.loads(tool_call.function.arguments)
-        log.debug(f"[chat_completion] process tool call <{function_name}>")
+        logger.debug(
+            f"[chat_completion] process tool call <{function_name}>, args: {function_args}"
+        )
 
         function_to_call = tools_mananger.tools.get(function_name)
 
