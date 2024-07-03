@@ -3,12 +3,7 @@
 This project is designed to explore the expansive capabilities of Large Language Models (LLM) in a compact and accessible format. The goal is to provide a powerful yet minimalistic tool and architecture to help to understand, explore and utilize AI agent effectively. This initiative places a strong emphasis on prompt engineering and is designed to evolve alongside advancements in LLM. **This ensures that the capabilities of the agent will continue to improve and adapt over time.**
 
 ## Set up
-
-```bash
-$ python3 -m venv venv
-$ . venv/bin/activate
-$ pip install -r requirements.txt
-```
+Run `./scripts/setup.sh`
 
 ## Create .env file
 

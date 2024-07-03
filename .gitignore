@@ -1,4 +1,9 @@
 __pycache__/
+.mypy_cache
+*.egg-info
+
 venv/
+
 .env
-memory/memory.jsonl
+
+src/memory/memory.jsonl

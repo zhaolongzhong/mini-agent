@@ -1,0 +1,88 @@
+[project]
+name = "mini-agent"
+version = "0.0.1"
+description = ""
+authors = [
+    { name = "Zhaolong Zhong" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "openai==1.23.0",
+    "python-dotenv==1.0.0",
+    "pydantic==2.7.0",
+    "pydantic-settings==2.2.1",
+    "sqlalchemy==2.0.30",
+    "psycopg2==2.9.9",
+    "asyncpg==0.29.0",
+    "blobfile==2.1.1"
+]
+
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "pyright>=1.1.370",
+    "mypy>=1.10.1",
+    "ruff>=0.5.0",
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.rye.scripts]
+format = { chain = [
+  "format:ruff",
+  "fix:ruff",
+]}
+"format:black" = "black ."
+"format:ruff" = "ruff format ."
+"format:isort" = "isort ."
+
+lint = { chain = [
+  "check:ruff",
+]}
+"check:ruff" = "ruff check ."
+"fix:ruff" = "ruff check --fix ."
+test = "pytest"
+
+[tool.black]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short"
+xfail_strict = true
+asyncio_mode = "auto"
+filterwarnings = [
+  "error"
+]
+
+[tool.mypy]
+strict = true
+exclude = ["venv", ".venv", "alembic"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = ["alembic"]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "W191",  # indentation contains tabs
+    "B006",  # mutable defaults
+    "B904",  # Allow raising exceptions without from e, for HTTPException
+    "B024",  # Allow an abstract base class has no abstract methods
+]
+
+[tool.ruff.format]
+docstring-code-format = true

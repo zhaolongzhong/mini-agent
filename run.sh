@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-python3 main.py
+rye run python src/main.py
