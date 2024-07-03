@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from core.chat_base import ChatBase
@@ -37,7 +38,7 @@ async def send_completion_request(memory: MemoryInterface | None = None, metadat
         return response  # return original response
     tool_call_message = convert_to_assistant_message(response.choices[0].message)
     await memory.save(tool_call_message)
-    tool_responses = process_tool_calls(tool_calls)
+    tool_responses = await process_tool_calls(tool_calls)
     await memory.saveList(tool_responses)
 
     metadata = Metadata(
@@ -49,20 +50,27 @@ async def send_completion_request(memory: MemoryInterface | None = None, metadat
     return await send_completion_request(memory=memory, metadata=metadata)
 
 
-def process_tool_calls(tool_calls):
-    logger.debug(f"[chat_completion] process tool calls count: {len(tool_calls)}")
+async def run_tool(tool_func, *args):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, tool_func, *args)
+
+
+async def process_tool_calls(tool_calls, timeout=5) -> list[ToolMessage]:
+    logger.debug(f"[chat_completion] process tool calls count: {len(tool_calls)}, timeout: {timeout}")
     tool_call_responses: list[ToolMessage] = []
-    for _index, tool_call in enumerate(tool_calls):
+
+    tasks = []
+    for tool_call in tool_calls:
+        tool_func = tools_manager.tools[tool_call.function.name]
+        args = tuple(json.loads(tool_call.function.arguments).values())
+        task = asyncio.create_task(run_tool(tool_func, *args))
+        tasks.append((task, tool_call))
+
+    for task, tool_call in tasks:
         tool_call_id = tool_call.id
         function_name = tool_call.function.name
-        function_args = json.loads(tool_call.function.arguments)
-        logger.debug(f"[chat_completion] process tool call <{function_name}>, args: {function_args}")
-
-        function_to_call = tools_manager.tools.get(function_name)
-
-        function_response: str | None = None
         try:
-            function_response = function_to_call(**function_args)
+            function_response = await asyncio.wait_for(task, timeout=timeout)
             tool_response_message = ToolMessage(
                 tool_call_id=tool_call_id,
                 role="tool",
@@ -70,7 +78,25 @@ def process_tool_calls(tool_calls):
                 content=str(function_response),
             )
             tool_call_responses.append(tool_response_message)
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout while calling function <{function_name}>")
+            function_response = f"Timeout while calling function <{function_name}> after {timeout}s."
+            tool_response_message = ToolMessage(
+                tool_call_id=tool_call_id,
+                role="tool",
+                name=function_name,
+                content=function_response,
+            )
+            tool_call_responses.append(tool_response_message)
         except Exception as e:
+            logger.error(f"Error while calling function <{function_name}>: {e}")
             function_response = f"Error while calling function <{function_name}>: {e}"
+            tool_response_message = ToolMessage(
+                tool_call_id=tool_call_id,
+                role="tool",
+                name=function_name,
+                content=function_response,
+            )
+            tool_call_responses.append(tool_response_message)
 
     return tool_call_responses
