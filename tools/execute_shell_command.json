@@ -9,6 +9,10 @@
                 "command": {
                     "type": "string",
                     "description": "The shell command to be executed."
+                },
+                "wait": {
+                    "type": "boolean",
+                    "description": "Wait for the command to complete. Set to true for blocking execution and false for non-blocking."
                 }
             },
             "required": [
