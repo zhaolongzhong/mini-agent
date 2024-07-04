@@ -13,10 +13,14 @@ class MessageBase(BaseModel):
 
     @field_validator("role", mode="before")
     def check_role(cls, value):
-        if value not in ["user", "system"]:
-            raise ValueError('Role must be either "user" and "system"')
+        if value not in ["user", "system", "assistant"]:
+            raise ValueError('Role must be either "user", "system" or "assistant"')
         return value
 
 
 class Message(MessageBase):
     pass
+
+
+UserMessage = Message
+SystemMessage = Message

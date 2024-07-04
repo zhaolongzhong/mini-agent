@@ -1,12 +1,19 @@
 import json
 from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
 
-from memory.load_file_memory import load_from_memory
+from memory.memory_utils import load_from_memory
 from memory.messages_operations import MessageOperations
 from schemas.message import Message as SchemaMessage
 from schemas.message_param import MessageLike
 from schemas.tool_call import AssistantMessage, ToolMessage
+
+
+class StorageType(Enum):
+    IN_MEMORY = "in_memory"
+    FILE = "file"
+    DATABASE = "database"
 
 
 class MemoryInterface(ABC):
@@ -67,10 +74,12 @@ class InMemoryStorage(MemoryInterface):
 
 
 class FileStorage(MemoryInterface):
-    def __init__(self):
+    def __init__(self, name="memory.jsonl"):
         super().__init__()
-        # TODO: use dynamic path
-        self.file_path = Path("./src/memory/memory.jsonl")
+        self.memory_root_path = Path(__file__).parent
+        if "jsonl" not in name:
+            name += "_memory.jsonl"
+        self.file_path = Path(f"{self.memory_root_path}/{name}")
         self.file_path.touch(exist_ok=True)
         messages = load_from_memory(self.file_path)
         self.messages = messages

@@ -1,8 +1,7 @@
 import logging
 
 import openai
-from config import settings
-from llm_client import LLMClient
+from llm_client.llm_client import LLMClient
 from schemas.error import ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -10,26 +9,22 @@ logger.setLevel(logging.DEBUG)
 
 
 class ChatBase:
-    def __init__(self, model: str = settings.chat_model, tools: list = []):
+    def __init__(self, model, tools: list = []):
         self.model = model
-        self.client_wrapper = LLMClient(settings.api_key)
+        self.client_wrapper = LLMClient(model)
         self.tools = tools
 
     async def send_request(self, messages: list = [], use_tools=False):
         try:
-            message_params = []
-            for msg in messages:
-                exclude_fields = {"name"} if not hasattr(msg, "name") or msg.name is None else set()
-                message_params.append(msg.model_dump(exclude_none=True, exclude=exclude_fields))
             if not use_tools:
-                response = await self.client_wrapper.send_request(model=self.model, messages=message_params)
+                response = await self.client_wrapper.send_completion_request(model=self.model, messages=messages)
                 return response
 
             if len(self.tools) == 0:
                 return ErrorResponse(
                     message="No tools provided",
                 )
-            response = await self.client_wrapper.send_request(
+            response = await self.client_wrapper.send_completion_request(
                 model=self.model,
                 messages=messages,
                 tools=self.tools,
@@ -45,6 +40,7 @@ class ChatBase:
             )
         except openai.APIStatusError as e:
             message = f"Another non-200-range status code was received. {e.response}, {e.response.text}"
+            logger.error(f"{message} Request messages: {messages}")
             return ErrorResponse(
                 message=message,
                 code=str(e.status_code),

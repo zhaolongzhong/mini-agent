@@ -9,9 +9,11 @@ from utils.json_utils import append_jsonl, get_jsonl
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+_tag = "[MemoryUtils]"
+
 
 def load_from_memory(full_path: str):
-    logger.debug(f"load_from_memory: {full_path}")
+    logger.debug(f"{_tag} load_from_memory: {full_path}")
     system_message = Message(role="system", content="You're a helpful assistant!")
     directory = os.path.dirname(full_path)
     # Read file from memory.jsonl, use this file to store json lines as memory

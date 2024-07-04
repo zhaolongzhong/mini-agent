@@ -1,8 +1,8 @@
 import os
 from typing import Any
 
-from core.chat_model import ChatModel
 from dotenv import load_dotenv
+from llm_client.llm_model import ChatModel
 from pydantic import PostgresDsn, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings
 

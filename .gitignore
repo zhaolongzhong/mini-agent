@@ -6,4 +6,4 @@ venv/
 
 .env
 
-src/memory/memory.jsonl
+**/*memory.jsonl*
