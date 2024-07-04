@@ -3,10 +3,10 @@ import sys
 
 from chat_completion import send_completion_request
 from memory.memory import FileStorage, InMemoryStorage, MemoryInterface
-from models.error import ErrorResponse
-from models.message import Message
-from models.request_metadata import Metadata
-from models.tool_call import AssistantMessage
+from schemas.error import ErrorResponse
+from schemas.message import Message
+from schemas.request_metadata import Metadata
+from schemas.tool_call import AssistantMessage
 from utils.cli_utils import progress_indicator
 from utils.logs import logger
 

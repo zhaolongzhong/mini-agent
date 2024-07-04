@@ -1,9 +1,9 @@
 import logging
 import os
 
-from models.message import Message
-from models.message_param import MessageLike
-from models.tool_call import AssistantMessage, ToolMessage
+from schemas.message import Message
+from schemas.message_param import MessageLike
+from schemas.tool_call import AssistantMessage, ToolMessage
 from utils.json_utils import append_jsonl, get_jsonl
 
 logger = logging.getLogger(__name__)

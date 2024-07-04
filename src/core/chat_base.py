@@ -3,7 +3,7 @@ import logging
 import openai
 from config import settings
 from llm_client import LLMClient
-from models.error import ErrorResponse
+from schemas.error import ErrorResponse
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

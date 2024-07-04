@@ -1,5 +1,5 @@
-from models.message import Message
-from models.tool_call import AssistantMessage, ToolMessage
+from schemas.message import Message
+from schemas.tool_call import AssistantMessage, ToolMessage
 
 ChatCompletionMessageParam = Message | AssistantMessage | ToolMessage
 

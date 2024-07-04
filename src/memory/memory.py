@@ -4,9 +4,9 @@ from pathlib import Path
 
 from memory.load_file_memory import load_from_memory
 from memory.messages_operations import MessageOperations
-from models.message import Message as SchemaMessage
-from models.message_param import MessageLike
-from models.tool_call import AssistantMessage, ToolMessage
+from schemas.message import Message as SchemaMessage
+from schemas.message_param import MessageLike
+from schemas.tool_call import AssistantMessage, ToolMessage
 
 
 class MemoryInterface(ABC):

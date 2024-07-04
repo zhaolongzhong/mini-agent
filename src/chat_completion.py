@@ -3,9 +3,9 @@ import json
 
 from core.chat_base import ChatBase
 from memory.memory import MemoryInterface
-from models.error import ErrorResponse
-from models.request_metadata import Metadata
-from models.tool_call import AssistantMessage, ToolMessage, convert_to_assistant_message
+from schemas.error import ErrorResponse
+from schemas.request_metadata import Metadata
+from schemas.tool_call import AssistantMessage, ToolMessage, convert_to_assistant_message
 from tools.tool_manager import ToolManager
 from utils.logs import logger
 

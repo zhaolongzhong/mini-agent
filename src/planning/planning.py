@@ -1,8 +1,8 @@
 import logging
 
 from core.chat_base import ChatBase
-from models.error import ErrorResponse
-from models.message import Message
+from schemas.error import ErrorResponse
+from schemas.message import Message
 from tools.tool_manager import ToolManager
 
 log: logging.Logger = logging.getLogger(__name__)
