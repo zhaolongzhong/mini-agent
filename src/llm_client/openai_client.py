@@ -45,6 +45,10 @@ class OpenAIClient(LLMRequest):
         self,
         messages: list[ChatCompletionMessageParam],
     ) -> ChatCompletion:
+        length = len(messages)
+        for idx, message in enumerate(messages):
+            logger.debug(f"{_tag} send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
+
         body = {
             "model": self.model,
             "messages": [msg.model_dump() for msg in messages],

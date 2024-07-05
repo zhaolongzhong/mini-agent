@@ -26,6 +26,7 @@ dev-dependencies = [
     "ruff>=0.5.0",
     "pytest",
     "pytest-asyncio",
+    "rich==13.7.1",
 ]
 
 [tool.rye.scripts]

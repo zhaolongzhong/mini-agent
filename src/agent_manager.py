@@ -13,6 +13,7 @@ from utils.logs import logger
 
 class AgentManager:
     def __init__(self, env=None):
+        logger.info("AgentManager initialized")
         self.agents = {}
 
     async def create_agents(self):
@@ -20,7 +21,7 @@ class AgentManager:
             id="main",
             name="MainAgent",
             storage_type=StorageType.FILE,
-            model=ChatModel.CLAUDE_3_5_SONNET_20240620.value,
+            model=ChatModel.GPT_4O.value,
             tools=[
                 Tool.FileRead,
                 Tool.FileWrite,
@@ -55,6 +56,7 @@ class AgentManager:
         return agent
 
     async def start(self):
+        logger.info("AgentManager start")
         await self.create_agents()
         await self.run_main_agent()
 

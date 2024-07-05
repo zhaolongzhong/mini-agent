@@ -44,7 +44,7 @@ class Agent:
         memory = None
         if storage_type == StorageType.FILE:
             name = f"{config.id}_{config.model.split('-')[0]}"
-            memory = FileStorage(name=name)
+            memory = FileStorage(name=name, model=config.model)
         elif storage_type == StorageType.DATABASE:
             memory = DatabaseStorage()
         elif storage_type == StorageType.IN_MEMORY:

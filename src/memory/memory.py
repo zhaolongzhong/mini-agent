@@ -74,14 +74,14 @@ class InMemoryStorage(MemoryInterface):
 
 
 class FileStorage(MemoryInterface):
-    def __init__(self, name="memory.jsonl"):
+    def __init__(self, name="memory.jsonl", model: str = None):
         super().__init__()
         self.memory_root_path = Path(__file__).parent
         if "jsonl" not in name:
             name += "_memory.jsonl"
         self.file_path = Path(f"{self.memory_root_path}/{name}")
         self.file_path.touch(exist_ok=True)
-        messages = load_from_memory(self.file_path)
+        messages = load_from_memory(self.file_path, model)
         self.messages = messages
 
     async def init_messages(self, limit=20):

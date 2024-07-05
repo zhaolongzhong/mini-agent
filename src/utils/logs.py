@@ -1,16 +1,49 @@
 import logging
 import os
 
+from rich.console import Console
+from rich.style import Style
+from rich.theme import Theme
 from utils.cli_utils import clear_line
 
 _logger: logging.Logger = logging.getLogger("mini-agent")
 
 
+class CustomFormatter(logging.Formatter):
+    def format(self, record):
+        # Use the first character of the log level name
+        record.levelname = record.levelname[0]
+        return super().format(record)
+
+
+class ConsoleHandler(logging.StreamHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        msg = self.format(record)
+        # key: d=debug, i=info, w=warning, e=error
+        theme = Theme(
+            {
+                "d": Style(color="grey54"),
+                "i": "cyan",
+                "w": "magenta",
+                "e": "bold red",
+            }
+        )
+        style = str(record.levelname).lower().strip()
+        # Set markup to True to strip out [] in tag in message
+        console = Console(theme=theme, markup=False)
+        console.print(msg, style=style)
+
+
 def _basic_config() -> None:
-    logging.basicConfig(
-        format="[%(asctime)s - %(levelname)s] %(message)s",
+    console_handler = ConsoleHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = CustomFormatter(
+        fmt="[%(asctime)s - %(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    # handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    _logger.addHandler(console_handler)
 
 
 def setup_logging() -> None:

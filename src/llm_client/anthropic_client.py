@@ -67,7 +67,6 @@ class AnthropicClient:
             else:
                 return None
         messages = memory.get_message_params()
-        logger.debug(f"{_tag} send_completion_request model: {self.model}, tools: {self.tool_manager.tools}")
         chat_completion: Message = await self._send_completion_request(messages=messages)
         assistant_message = AnthropicAssistantMessage(**chat_completion.model_dump())
         await memory.save(assistant_message)
@@ -87,11 +86,11 @@ class AnthropicClient:
         self,
         messages: list[MessageParam],
     ) -> Message:
-        logger.debug(f"{_tag} send_completion_request model: {self.model}, tools: {self.tool_manager.tools}")
+        logger.debug(f"{_tag} send_completion_request model: {self.model}, tools: {self.tools}")
         system_messages = [msg for msg in messages if msg.role == "system"]
         length = len(messages)
         for idx, message in enumerate(messages):
-            logger.debug(f"{_tag} send_completion_request message ({idx}/{length}): {message.model_dump()}")
+            logger.debug(f"{_tag} send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
         # reference: https://docs.anthropic.com/en/docs/quickstart-guide
         body = {
             "model": self.model,

@@ -32,7 +32,7 @@ class ToolManager:
         }
 
         self.tools_path = Path(__file__).parent
-        logger.debug(f"{_tag} tools_path: {self.tools_path}")
+        # logger.debug(f"{_tag} tools_path: {self.tools_path}")
 
     def get_tool_config(
         self,
@@ -41,7 +41,7 @@ class ToolManager:
     ) -> dict | None:
         """Load the JSON configuration for a specific tool from its respective file."""
         config_path = Path(f"{self.tools_path}/{tool_name}.json")
-        logger.debug(f"{_tag} get_tool_config [{model}][{tool_name}]")
+        # logger.debug(f"{_tag} get_tool_config [{model}][{tool_name}]")
         if not config_path.exists():
             logger.error(f"Configuration file for {tool_name} does not exist")
             return None
@@ -66,7 +66,7 @@ class ToolManager:
 
     def get_tools_json(self, model: str = None, tools: list[Tool] | None = None) -> list[dict]:
         """Iterate through the tools and gather their JSON configurations."""
-        logger.debug(f"{_tag} get_tools_json [{model}]")
+        # logger.debug(f"{_tag} get_tools_json [{model}]")
         tools_configs = []
         if tools is None or len(tools) == 0:
             return tools_configs

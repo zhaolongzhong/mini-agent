@@ -29,6 +29,11 @@ class Message(BaseModel):
     usage: Usage
 
 
+class AnthropicUserMessage(BaseModel):
+    role: str
+    content: str
+
+
 class AnthropicAssistantMessage(BaseModel):
     role: str
     content: list[TextContent | ToolUseContent]
