@@ -1,39 +1,39 @@
-import logging
+import asyncio
 
-from core.chat_base import ChatBase
-from schemas.error import ErrorResponse
+from agent import Agent
+from llm_client.llm_model import ChatModel
+from memory.memory import InMemoryStorage, StorageType
+from schemas.agent import AgentConfig
 from schemas.message import Message
-from tools.tool_manager import ToolManager
-
-log: logging.Logger = logging.getLogger(__name__)
-
-tool_mananger = ToolManager()
-chat_base = ChatBase(tools=tool_mananger.get_tools_json())
-
-
-async def evaluate_input(content: str):
-    messages = [
-        Message(
-            role="system",
-            content="You are are helpful assistant to help evaluate if the user request needs a plan based on the complexity of the task and problems. If it is accomplished by available tools, then response no. Please only respond with Yes or No.",
-        )
-    ]
-    messages.append(Message(role="assistant", content="Here is the task (problem or request):" + content))
-    return await chat_base.send_request(messages, use_tools=True)
+from utils.logs import logger
 
 
 async def make_plan(content: str):
-    response = await evaluate_input(content)
-    if isinstance(response, ErrorResponse):
-        return response
-    chat_completion_message = response.choices[0].message
-    log.debug(f"[Planning] evaluation response: {chat_completion_message}")
-    if chat_completion_message.content is not None and "yes" in chat_completion_message.content.lower():
-        messages = [
-            Message(
-                role="system",
-                content="You are are helpful assistant to make a plan for a task or user request. Please provide a plan in the next few sentences.",
-            )
-        ]
-        messages.append(Message(role="assistant", content="Make a plan for the user request: " + content))
-        return await chat_base.send_request(messages)
+    messages = [
+        Message(
+            role="system",
+            content="You are are helpful assistant to make a plan for a task or user request. Please provide a plan in the next few sentences.",
+        )
+    ]
+    # If use claude, first message must use the \"user\"
+    messages.append(Message(role="user", content="User request: " + content))
+    memory = InMemoryStorage()
+    await memory.saveList(messages)
+    agent = await Agent.create(
+        config=AgentConfig(
+            id="plan_agent",
+            name="plan_agent",
+            storage_type=StorageType.IN_MEMORY,
+            model=ChatModel.GPT_4O.value,
+        ),
+    )
+    return await agent.send_request(memory=memory)
+
+
+async def main():
+    result = await make_plan("Can you help to scaffold a new project using python?")
+    logger.info(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

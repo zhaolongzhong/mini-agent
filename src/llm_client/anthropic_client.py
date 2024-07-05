@@ -86,11 +86,12 @@ class AnthropicClient:
         self,
         messages: list[MessageParam],
     ) -> Message:
-        logger.debug(f"{_tag} send_completion_request model: {self.model}, tools: {self.tools}")
+        logger.debug(f"{_tag}send_completion_request model: {self.model}, tools: {self.tools}")
+        # The Messages API accepts a top-level `system` parameter, not \"system\" as an input message role.
         system_messages = [msg for msg in messages if msg.role == "system"]
         length = len(messages)
         for idx, message in enumerate(messages):
-            logger.debug(f"{_tag} send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
+            logger.debug(f"{_tag}send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
         # reference: https://docs.anthropic.com/en/docs/quickstart-guide
         body = {
             "model": self.model,
@@ -100,21 +101,22 @@ class AnthropicClient:
             # "response_format": {"type": "text"},
         }
         if len(system_messages) > 0:
+            logger.debug(f"system_message: {system_messages[0].model_dump()}")
             body["system"] = system_messages[0].content
 
         if self.tool_json and len(self.tool_json) > 0:
-            logger.debug(f"{_tag} send_completion_request response self.tool_json: {len(self.tool_json)}")
+            logger.debug(f"{_tag}send_completion_request response self.tool_json: {len(self.tool_json)}")
             body["tools"] = self.tool_json
 
         data_json = json.dumps(body)
         response = await self.http_client.post(self.chat_completions_url, headers=self.headers, data=data_json)
 
         if response.status_code != 200:
-            logger.error(f"{_tag} send_completion_request error:\n{response.text}")
+            logger.error(f"{_tag}send_completion_request error:\n{response.text}")
             raise Exception(status_code=response.status_code, detail=response.text)
 
         response_data = response.json()
-        logger.debug(f"{_tag} send_completion_request response: {response_data}")
+        logger.debug(f"{_tag}send_completion_request response: {response_data}")
 
         chat_completion = Message(**response_data)
         logger.info(f"send_completion_request usage: {chat_completion.usage.model_dump()}")

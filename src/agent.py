@@ -76,3 +76,16 @@ class Agent:
                 error=f"Error in parsing response: {response}",
                 detail=f"Error in sending prompt: {e}",
             )
+
+    async def send_request(self, memory: MemoryInterface):
+        """Send a one-time completion request to the LLM model."""
+        try:
+            response = await self.llm_client.send_completion_request(
+                memory=memory,
+                metadata=Metadata(),
+            )
+            return response
+        except Exception as e:
+            return ErrorResponse(
+                message=f"Exception: {e}",
+            )

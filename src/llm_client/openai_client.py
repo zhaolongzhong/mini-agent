@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import httpx
+import openai
 from llm_client.llm_request import LLMRequest
 from memory.memory import MemoryInterface
 from schemas.agent import AgentConfig
@@ -47,7 +48,7 @@ class OpenAIClient(LLMRequest):
     ) -> ChatCompletion:
         length = len(messages)
         for idx, message in enumerate(messages):
-            logger.debug(f"{_tag} send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
+            logger.debug(f"{_tag}send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
 
         body = {
             "model": self.model,
@@ -61,17 +62,36 @@ class OpenAIClient(LLMRequest):
             body["tools"] = self.tool_json
             body["tool_choice"] = "auto"
 
-        response = await self.http_client.post(self.chat_completions_url, headers=self.headers, json=body)
+        try:
+            response = await self.http_client.post(self.chat_completions_url, headers=self.headers, json=body)
 
-        if response.status_code != 200:
-            logger.error(f"{_tag} send_completion_request error:\n{response.text}")
-            raise Exception(response.text)
+            if response.status_code != 200:
+                logger.error(f"{_tag}send_completion_request error:\n{response.text}")
+                raise Exception(response.text)
 
-        response_data = response.json()
-        logger.debug(f"{_tag} send_completion_request response:\n{json.dumps(response_data, indent=2)}")
-        chat_completion = ChatCompletion(**response_data)
-        logger.info(f"send_completion_request usage: {chat_completion.usage.model_dump()}")
-        return chat_completion
+            response_data = response.json()
+            logger.debug(f"{_tag}send_completion_request response:\n{json.dumps(response_data, indent=2)}")
+            chat_completion = ChatCompletion(**response_data)
+            logger.info(f"send_completion_request usage: {chat_completion.usage.model_dump()}")
+            return chat_completion
+        except openai.APIConnectionError as e:
+            return ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
+        except openai.RateLimitError as e:
+            return ErrorResponse(
+                message=f"A 429 status code was received; we should back off a bit. {e.response}",
+                code=str(e.status_code),
+            )
+        except openai.APIStatusError as e:
+            message = f"Another non-200-range status code was received. {e.response}, {e.response.text}"
+            logger.error(f"{message}")
+            return ErrorResponse(
+                message=message,
+                code=str(e.status_code),
+            )
+        except Exception as e:
+            return ErrorResponse(
+                message=f"Exception: {e}",
+            )
 
     async def send_completion_request(
         self,

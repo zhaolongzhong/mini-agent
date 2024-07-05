@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-rye run python src/main.py
+rye run python src/agent_manager.py
