@@ -3,6 +3,7 @@ import json
 
 import httpx
 from memory.memory import MemoryInterface
+from schemas.agent import AgentConfig
 from schemas.anthropic import (
     AnthropicAssistantMessage,
     Message,
@@ -15,38 +16,39 @@ from schemas.request_metadata import Metadata
 from tools.tool_manager import ToolManager
 from utils.logs import logger
 
-_tag = "[AnthropicClient]"
+_tag = ""
 
 
 class AnthropicClient:
     """
     - https://docs.anthropic.com/en/docs/quickstart
     - https://docs.anthropic.com/en/docs/about-claude/models
+    - https://docs.anthropic.com/en/docs/build-with-claude/tool-use
     """
 
     def __init__(
         self,
         api_key,
-        model: str = "claude-3-5-sonnet-20240620",
-        tool_manager: ToolManager | None = None,
+        config: AgentConfig,
     ):
         self.http_client = httpx.AsyncClient(timeout=60)
         self.chat_completions_url = "https://api.anthropic.com/v1/messages"
         self.api_key = api_key
-        self.model = model
-        self.tool_manager: ToolManager = tool_manager
-        # logger.debug(f"{_tag} model: {model}, self.model: {self.model}")
-        if self.tool_manager is not None:
-            self.tool_json = self.tool_manager.get_tools_json(model=self.model)
+        self.model = config.model
+        self.tools = config.tools
+        self.tool_manager: ToolManager = ToolManager()
+        if len(self.tools) > 0:
+            self.tool_json = self.tool_manager.get_tools_json(self.model, self.tools)
         else:
             self.tool_json = None
-        # https://docs.anthropic.com/en/docs/build-with-claude/tool-use
         self.headers = {
             "Content-Type": "application/json",
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
         }
-        logger.debug(f"{_tag} model: {model}")
+        logger.info(
+            f"[AnthropicClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]}"
+        )
 
     async def send_completion_request(
         self,
@@ -129,38 +131,23 @@ class AnthropicClient:
         else:
             return []
 
-    def process_tools(self, tool_use_contents: list[ToolUseContent], tools_dict) -> list[ToolResultContent]:
-        tool_result_content_list: list[ToolResultContent] = []
-        for tool_use_content in tool_use_contents:
-            print(f"Processing tool use: {tool_use_contents}")
-            tool_name = tool_use_content.name
-            tool_input = tool_use_content.input
-
-            if tool_name in tools_dict:
-                tool_function = tools_dict[tool_name]
-                tool_response = tool_function(**tool_input)
-                tool_result_content = ToolResultContent(
-                    type="tool_result",
-                    tool_use_id=tool_use_content.id,
-                    content=str(tool_response),
-                )
-            else:
-                tool_result_content = ToolResultContent(
-                    type="tool_result",
-                    tool_use_id=tool_use_content.id,
-                    content=f"Error: Tool '{tool_name}' not found",
-                )
-            print(f"tool_result_content: {tool_result_content}")
-            tool_result_content_list.append(tool_result_content)
-        return tool_result_content_list
-
     async def process_tools_with_timeout(self, tool_calls: list[ToolUseContent], timeout=5) -> list[ToolResultContent]:
         logger.debug(f"[chat_completion] process tool calls count: {len(tool_calls)}, timeout: {timeout}")
         tool_responses: list[ToolResultContent] = []
 
         tasks = []
         for tool in tool_calls:
+            tool_name = tool.name
             tool_func = self.tool_manager.tools[tool.name]
+            if tool_name not in self.tool_manager.tools:
+                logger.error(f"Tool '{tool_name}' not found.")
+                tool_response_message = ToolResultContent(
+                    tool_call_id=tool.id,
+                    name=tool_name,
+                    content="Tool not found",
+                )
+                tool_responses.append(tool_response_message)
+                continue
             args = tuple(tool.input.values())
             task = asyncio.create_task(self.run_tool(tool_func, *args))
             tasks.append((task, tool))

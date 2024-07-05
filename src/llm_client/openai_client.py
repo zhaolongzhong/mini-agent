@@ -2,9 +2,9 @@ import asyncio
 import json
 
 import httpx
-from llm_client.llm_model import ChatModel
 from llm_client.llm_request import LLMRequest
 from memory.memory import MemoryInterface
+from schemas.agent import AgentConfig
 from schemas.assistant import AssistantMessage, convert_to_assistant_message
 from schemas.chat_completion import ChatCompletion
 from schemas.error import ErrorResponse
@@ -15,23 +15,23 @@ from schemas.tool_message import ToolMessage
 from tools.tool_manager import ToolManager
 from utils.logs import logger
 
-_tag = "[OpenAIClient]"
+_tag = ""
 
 
 class OpenAIClient(LLMRequest):
     def __init__(
         self,
         api_key,
-        model: str = ChatModel.GPT_4O.value,
-        tool_manager: ToolManager | None = None,
+        config: AgentConfig,
     ):
         self.http_client = httpx.AsyncClient(timeout=60)
         self.chat_completions_url = "https://api.openai.com/v1/chat/completions"
         self.api_key = api_key
-        self.model = model
-        self.tool_manager = tool_manager
-        if self.tool_manager is not None:
-            self.tool_json = self.tool_manager.get_tools_json()
+        self.model = config.model
+        self.tools = config.tools
+        self.tool_manager = ToolManager()
+        if len(self.tools) > 0:
+            self.tool_json = self.tool_manager.get_tools_json(self.model, self.tools)
         else:
             self.tool_json = None
         self.headers = {
@@ -39,7 +39,7 @@ class OpenAIClient(LLMRequest):
             "Authorization": f"Bearer {api_key}",
         }
 
-        logger.info(f"OpenAIClient initialized with model: {model}, tools: {len(self.tool_json)}")
+        logger.info(f"[OpenAIClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]}")
 
     async def _send_completion_request(
         self,
@@ -109,39 +109,24 @@ class OpenAIClient(LLMRequest):
 
         return await self.send_completion_request(memory=memory, metadata=metadata)
 
-    def process_tools(self, tool_calls):
-        logger.debug(f"[chat_completion] process tool calls count: {len(tool_calls)}")
-        tool_call_responses: list[str] = []
-        for _index, tool_call in enumerate(tool_calls):
-            tool_call_id = tool_call.id
-            function_name = tool_call.function.name
-            function_args = json.loads(tool_call.function.arguments)
-            logger.debug(f"[chat_completion] process tool call <{function_name}>, args: {function_args}")
-
-            function_to_call = self.tool_manager.tools.get(function_name)
-
-            tool_response: str | None = None
-            try:
-                tool_response = function_to_call(**function_args)
-                tool_response_message = ToolMessage(
-                    tool_call_id=tool_call_id,
-                    role="tool",
-                    name=function_name,
-                    content=str(tool_response),
-                )
-                tool_call_responses.append(tool_response_message)
-            except Exception as e:
-                tool_response = f"Error while calling function <{function_name}>: {e}"
-
-        return tool_call_responses
-
     async def process_tools_with_timeout(self, tool_calls: list[ToolCall], timeout=5) -> list[ToolMessage]:
         logger.debug(f"[chat_completion] process tool calls count: {len(tool_calls)}, timeout: {timeout}")
         tool_responses: list[ToolMessage] = []
 
         tasks = []
         for tool_call in tool_calls:
-            tool_func = self.tool_manager.tools[tool_call.function.name]
+            tool_name = tool_call.function.name
+            if tool_name not in self.tool_manager.tools:
+                logger.error(f"Tool '{tool_name}' not found.")
+                tool_response_message = ToolMessage(
+                    tool_call_id=tool_call.id,
+                    name=tool_name,
+                    content="Tool not found",
+                )
+                tool_responses.append(tool_response_message)
+                continue
+
+            tool_func = self.tool_manager.tools[tool_name]
             args = tuple(json.loads(tool_call.function.arguments).values())
             task = asyncio.create_task(self.run_tool(tool_func, *args))
             tasks.append((task, tool_call))

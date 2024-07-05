@@ -4,5 +4,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-echo "Running test ..."
+# Load the .env.test file
+if [ -f .env.test ]; then
+  export $(cat .env.test | xargs)
+fi
+
+echo "Running tests ..."
 rye run test

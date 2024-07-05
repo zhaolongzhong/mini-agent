@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 from pathlib import Path
 
 from llm_client.llm_model import ChatModel
@@ -12,14 +13,22 @@ from utils.logs import logger
 _tag = "[ToolManager]"
 
 
+class Tool(Enum):
+    FileRead = "read_file"
+    FileWrite = "write_to_file"
+    CheckFolder = "scan_folder"
+    CodeInterpreter = "run_python_script"
+    ShellTool = "execute_shell_command"
+
+
 class ToolManager:
     def __init__(self):
         self.tools = {
-            "read_file": read_file,
-            "write_to_file": write_to_file,
-            "scan_folder": scan_folder,
-            "run_python_script": run_python_script,
-            "execute_shell_command": execute_shell_command,
+            Tool.FileRead.value: read_file,
+            Tool.FileWrite.value: write_to_file,
+            Tool.CheckFolder.value: scan_folder,
+            Tool.CodeInterpreter.value: run_python_script,
+            Tool.ShellTool.value: execute_shell_command,
         }
 
         self.tools_path = Path(__file__).parent
@@ -38,13 +47,13 @@ class ToolManager:
             return None
 
         with config_path.open("r", encoding="utf-8") as file:
-            definition_data = json.load(file)
+            function_definition_json = json.load(file)
             if model is None or "gpt-4" in model or "gemini" in model:
-                return definition_data
+                return function_definition_json
             elif "claude" in model:
                 # https://docs.anthropic.com/en/docs/build-with-claude/tool-use
-                if "function" in definition_data:
-                    function_data = definition_data["function"]
+                if "function" in function_definition_json:
+                    function_data = function_definition_json["function"]
                     updated_definition_data = {
                         "name": function_data.get("name"),
                         "description": function_data.get("description"),
@@ -55,15 +64,15 @@ class ToolManager:
                 logger.error(f"Unsupported model: {model}")
                 raise ValueError(f"Unsupported model: {model}")
 
-    def get_tools_json(self, model: str = None) -> list[dict]:
+    def get_tools_json(self, model: str = None, tools: list[Tool] | None = None) -> list[dict]:
         """Iterate through the tools and gather their JSON configurations."""
         logger.debug(f"{_tag} get_tools_json [{model}]")
         tools_configs = []
-        for tool_name in self.tools:
-            config = self.get_tool_config(tool_name, model)
+        if tools is None or len(tools) == 0:
+            return tools_configs
+
+        for tool in tools:
+            config = self.get_tool_config(tool.value, model)
             if config:
                 tools_configs.append(config)
         return tools_configs
-
-    def get_tool(self, tool_name: str):
-        return self.tools.get(tool_name)

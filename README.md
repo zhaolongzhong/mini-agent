@@ -58,7 +58,7 @@ Can you write a fibonacci function to fibo.py and write a test for it? Make sure
 [2024-06-03 14:06:35 - DEBUG] [chat_completion] process tool call <execute_shell_command>, args: {'command': 'python -m unittest test_fibo.py'}
 ```
 
-Step 1: generate fibonacci code and with two tool calls: <write_file>
+Step 1: generate fibonacci code and with two tool calls: <write_to_file>
 
 Step 2: write code to fibo.py
 

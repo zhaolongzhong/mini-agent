@@ -6,32 +6,59 @@ from llm_client.llm_model import ChatModel
 from memory.memory import StorageType
 from schemas.agent import AgentConfig
 from schemas.error import ErrorResponse
-from tools.tool_manager import ToolManager
+from tools.tool_manager import Tool
 from utils.cli_utils import progress_indicator
 from utils.logs import logger
 
 
 class AgentManager:
     def __init__(self, env=None):
-        self.tools_manager = ToolManager()
+        self.agents = {}
 
-    async def create_agent(self):
-        self.agent = await Agent.create(
-            config=AgentConfig(
-                id="1",
-                name="Main Agent",
-                storage_type=StorageType.FILE,
-                model=ChatModel.GPT_4O.value,
-                # model=ChatModel.CLAUDE_3_5_SONNET_20240620.value,
-            ),
-            tools_manager=self.tools_manager,
+    async def create_agents(self):
+        self.agent: Agent = await self.create_agent(
+            id="main",
+            name="MainAgent",
+            storage_type=StorageType.FILE,
+            model=ChatModel.CLAUDE_3_5_SONNET_20240620.value,
+            tools=[
+                Tool.FileRead,
+                Tool.FileWrite,
+                Tool.CheckFolder,
+                Tool.CodeInterpreter,
+                Tool.ShellTool,
+            ],
         )
 
-    async def start(self):
-        await self.create_agent()
-        await self.run()
+    async def create_agent(
+        self,
+        id: str = "",
+        name: str = "",
+        model: str = ChatModel.GPT_4O.value,
+        storage_type: StorageType = StorageType.FILE,
+        tools: list[Tool] = [],
+    ):
+        if id in self.agents:
+            logger.warning(f"Agent with id {id} already exists, return existing agent.")
+            return self.agents[id]
+        agent = await Agent.create(
+            config=AgentConfig(
+                id=id,
+                name=name,
+                storage_type=storage_type,
+                model=model,
+                tools=tools,
+            ),
+        )
+        self.agents[agent.id] = agent
+        logger.info(f"Created agent, available agents: {list(self.agents.keys())}")
+        return agent
 
-    async def run(self):
+    async def start(self):
+        await self.create_agents()
+        await self.run_main_agent()
+
+    async def run_main_agent(self):
         while True:
             user_input = input("[User ]: ")
             if user_input:

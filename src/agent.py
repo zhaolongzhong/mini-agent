@@ -18,35 +18,33 @@ class Agent:
         self,
         config: AgentConfig,
         memory: MemoryInterface,
-        tools_manager,
     ):
+        self.id = config.id
         self.config = config
         self.memory = memory
-        self.tools_manager = tools_manager
-        self.llm_client = LLMClient(self.config.model, self.tools_manager)
-        logger.debug(f"{_tag} AgentConfig: {self.config.model_dump()}")
+        self.llm_client = LLMClient(self.config)
+        logger.info(f"{_tag} Create agent: {self.config.model_dump(exclude=['tools'])}")
 
     @classmethod
     async def create(
         cls,
         config: AgentConfig,
-        tools_manager,
     ):
         memory_storage: MemoryInterface = cls.setup_memory_storage(
             storage_type=config.storage_type,
-            model=config.model,
+            config=config,
         )
         await memory_storage.init_messages()
         return cls(
             config=config,
             memory=memory_storage,
-            tools_manager=tools_manager,
         )
 
-    def setup_memory_storage(storage_type: StorageType, model: str) -> MemoryInterface | None:
+    def setup_memory_storage(storage_type: StorageType, config: AgentConfig) -> MemoryInterface | None:
         memory = None
         if storage_type == StorageType.FILE:
-            memory = FileStorage(name=model.split("-")[0])
+            name = f"{config.id}_{config.model.split('-')[0]}"
+            memory = FileStorage(name=name)
         elif storage_type == StorageType.DATABASE:
             memory = DatabaseStorage()
         elif storage_type == StorageType.IN_MEMORY:

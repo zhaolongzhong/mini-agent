@@ -44,7 +44,7 @@ class Settings(BaseSettings):
             )
         )
 
-    class Config:
+    class ConfigDict:
         use_enum_values = True
 
 
