@@ -21,7 +21,7 @@ class AgentManager:
             id="main",
             name="MainAgent",
             storage_type=StorageType.FILE,
-            model=ChatModel.GPT_4O.value,
+            model=ChatModel.GPT_4O,
             tools=[
                 Tool.FileRead,
                 Tool.FileWrite,
@@ -35,7 +35,7 @@ class AgentManager:
         self,
         id: str = "",
         name: str = "",
-        model: str = ChatModel.GPT_4O.value,
+        model: ChatModel = ChatModel.GPT_4O,
         storage_type: StorageType = StorageType.FILE,
         tools: list[Tool] = [],
     ):

@@ -37,6 +37,12 @@ class AssistantMessage(BaseModel):
             raise ValueError('Role must be "assistant"')
         return value
 
+    @field_validator("tool_calls", mode="before")
+    def check_tool_calls(cls, value):
+        if value is None:
+            return []
+        return value
+
 
 def convert_to_assistant_message(chat_message: any) -> AssistantMessage:
     tool_calls = [ToolCall(id=call.id, function=call.function, type=call.type) for call in chat_message.tool_calls]

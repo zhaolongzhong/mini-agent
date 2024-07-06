@@ -1,26 +1,56 @@
+import os
 from enum import Enum
 
 
 class ChatModel(Enum):
     # Claude https://docs.anthropic.com/en/docs/about-claude/models#model-names
-    CLAUDE_3_OPUS_20240229 = "claude-3-opus-20240229"
-    CLAUDE_3_5_SONNET_20240620 = "claude-3-5-sonnet-20240620"
+    CLAUDE_3_OPUS_20240229 = ("claude-3-opus-20240229", True, "anthropic")
+    CLAUDE_3_5_SONNET_20240620 = ("claude-3-5-sonnet-20240620", True, "anthropic")
 
     # Gemini https://ai.google.dev/gemini-api/docs/models/gemini#model-variations
-    GEMINI_1_5_FLASH = "gemini-1.5-flash"
-    GEMINI_1_5_PRO = "gemini-1.5-pro"
+    GEMINI_1_5_FLASH = ("gemini-1.5-flash", True, "google")
+    GEMINI_1_5_PRO = ("gemini-1.5-pro", True, "google")
 
     # OpenAI https://platform.openai.com/docs/models/overview
-    GPT_4O = "gpt-4o"
-    GPT_4O_24_05_13 = "gpt-4o-2024-05-13"
-    GPT_4_TURBO_24_04_09 = "gpt-4-turbo-2024-04-09"
+    GPT_4O = ("gpt-4o", True, "openai")
+    GPT_4O_24_05_13 = ("gpt-4o-2024-05-13", True, "openai")
+    GPT_4_TURBO_24_04_09 = ("gpt-4-turbo-2024-04-09", True, "openai")
 
-    def short_name(self) -> str:
-        if "claude" in self:
-            return "claude"
-        elif "gemini" in self:
-            return "gemini"
-        elif "gpt-4" in self:
-            return "gpt"
-        else:
-            return "unknown"
+    # LLAMA
+    LLAMA3_8B_8192_GROQ = ("llama3-8b-8192", True, "groq")
+    LLAMA3_70B_8192_GROQ = ("llama3-70b-8192", True, "groq")
+    LLAMA_2_70B_CHAT_HF_TOGETHER = ("meta-llama/Llama-3-70b-chat-hf", False, "together")
+
+    # MIXTRAL
+    MIXTRAL_8X7B_32768_TOGETHER = ("mixtral-8x7b-32768", True, "together")
+    MISTRALAI_MISTRAL_8X7B_INSTRUCT_V0_1_TOGETHER = ("mistralai/mixtral-8x7b-instruct-v0.1", True, "together")
+
+    # GEMMA
+    GEMMA2_9B_IT_GROQ = ("gemma2-9b-it", True, "groq")
+
+    # Qwen
+    QWEN_2_72B_INSTRUCT_TOGETHER = ("qwen/qwen2-72b-instruct", False, "together")
+
+    def __init__(self, model_name, allows_tool_use, key_prefix):
+        self.model_name = model_name
+        self.allows_tool_use = allows_tool_use
+        self.key_prefix = key_prefix
+
+    @property
+    def name(self) -> str:
+        return self.model_name
+
+    @property
+    def tool_use_allowed(self):
+        return self.allows_tool_use
+
+    @property
+    def api_key_env(self) -> str:
+        return f"{self.key_prefix.upper()}_API_KEY"
+
+
+def get_api_key(model: ChatModel) -> str:
+    api_key = os.getenv(model.api_key_env)
+    if not api_key:
+        raise ValueError(f"API key for {model.api_key_env} not found in environment variables")
+    return api_key

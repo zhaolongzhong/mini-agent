@@ -26,12 +26,12 @@ Update the API keys in the `.env` file
 Note: multiple tool calls
 
 ```
-Can you check format.sh and run.sh?
+Can you check README.md and run.sh and summarize them?
 ```
 
 ```bash
 [2024-06-03 14:02:01 - DEBUG] [chat_completion] process tool calls count: 2
-[2024-06-03 14:02:01 - DEBUG] [chat_completion] process tool call <read_file>, args: {'file_path': 'format.sh'}
+[2024-06-03 14:02:01 - DEBUG] [chat_completion] process tool call <read_file>, args: {'file_path': 'README.md'}
 [2024-06-03 14:02:01 - DEBUG] [chat_completion] process tool call <read_file>, args: {'file_path': 'run.sh'}
 ```
 

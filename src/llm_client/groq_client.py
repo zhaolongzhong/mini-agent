@@ -1,8 +1,7 @@
 import asyncio
 import json
 
-import httpx
-import openai
+from groq import AsyncGroq
 from llm_client.llm_request import LLMRequest
 from memory.memory import MemoryInterface
 from schemas.agent import AgentConfig
@@ -19,14 +18,17 @@ from utils.logs import logger
 _tag = ""
 
 
-class OpenAIClient(LLMRequest):
+class GroqClient(LLMRequest):
+    """https://console.groq.com/docs/quickstart"""
+
     def __init__(
         self,
         api_key,
         config: AgentConfig,
     ):
-        self.http_client = httpx.AsyncClient(timeout=60)
-        self.chat_completions_url = "https://api.openai.com/v1/chat/completions"
+        self.client = AsyncGroq(
+            api_key=api_key,
+        )
         self.api_key = api_key
         self.model = config.model
         self.tools = config.tools
@@ -35,12 +37,8 @@ class OpenAIClient(LLMRequest):
             self.tool_json = self.tool_manager.get_tools_json(self.model, self.tools)
         else:
             self.tool_json = None
-        self.headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
 
-        logger.info(f"[OpenAIClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]}")
+        logger.info(f"[GroqClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]}")
 
     async def _send_completion_request(
         self,
@@ -50,44 +48,25 @@ class OpenAIClient(LLMRequest):
         for idx, message in enumerate(messages):
             logger.debug(f"{_tag}send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
 
-        body = {
-            "model": self.model.name,
-            "messages": [msg.model_dump() for msg in messages],
-            "max_tokens": 2048,
-            "temperature": 0.8,
-            "response_format": {"type": "text"},
-        }
-
-        if self.tool_json and len(self.tool_json) > 0:
-            body["tools"] = self.tool_json
-            body["tool_choice"] = "auto"
-
         try:
-            response = await self.http_client.post(self.chat_completions_url, headers=self.headers, json=body)
+            if self.tool_json and len(self.tool_json) > 0:
+                chat_completion = await self.client.chat.completions.create(
+                    messages=[msg.model_dump(exclude="name") for msg in messages],
+                    model=self.model,
+                    tools=self.tool_json,
+                    tool_choice="auto",
+                    max_tokens=2048,
+                    temperature=0.8,
+                )
+            else:
+                chat_completion = await self.client.chat.completions.create(
+                    messages=[msg.model_dump() for msg in messages],
+                    model=self.model,
+                )
 
-            if response.status_code != 200:
-                logger.error(f"{_tag}send_completion_request error:\n{response.text}")
-                raise Exception(response.text)
-
-            response_data = response.json()
-            logger.debug(f"{_tag}send_completion_request response:\n{json.dumps(response_data, indent=2)}")
-            chat_completion = ChatCompletion(**response_data)
+            chat_completion = ChatCompletion(**chat_completion.model_dump())
             logger.info(f"send_completion_request usage: {chat_completion.usage.model_dump()}")
             return chat_completion
-        except openai.APIConnectionError as e:
-            return ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
-        except openai.RateLimitError as e:
-            return ErrorResponse(
-                message=f"A 429 status code was received; we should back off a bit. {e.response}",
-                code=str(e.status_code),
-            )
-        except openai.APIStatusError as e:
-            message = f"Another non-200-range status code was received. {e.response}, {e.response.text}"
-            logger.error(f"{message}")
-            return ErrorResponse(
-                message=message,
-                code=str(e.status_code),
-            )
         except Exception as e:
             return ErrorResponse(
                 message=f"Exception: {e}",
@@ -117,6 +96,7 @@ class OpenAIClient(LLMRequest):
 
         tool_calls = response.choices[0].message.tool_calls
         if tool_calls is None:
+            logger.debug(f"[chat_completion] no tool calls found in response. response: {response.choices[0].message}")
             message = AssistantMessage(**response.choices[0].message.model_dump())
             await memory.save(message)
             return response  # return original response

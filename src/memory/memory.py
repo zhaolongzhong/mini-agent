@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 
+from llm_client.llm_model import ChatModel
 from memory.memory_utils import load_from_memory
 from memory.messages_operations import MessageOperations
 from schemas.message import Message as SchemaMessage
@@ -74,7 +75,7 @@ class InMemoryStorage(MemoryInterface):
 
 
 class FileStorage(MemoryInterface):
-    def __init__(self, name="memory.jsonl", model: str = None):
+    def __init__(self, name="memory.jsonl", model: ChatModel = None):
         super().__init__()
         self.memory_root_path = Path(__file__).parent
         if "jsonl" not in name:

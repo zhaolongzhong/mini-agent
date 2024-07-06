@@ -1,5 +1,6 @@
 import os
 
+from llm_client.llm_model import ChatModel
 from schemas.anthropic import AnthropicAssistantMessage, ToolResultMessage
 from schemas.message import Message
 from schemas.message_param import MessageLike
@@ -10,7 +11,7 @@ from utils.logs import logger
 _tag = "[MemoryUtils]"
 
 
-def load_from_memory(full_path: str, model: str = None):
+def load_from_memory(full_path: str, model: ChatModel = None):
     logger.debug(f"{_tag} load_from_memory: {full_path}")
     system_message = Message(role="system", content="You're a helpful assistant!")
     directory = os.path.dirname(full_path)
@@ -35,7 +36,7 @@ def load_from_memory(full_path: str, model: str = None):
             save_to_memory(full_path, system_message)
             return [system_message]
         validated_messages = []
-        if model and "claude" in model:
+        if model and "claude" in model.name.lower():
             for message in messages:
                 if "role" in message and message.get("role") == "system":
                     validated_messages.append(Message(**message))

@@ -94,7 +94,7 @@ class AnthropicClient:
             logger.debug(f"{_tag}send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
         # reference: https://docs.anthropic.com/en/docs/quickstart-guide
         body = {
-            "model": self.model,
+            "model": self.model.name,
             "messages": [msg.model_dump(exclude="name") for msg in messages if msg.role != "system"],
             "max_tokens": 4096,
             "temperature": 0.0,

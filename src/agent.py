@@ -43,7 +43,10 @@ class Agent:
     def setup_memory_storage(storage_type: StorageType, config: AgentConfig) -> MemoryInterface | None:
         memory = None
         if storage_type == StorageType.FILE:
-            name = f"{config.id}_{config.model.split('-')[0]}"
+            model_name = config.model.name
+            if "/" in model_name:
+                model_name = model_name.split("/")[1]
+            name = f"{config.id}_{model_name.split('-')[0]}"
             memory = FileStorage(name=name, model=config.model)
         elif storage_type == StorageType.DATABASE:
             memory = DatabaseStorage()

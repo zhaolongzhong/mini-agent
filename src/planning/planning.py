@@ -24,7 +24,7 @@ async def make_plan(content: str):
             id="plan_agent",
             name="plan_agent",
             storage_type=StorageType.IN_MEMORY,
-            model=ChatModel.GPT_4O.value,
+            model=ChatModel.GPT_4O,
         ),
     )
     return await agent.send_request(memory=memory)

@@ -1,8 +1,10 @@
 import os
 
 from llm_client.anthropic_client import AnthropicClient
+from llm_client.groq_client import GroqClient
 from llm_client.llm_request import LLMRequest
 from llm_client.openai_client import OpenAIClient
+from llm_client.together_client import TogetherAIClient
 from memory.memory import MemoryInterface
 from schemas.agent import AgentConfig
 from schemas.request_metadata import Metadata
@@ -10,23 +12,29 @@ from utils.logs import logger
 
 
 class LLMClient(LLMRequest):
-    def __init__(
-        self,
-        config: AgentConfig,
-    ):
-        if "gpt-4" in config.model:
-            api_key = os.getenv("OPENAI_API_KEY")
-            self.llm_client = OpenAIClient(api_key=api_key, config=config)
-        elif "claude" in config.model:
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            self.llm_client = AnthropicClient(api_key=api_key, config=config)
-        else:
-            logger.error(f"Model {config.model} not supported")
-            raise ValueError(f"Model {config.model} not supported")
+    def __init__(self, config: AgentConfig):
+        self.llm_client = self._initialize_client(config)
 
-    async def send_completion_request(
-        self,
-        memory: MemoryInterface,
-        metadata: Metadata,
-    ) -> dict:
+    def _initialize_client(self, config: AgentConfig):
+        model = config.model
+        api_key = os.getenv(model.api_key_env)
+        if not api_key:
+            logger.error(f"API key for {model.api_key_env} not found in environment variables")
+            raise ValueError(f"API key for {model.api_key_env} not found")
+
+        client_class_mapping = {
+            "openai": OpenAIClient,
+            "anthropic": AnthropicClient,
+            "groq": GroqClient,
+            "together": TogetherAIClient,
+        }
+
+        client_class = client_class_mapping.get(model.key_prefix)
+        if not client_class:
+            logger.error(f"Client class for key prefix {model.key_prefix} not found")
+            raise ValueError(f"Client class for key prefix {model.key_prefix} not found")
+
+        return client_class(api_key=api_key, config=config)
+
+    async def send_completion_request(self, memory: MemoryInterface, metadata: Metadata) -> dict:
         return await self.llm_client.send_completion_request(memory=memory, metadata=metadata)

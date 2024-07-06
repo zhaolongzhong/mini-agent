@@ -37,6 +37,12 @@ class AssistantMessage(BaseModel):
             raise ValueError('Role must be "assistant"')
         return value
 
+    @field_validator("tool_calls", mode="before")
+    def check_tool_calls(cls, value):
+        if value is None:
+            return []
+        return value
+
 
 class ToolMessage(BaseModel):
     content: str
