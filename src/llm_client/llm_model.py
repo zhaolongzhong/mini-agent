@@ -17,8 +17,9 @@ class ChatModel(Enum):
     GPT_4_TURBO_24_04_09 = ("gpt-4-turbo-2024-04-09", True, "openai")
 
     # LLAMA
+    ## https://console.groq.com/docs/tool-use#models
+    LLAMA3_70B_8192_GROQ = ("llama3-70b-8192", True, "groq")  # only model we currently recommend using for tool use
     LLAMA3_8B_8192_GROQ = ("llama3-8b-8192", True, "groq")
-    LLAMA3_70B_8192_GROQ = ("llama3-70b-8192", True, "groq")
     LLAMA_2_70B_CHAT_HF_TOGETHER = ("meta-llama/Llama-3-70b-chat-hf", False, "together")
 
     # MIXTRAL
@@ -26,7 +27,7 @@ class ChatModel(Enum):
     MISTRALAI_MISTRAL_8X7B_INSTRUCT_V0_1_TOGETHER = ("mistralai/mixtral-8x7b-instruct-v0.1", True, "together")
 
     # GEMMA
-    GEMMA2_9B_IT_GROQ = ("gemma2-9b-it", True, "groq")
+    GEMMA2_9B_IT_GROQ = ("gemma2-9b-it", False, "groq")
 
     # Qwen
     QWEN_2_72B_INSTRUCT_TOGETHER = ("qwen/qwen2-72b-instruct", False, "together")

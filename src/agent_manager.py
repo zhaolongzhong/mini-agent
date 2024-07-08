@@ -21,7 +21,7 @@ class AgentManager:
             id="main",
             name="MainAgent",
             storage_type=StorageType.FILE,
-            model=ChatModel.GPT_4O,
+            model=ChatModel.LLAMA3_70B_8192_GROQ,
             tools=[
                 Tool.FileRead,
                 Tool.FileWrite,
