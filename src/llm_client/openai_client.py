@@ -32,7 +32,7 @@ class OpenAIClient(LLMRequest):
         self.tools = config.tools
         self.tool_manager = ToolManager()
         if len(self.tools) > 0:
-            self.tool_json = self.tool_manager.get_tools_json(self.model, self.tools)
+            self.tool_json = self.tool_manager.get_tool_definitions(self.model, self.tools)
         else:
             self.tool_json = None
         self.headers = {
@@ -52,7 +52,12 @@ class OpenAIClient(LLMRequest):
 
         body = {
             "model": self.model.name,
-            "messages": [msg.model_dump() for msg in messages],
+            "messages": [
+                msg.model_dump(exclude={"tool_calls"})
+                if hasattr(msg, "tool_calls") and not msg.tool_calls
+                else msg.model_dump()
+                for msg in messages
+            ],
             "max_tokens": 2048,
             "temperature": 0.8,
             "response_format": {"type": "text"},
