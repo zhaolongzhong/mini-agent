@@ -38,7 +38,7 @@ class AnthropicClient:
         self.tools = config.tools
         self.tool_manager: ToolManager = ToolManager()
         if len(self.tools) > 0:
-            self.tool_json = self.tool_manager.get_tools_json(self.model, self.tools)
+            self.tool_json = self.tool_manager.get_tool_definitions(self.model, self.tools)
         else:
             self.tool_json = None
         self.headers = {

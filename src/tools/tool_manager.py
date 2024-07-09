@@ -34,7 +34,7 @@ class ToolManager:
         self.tools_path = Path(__file__).parent
         # logger.debug(f"{_tag} tools_path: {self.tools_path}")
 
-    def get_tool_config(self, tool_name: str, model: ChatModel = ChatModel.GPT_4O) -> dict | None:
+    def _get_tool_definition(self, tool_name: str, model: ChatModel = ChatModel.GPT_4O) -> dict | None:
         """Load the JSON configuration for a specific tool from its respective file."""
         config_path = Path(self.tools_path) / f"{tool_name}.json"
 
@@ -58,7 +58,7 @@ class ToolManager:
 
         return function_definition_json
 
-    def get_tools_json(self, model: ChatModel = None, tools: list[Tool] | None = None) -> list[dict]:
+    def get_tool_definitions(self, model: ChatModel = None, tools: list[Tool] | None = None) -> list[dict]:
         """Iterate through the tools and gather their JSON configurations."""
         # logger.debug(f"{_tag} get_tools_json [{model}]")
         tools_configs = []
@@ -66,7 +66,7 @@ class ToolManager:
             return tools_configs
 
         for tool in tools:
-            config = self.get_tool_config(tool.value, model)
+            config = self._get_tool_definition(tool.value, model)
             if config:
                 tools_configs.append(config)
         return tools_configs
