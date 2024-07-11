@@ -81,6 +81,10 @@ class FileStorage(MemoryInterface):
         if "jsonl" not in name:
             name += "_memory.jsonl"
         self.file_path = Path(f"{self.memory_root_path}/{name}")
+        # clear test files
+        for file in Path(self.memory_root_path).glob("*_test*"):
+            if file.is_file():
+                file.unlink()
         self.file_path.touch(exist_ok=True)
         messages = load_from_memory(self.file_path, model)
         self.messages = messages

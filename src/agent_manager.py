@@ -12,16 +12,24 @@ from utils.logs import logger
 
 
 class AgentManager:
-    def __init__(self, env=None):
+    def __init__(
+        self,
+        env=None,
+        input_func=input,
+        is_test=False,
+    ):
         logger.info("AgentManager initialized")
         self.agents = {}
+        self.input_func = input_func
+        self.is_test = is_test
 
-    async def create_agents(self):
+    async def create_agents(self, model=ChatModel.GPT_4O):
+        id = "main_test" if self.is_test else "main"
         self.agent: Agent = await self.create_agent(
-            id="main",
+            id=id,
             name="MainAgent",
             storage_type=StorageType.FILE,
-            model=ChatModel.GPT_4O,  # Try different models here
+            model=model,  # Try different models here
             tools=[
                 Tool.FileRead,
                 Tool.FileWrite,
@@ -55,35 +63,44 @@ class AgentManager:
         logger.info(f"Created agent, available agents: {list(self.agents.keys())}")
         return agent
 
-    async def start(self):
-        logger.info("AgentManager start")
-        await self.create_agents()
-        await self.run_main_agent()
-
-    async def run_main_agent(self):
-        while True:
-            user_input = input("[User ]: ")
-            if user_input:
+    async def handle_input(self, user_input: str):
+        if user_input:
+            indicator = None
+            if self.is_test is False:
                 indicator = asyncio.create_task(progress_indicator())
-                try:
-                    response = await self.agent.send_prompt(user_input)
+            try:
+                response = await self.agent.send_prompt(user_input)
+                if indicator:
                     indicator.cancel()
-                    logger.debug(f"[main] {response}")
-                    if isinstance(response, ErrorResponse):
-                        print(f"[Agent]: There is an error. Error: {response.model_dump_json()}")
-                    else:
-                        print(f"[Agent]: {response.content}")
-                finally:
+                logger.debug(f"[main] {response}")
+                if isinstance(response, ErrorResponse):
+                    return f"[Agent]: There is an error. Error: {response.model_dump_json()}"
+                else:
+                    return f"[Agent]: {response.content}"
+            finally:
+                if indicator:
                     try:
                         await indicator
                     except asyncio.CancelledError:
                         sys.stdout.write("\r")
                         sys.stdout.flush()
+        return None
+
+    async def run(self):
+        logger.info("AgentManager run")
+        await self.create_agents()
+        while True:
+            user_input = self.input_func("[User ]: ")
+            if user_input.lower() in ["exit", "quit"]:
+                break
+            response = await self.handle_input(user_input)
+            if response:
+                print(response)
 
 
 async def main():
     agentManager = AgentManager()
-    await agentManager.start()
+    await agentManager.run()
 
 
 if __name__ == "__main__":

@@ -2,9 +2,12 @@ import subprocess
 import time
 import unittest
 
+import pytest
+
 from src.tools.execute_shell_command import execute_shell_command
 
 
+@pytest.mark.unit
 class TestExecuteShellCommand(unittest.TestCase):
     def test_blocking_execution(self):
         command = "echo 'Hello, World!'"
