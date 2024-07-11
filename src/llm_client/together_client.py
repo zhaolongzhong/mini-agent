@@ -43,7 +43,7 @@ class TogetherAIClient(BaseClient, LLMRequest):
             if self.tool_json and len(self.tool_json) > 0:
                 chat_completion = await self.client.chat.completions.create(
                     messages=[msg.model_dump(exclude="name") for msg in messages],
-                    model=self.model.name,
+                    model=self.model.model_id,
                     tools=self.tool_json,
                     tool_choice="auto",
                     max_tokens=2048,
@@ -52,7 +52,7 @@ class TogetherAIClient(BaseClient, LLMRequest):
             else:
                 chat_completion = await self.client.chat.completions.create(
                     messages=[msg.model_dump() for msg in messages],
-                    model=self.model.name,
+                    model=self.model.model_id,
                 )
             # chat_completion = await self.client.chat.completions.create(
             #     messages=[msg.model_dump() for msg in messages],

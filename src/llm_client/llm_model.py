@@ -33,14 +33,14 @@ class ChatModel(Enum):
     # Qwen
     QWEN_2_72B_INSTRUCT_TOGETHER = ("qwen/qwen2-72b-instruct", False, "together")
 
-    def __init__(self, model_name, allows_tool_use, key_prefix):
-        self.model_name = model_name
+    def __init__(self, id, allows_tool_use, key_prefix):
+        self.id = id
         self.allows_tool_use = allows_tool_use
         self.key_prefix = key_prefix
 
     @property
-    def name(self) -> str:
-        return self.model_name
+    def model_id(self) -> str:
+        return self.id
 
     @property
     def tool_use_allowed(self):

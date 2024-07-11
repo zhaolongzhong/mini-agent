@@ -45,9 +45,9 @@ class ToolManager:
         with config_path.open("r", encoding="utf-8") as file:
             function_definition_json = json.load(file)
 
-        model = model.name.lower()
+        model_id = model.model_id.lower()
 
-        if "claude" in model:
+        if "claude" in model_id:
             function_data = function_definition_json.get("function")
             if function_data:
                 return {

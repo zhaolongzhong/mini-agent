@@ -72,7 +72,7 @@ class GeminiClient(LLMRequest, BaseClient):
         try:
             if self.tool_json and len(self.tool_json) > 0:
                 response = await self.client.chat.completions.create(
-                    model=f"google/{self.model.name}",
+                    model=f"google/{self.model.model_id}",
                     messages=[
                         msg.model_dump(exclude={"tool_calls"})
                         if hasattr(msg, "tool_calls") and not msg.tool_calls
@@ -86,7 +86,7 @@ class GeminiClient(LLMRequest, BaseClient):
                 )
             else:
                 response = await self.client.chat.completions.create(
-                    model=f"google/{self.model.name}",
+                    model=f"google/{self.model.model_id}",
                     messages=[
                         msg.model_dump(exclude={"tool_calls"})
                         if hasattr(msg, "tool_calls") and not msg.tool_calls

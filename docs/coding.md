@@ -44,12 +44,3 @@ Step 2: write code to fibo.py
 Step 3: write test to test_fibo.py
 
 Step 4: run test
-
-## Open Source Function Calling (Tool Use)
- - [groq](https://console.groq.com/docs/tool-use#models): 
-    - llama3-70b-8192 (recommend)
-    - llama3-8b-8192
-    - mixtral-8x7b
-    - gemma-7b-it
- - [Together](https://docs.together.ai/docs/function-calling#supported-models): 
-    - mistralai/Mixtral-8x7B-Instruct-v0.1

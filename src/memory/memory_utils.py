@@ -36,7 +36,7 @@ def load_from_memory(full_path: str, model: ChatModel = None):
             save_to_memory(full_path, system_message)
             return [system_message]
         validated_messages = []
-        if model and "claude" in model.name.lower():
+        if model and "claude" in model.model_id.lower():
             for message in messages:
                 if "role" in message and message.get("role") == "system":
                     validated_messages.append(Message(**message))

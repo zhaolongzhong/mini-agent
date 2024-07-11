@@ -51,7 +51,7 @@ class OpenAIClient(LLMRequest):
             logger.debug(f"{_tag}send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
 
         body = {
-            "model": self.model.name,
+            "model": self.model.model_id,
             "messages": [
                 msg.model_dump(exclude={"tool_calls"})
                 if hasattr(msg, "tool_calls") and not msg.tool_calls
