@@ -46,7 +46,7 @@ class Choice(BaseModel):
 
 
 class ChatCompletion(BaseModel):
-    id: str
+    id: str | None = None  # gemini client returns None
     """A unique identifier for the chat completion."""
 
     choices: list[Choice]
@@ -55,7 +55,7 @@ class ChatCompletion(BaseModel):
     Can be more than one if `n` is greater than 1.
     """
 
-    created: int
+    created: int | None = None  # gemini client returns None
     """The Unix timestamp (in seconds) of when the chat completion was created."""
 
     model: str

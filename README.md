@@ -18,9 +18,16 @@ Update the API keys in the `.env` file
 ```bash
 ./run.sh
 ```
+
+## Model Configuration
+Go to `src/agent_manager.py` to specify a different model.
+
 ## Support Models
+Check a full list of supported models at `src/llm_client/llm_model.py`.
+
 - [GPT-4o](https://platform.openai.com/docs/models)
-- [Claude](https://docs.anthropic.com/en/docs/about-claude/models)
+- [Claude 3.5](https://docs.anthropic.com/en/docs/about-claude/models)
+- [Gemini 1.5 Pro](https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library#supported_models)
 - All open source Models provided by [Together AI](https://docs.together.ai/docs/chat-models) and [Groq](https://console.groq.com/docs/models)
   - [Gemma 2](https://ai.google.dev/gemma/docs/get_started)
   - [LLama 3](https://llama.meta.com/llama3)

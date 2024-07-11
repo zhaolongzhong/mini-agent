@@ -21,14 +21,21 @@ asyncpg==0.29.0
     # via mini-agent
 blobfile==2.1.1
     # via mini-agent
+cachetools==5.3.3
+    # via google-auth
 certifi==2024.6.2
     # via httpcore
     # via httpx
+    # via requests
+charset-normalizer==3.3.2
+    # via requests
 distro==1.9.0
     # via groq
     # via openai
 filelock==3.15.4
     # via blobfile
+google-auth==2.31.0
+    # via mini-agent
 groq==0.9.0
     # via mini-agent
 h11==0.14.0
@@ -41,12 +48,18 @@ httpx==0.27.0
 idna==3.7
     # via anyio
     # via httpx
+    # via requests
 lxml==4.9.4
     # via blobfile
 openai==1.23.0
     # via mini-agent
 psycopg2==2.9.9
     # via mini-agent
+pyasn1==0.6.0
+    # via pyasn1-modules
+    # via rsa
+pyasn1-modules==0.4.0
+    # via google-auth
 pycryptodomex==3.20.0
     # via blobfile
 pydantic==2.7.0
@@ -61,6 +74,10 @@ pydantic-settings==2.2.1
 python-dotenv==1.0.0
     # via mini-agent
     # via pydantic-settings
+requests==2.32.3
+    # via mini-agent
+rsa==4.9
+    # via google-auth
 sniffio==1.3.1
     # via anyio
     # via groq
@@ -78,3 +95,4 @@ typing-extensions==4.12.2
     # via sqlalchemy
 urllib3==2.2.2
     # via blobfile
+    # via requests

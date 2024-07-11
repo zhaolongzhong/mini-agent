@@ -8,6 +8,7 @@ class ChatModel(Enum):
     CLAUDE_3_5_SONNET_20240620 = ("claude-3-5-sonnet-20240620", True, "anthropic")
 
     # Gemini https://ai.google.dev/gemini-api/docs/models/gemini#model-variations
+    # https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library#supported_models
     GEMINI_1_5_FLASH = ("gemini-1.5-flash", True, "google")
     GEMINI_1_5_PRO = ("gemini-1.5-pro", True, "google")
 

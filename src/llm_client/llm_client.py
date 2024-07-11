@@ -1,6 +1,7 @@
 import os
 
 from llm_client.anthropic_client import AnthropicClient
+from llm_client.gemini_client import GeminiClient
 from llm_client.groq_client import GroqClient
 from llm_client.llm_request import LLMRequest
 from llm_client.openai_client import OpenAIClient
@@ -13,12 +14,12 @@ from utils.logs import logger
 
 class LLMClient(LLMRequest):
     def __init__(self, config: AgentConfig):
-        self.llm_client = self._initialize_client(config)
+        self.llm_client: LLMRequest = self._initialize_client(config)
 
     def _initialize_client(self, config: AgentConfig):
         model = config.model
         api_key = os.getenv(model.api_key_env)
-        if not api_key:
+        if not api_key and model.api_key_env != "GOOGLE_API_KEY":
             logger.error(f"API key for {model.api_key_env} not found in environment variables")
             raise ValueError(f"API key for {model.api_key_env} not found")
 
@@ -27,6 +28,7 @@ class LLMClient(LLMRequest):
             "anthropic": AnthropicClient,
             "groq": GroqClient,
             "together": TogetherAIClient,
+            "google": GeminiClient,
         }
 
         client_class = client_class_mapping.get(model.key_prefix)

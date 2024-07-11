@@ -7,3 +7,5 @@ venv/
 .env
 
 **/*memory.jsonl*
+
+credentials/

@@ -21,7 +21,7 @@ class AgentManager:
             id="main",
             name="MainAgent",
             storage_type=StorageType.FILE,
-            model=ChatModel.GPT_4O,
+            model=ChatModel.GPT_4O,  # Try different models here
             tools=[
                 Tool.FileRead,
                 Tool.FileWrite,
