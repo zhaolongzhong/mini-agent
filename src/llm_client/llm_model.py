@@ -21,7 +21,8 @@ class ChatModel(Enum):
     ## https://console.groq.com/docs/tool-use#models
     LLAMA3_70B_8192_GROQ = ("llama3-70b-8192", True, "groq")  # only model we currently recommend using for tool use
     LLAMA3_8B_8192_GROQ = ("llama3-8b-8192", True, "groq")
-    LLAMA_2_70B_CHAT_HF_TOGETHER = ("meta-llama/Llama-3-70b-chat-hf", False, "together")
+    LLAMA_3_70B_CHAT_HF_TOGETHER = ("meta-llama/Llama-3-70b-chat-hf", False, "together")
+    LLAMA_3_70B_TOGETHER = ("meta-llama/Meta-Llama-3-70B", False, "together")
 
     # MIXTRAL
     MIXTRAL_8X7B_32768_TOGETHER = ("mixtral-8x7b-32768", True, "together")
