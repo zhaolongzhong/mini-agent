@@ -49,10 +49,16 @@ idna==3.7
     # via anyio
     # via httpx
     # via requests
+iniconfig==2.0.0
+    # via pytest
 lxml==4.9.4
     # via blobfile
 openai==1.23.0
     # via mini-agent
+packaging==24.1
+    # via pytest
+pluggy==1.5.0
+    # via pytest
 psycopg2==2.9.9
     # via mini-agent
 pyasn1==0.6.0
@@ -70,6 +76,10 @@ pydantic==2.7.0
 pydantic-core==2.18.1
     # via pydantic
 pydantic-settings==2.2.1
+    # via mini-agent
+pytest==8.2.2
+    # via pytest-asyncio
+pytest-asyncio==0.23.7
     # via mini-agent
 python-dotenv==1.0.0
     # via mini-agent

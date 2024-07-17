@@ -1,5 +1,6 @@
 import asyncio
 import sys
+from datetime import datetime
 
 from agent import Agent
 from llm_client.llm_model import ChatModel
@@ -24,7 +25,9 @@ class AgentManager:
         self.is_test = is_test
 
     async def create_agents(self, model=ChatModel.GPT_4O):
-        id = "main_test" if self.is_test else "main"
+        # id = "main_test" if self.is_test else "main"
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        id = f"main_test_{timestamp}" if self.is_test else "main"
         self.agent: Agent = await self.create_agent(
             id=id,
             name="MainAgent",

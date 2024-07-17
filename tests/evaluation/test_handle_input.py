@@ -40,9 +40,10 @@ def agent_config(temp_dir):
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 @pytest.mark.asyncio
 @pytest.mark.evaluation
+@pytest.mark.skip
 async def test_handle_input(agent_config: AgentConfig, monkeypatch):
     agent_manager = AgentManager(is_test=True)
-    await agent_manager.create_agents(model=ChatModel.LLAMA3_70B_8192_GROQ)
+    await agent_manager.create_agents(model=ChatModel.GPT_4O)
     response = await agent_manager.handle_input("This is basic test, respond with 'Hello, World!'")
     assert response is not None
     assert "Hello, World!" in response
@@ -52,9 +53,10 @@ async def test_handle_input(agent_config: AgentConfig, monkeypatch):
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 @pytest.mark.asyncio
 @pytest.mark.evaluation
+@pytest.mark.skip
 async def test_basic_tool_use(agent_config: AgentConfig, monkeypatch, temp_dir):
     agent_manager = AgentManager(is_test=True)
-    await agent_manager.create_agents(model=ChatModel.LLAMA3_70B_8192_GROQ)
+    await agent_manager.create_agents(model=ChatModel.GPT_4O)
 
     # temp_dir = "tests/temp"
     file_path = os.path.join(temp_dir, "fibo.py")

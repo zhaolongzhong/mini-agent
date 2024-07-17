@@ -92,6 +92,7 @@ pyright==1.1.370
 pytest==8.2.2
     # via pytest-asyncio
 pytest-asyncio==0.23.7
+    # via mini-agent
 python-dotenv==1.0.0
     # via mini-agent
     # via pydantic-settings
