@@ -24,7 +24,7 @@ class AgentManager:
         self.input_func = input_func
         self.is_test = is_test
 
-    async def create_agents(self, model=ChatModel.GPT_4O):
+    async def create_agents(self, model=ChatModel.GPT_4O_MINI):
         # id = "main_test" if self.is_test else "main"
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         id = f"main_test_{timestamp}" if self.is_test else "main"
