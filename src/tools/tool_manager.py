@@ -6,6 +6,8 @@ from llm_client.llm_model import ChatModel
 from tools.browse_web import browse_web
 from tools.execute_shell_command import execute_shell_command
 from tools.make_plan import make_plan
+from tools.manage_drive import manage_drive
+from tools.manage_email import manage_email
 from tools.read_file import read_file
 from tools.run_python_script import run_python_script
 from tools.scan_folder import scan_folder
@@ -23,6 +25,8 @@ class Tool(Enum):
     ShellTool = "execute_shell_command"
     MakePlan = "make_plan"
     BrowseWeb = "browse_web"
+    ManageEmail = "manage_email"
+    ManageDrive = "manage_drive"
 
 
 class ToolManager:
@@ -35,6 +39,8 @@ class ToolManager:
             Tool.ShellTool.value: execute_shell_command,
             Tool.MakePlan.value: make_plan,
             Tool.BrowseWeb.value: browse_web,
+            Tool.ManageEmail.value: manage_email,
+            Tool.ManageDrive.value: manage_drive,
         }
 
         self.tools_path = Path(__file__).parent

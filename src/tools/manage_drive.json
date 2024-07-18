@@ -1,0 +1,27 @@
+{
+    "type": "function",
+    "function": {
+        "name": "manage_drive",
+        "description": "Manage Google Drive operations, including listing files or folders, getting files by folder ID, downloading files, creating folders, and uploading files to folders. You must provide the 'command' and 'args' in arguments.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The command to execute. Can be 'get_files_or_folders', 'get_by_folder_id', 'download_file', 'create_folder', or 'upload_file_to_folder'."
+                },
+                "args": {
+                    "type": "array",
+                    "description": "The arguments for the command. Here is some signature example: get_files_or_folders(query, page_size), get_by_folder_id(folder_id), download_file(file_id, file_name, directory), create_folder(folder_name, parent_folder_id=None), upload_file_to_folder(file_name, folder_id)",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "command",
+                "args"
+            ]
+        }
+    }
+}

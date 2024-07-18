@@ -142,12 +142,15 @@ class OpenAIClient(LLMRequest):
         tasks = []
         for tool_call in tool_calls:
             tool_name = tool_call.function.name
+            # if use generic command approach for tool, sometimes tool name is in the format of <manage_drive.get_by_folder_id>
+            tool_name = tool_name if "." not in tool_name else tool_name.split(".")[0]
             if tool_name not in self.tool_manager.tools:
                 logger.error(f"Tool '{tool_name}' not found.")
                 tool_response_message = ToolMessage(
                     tool_call_id=tool_call.id,
-                    name=tool_name,
-                    content="Tool not found",
+                    name=tool_name if "." not in tool_name else None,
+                    content=f"Tool<{tool_name}> not found, available tools: "
+                    + ", ".join(self.tool_manager.tools.keys()),
                 )
                 tool_responses.append(tool_response_message)
                 continue

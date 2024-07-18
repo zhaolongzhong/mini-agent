@@ -42,6 +42,8 @@ class AgentManager:
                 Tool.ShellTool,
                 Tool.MakePlan,
                 Tool.BrowseWeb,
+                Tool.ManageEmail,
+                Tool.ManageDrive,
             ],
         )
 

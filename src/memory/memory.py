@@ -10,7 +10,7 @@ from schemas.message import Message as SchemaMessage
 from schemas.message_param import MessageLike
 from schemas.tool_call import AssistantMessage, ToolMessage
 
-max_messages = 15
+max_messages = 20
 
 
 class StorageType(Enum):

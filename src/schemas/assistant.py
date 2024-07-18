@@ -1,9 +1,20 @@
+import re
+
 from pydantic import BaseModel, field_validator
 
 
 class Function(BaseModel):
     arguments: str
     name: str
+
+    @field_validator("name", mode="before")
+    def check_name(cls, value):
+        ## valid matches the pattern '^[a-zA-Z0-9_-]+$'
+        if not re.match(r"^[a-zA-Z0-9_-]+$", value):
+            print(f"'{value}' does not match the required pattern '^[a-zA-Z0-9_-]+$'")
+            if "." in value:
+                value = value.split(".")[0]
+        return value
 
 
 class ToolCall(BaseModel):

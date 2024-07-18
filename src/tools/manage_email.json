@@ -1,0 +1,27 @@
+{
+    "type": "function",
+    "function": {
+        "name": "manage_email",
+        "description": "Manage emails, including reading inbox, reading email details, and sending emails.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The command to execute. Can be 'read_email_inbox', 'read_email_detail', or 'send'."
+                },
+                "args": {
+                    "type": "array",
+                    "description": "The arguments for the command. For 'read_email_inbox', provide the max count of emails. For 'read_email_detail', provide the email ID. For 'send', provide (recipient, subject, and content).",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "command",
+                "args"
+            ]
+        }
+    }
+}
