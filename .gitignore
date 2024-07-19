@@ -9,3 +9,4 @@ venv/
 **/*memory.jsonl*
 
 credentials/
+evals/results/

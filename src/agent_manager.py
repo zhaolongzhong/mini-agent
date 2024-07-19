@@ -7,6 +7,7 @@ from llm_client.llm_model import ChatModel
 from memory.memory import StorageType
 from schemas.agent import AgentConfig
 from schemas.error import ErrorResponse
+from schemas.request_metadata import Metadata
 from tools.tool_manager import Tool
 from utils.cli_utils import progress_indicator
 from utils.logs import logger
@@ -89,6 +90,11 @@ class AgentManager:
                         sys.stdout.flush()
         return None
 
+    def get_metadata(self) -> Metadata | None:
+        if self.agent is None:
+            return None
+        return self.agent.metadata
+
     async def run(self):
         logger.info("AgentManager run")
         await self.create_agents()
@@ -98,6 +104,7 @@ class AgentManager:
                 break
             response = await self.handle_input(user_input)
             if response:
+                logger.debug(f"metadata: {self.get_metadata()}")
                 print(response)
 
 

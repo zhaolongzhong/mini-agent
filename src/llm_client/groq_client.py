@@ -82,6 +82,10 @@ class GroqClient(BaseClient, LLMRequest):
         if isinstance(response, ErrorResponse):
             return response
 
+        metadata.current_depth += 1
+        metadata.total_depth += 1
+        metadata.request_count += 1
+
         tool_calls = response.choices[0].message.tool_calls
         if tool_calls is None:
             logger.debug(f"[chat_completion] no tool calls found in response. response: {response.choices[0].message}")
@@ -92,11 +96,5 @@ class GroqClient(BaseClient, LLMRequest):
         await memory.save(tool_call_message)
         tool_responses = await self.process_tools_with_timeout(tool_calls, timeout=5)
         await memory.saveList(tool_responses)
-
-        metadata = Metadata(
-            last_user_message=metadata.last_user_message,
-            current_depth=metadata.current_depth + 1,
-            total_depth=metadata.total_depth + 1,
-        )
 
         return await self.send_completion_request(memory=memory, metadata=metadata)

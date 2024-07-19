@@ -102,7 +102,9 @@ class TogetherAIClient(BaseClient, LLMRequest):
         response = await self._send_completion_request(schema_messages)
         if isinstance(response, ErrorResponse):
             return response
-
+        metadata.current_depth += 1
+        metadata.total_depth += 1
+        metadata.request_count += 1
         tool_calls = response.choices[0].message.tool_calls
         if tool_calls is None:
             message = AssistantMessage(**response.choices[0].message.model_dump())

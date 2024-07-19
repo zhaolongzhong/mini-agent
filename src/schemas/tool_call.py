@@ -16,7 +16,7 @@ class ToolCall(BaseModel):
     @field_validator("function", mode="before")
     @classmethod
     def ensure_function_dict(cls, v):
-        return v if isinstance(v, dict) else v.dict()
+        return v if isinstance(v, dict) else v.model_dump()
 
 
 class AssistantMessage(BaseModel):

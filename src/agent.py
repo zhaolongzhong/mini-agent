@@ -1,3 +1,5 @@
+import uuid
+
 import schemas.anthropic as anthropic
 from llm_client.llm_client import LLMClient
 from memory.memory import DatabaseStorage, FileStorage, InMemoryStorage, MemoryInterface, StorageType
@@ -23,6 +25,7 @@ class Agent:
         self.config = config
         self.memory = memory
         self.llm_client = LLMClient(self.config)
+        self.metadata = None
         logger.info(f"{_tag} Create agent: {self.config.model_dump(exclude=['tools'])}")
 
     @classmethod
@@ -57,10 +60,11 @@ class Agent:
         return memory
 
     async def send_prompt(self, content: str) -> MessageLike:
+        self.metadata = Metadata(last_user_message=content, session_id=uuid.uuid4().hex)
         await self.memory.save(Message(role="user", content=content))
         response = await self.llm_client.send_completion_request(
             memory=self.memory,
-            metadata=Metadata(last_user_message=content),
+            metadata=self.metadata,
         )
         try:
             if isinstance(response, ErrorResponse):
@@ -92,3 +96,6 @@ class Agent:
             return ErrorResponse(
                 message=f"Exception: {e}",
             )
+
+    def get_metadata(self):
+        return self.metadata

@@ -68,6 +68,9 @@ class AnthropicClient:
                 return None
         messages = memory.get_message_params()
         chat_completion: Message = await self._send_completion_request(messages=messages)
+        metadata.current_depth += 1
+        metadata.total_depth += 1
+        metadata.request_count += 1
         assistant_message = AnthropicAssistantMessage(**chat_completion.model_dump())
         await memory.save(assistant_message)
 

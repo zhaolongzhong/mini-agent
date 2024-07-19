@@ -1,6 +1,8 @@
+import json
 import shutil
 import subprocess
 import tempfile
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -28,17 +30,19 @@ def temp_dir():
 @pytest_asyncio.fixture
 async def agent_manager() -> AgentManager:
     manager = AgentManager(is_test=True)
-    await manager.create_agents(model=ChatModel.GPT_4O)
+    await manager.create_agents(model=ChatModel.GPT_4O_MINI)
     return manager
 
 
 @pytest.mark.asyncio
 @pytest.mark.evaluation
-async def test_write_file(task_family: TaskFamily, temp_dir: str):
+async def test_tool_use(task_family: TaskFamily, temp_dir: str):
+    results = []
+    model = ChatModel.GPT_4O_MINI
     for task in task_family.get_tasks().values():
         # refresh agent for each task
         manager = AgentManager(is_test=True)
-        await manager.create_agents(model=ChatModel.GPT_4O)
+        await manager.create_agents(model=model)
 
         # set up task
         init_cmd = task["start"]["code"]
@@ -47,7 +51,8 @@ async def test_write_file(task_family: TaskFamily, temp_dir: str):
 
         instruction = task_family.get_instructions(task, temp_dir)
         response = await manager.handle_input(instruction)
-        print(f"agent response: {response}")
+        metadata = manager.get_metadata()
+        print(f"task:{task['id']}, metadata: {metadata}, agent response: {response}")
         submission = response
 
         # check if there is a check command
@@ -56,7 +61,19 @@ async def test_write_file(task_family: TaskFamily, temp_dir: str):
             output = run_command(f"cd {temp_dir} && {check_cmd}")
             submission = output
         score = task_family.score(task, submission)
+        results.append(
+            {
+                "task_id": task["id"],
+                "model": model.model_id,
+                "submission": submission,
+                "score": score,
+                "metadata": metadata.model_dump() if metadata else None,
+            }
+        )
         assert score == 1.0
+    result_path = Path(__file__).parent / "results/test_tool_use.json"
+    with open(result_path, "w") as result_file:
+        json.dump(results, result_file, indent=4)
 
 
 def run_command(cmd):
