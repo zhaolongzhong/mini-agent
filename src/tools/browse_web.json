@@ -1,0 +1,27 @@
+{
+    "type": "function",
+    "function": {
+        "name": "browse_web",
+        "description": "Browse the web to perform different actions like search, open URLs, or fetch news.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The command to execute. Can be 'search', 'open_url', or 'news'."
+                },
+                "args": {
+                    "type": "array",
+                    "description": "The arguments for the command. For 'search' and 'news', provide a list of search keywords. For 'open_url', provide a list of URLs.",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "command",
+                "args"
+            ]
+        }
+    }
+}

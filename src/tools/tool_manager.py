@@ -3,6 +3,7 @@ from enum import Enum
 from pathlib import Path
 
 from llm_client.llm_model import ChatModel
+from tools.browse_web import browse_web
 from tools.execute_shell_command import execute_shell_command
 from tools.make_plan import make_plan
 from tools.read_file import read_file
@@ -21,6 +22,7 @@ class Tool(Enum):
     CodeInterpreter = "run_python_script"
     ShellTool = "execute_shell_command"
     MakePlan = "make_plan"
+    BrowseWeb = "browse_web"
 
 
 class ToolManager:
@@ -32,6 +34,7 @@ class ToolManager:
             Tool.CodeInterpreter.value: run_python_script,
             Tool.ShellTool.value: execute_shell_command,
             Tool.MakePlan.value: make_plan,
+            Tool.BrowseWeb.value: browse_web,
         }
 
         self.tools_path = Path(__file__).parent

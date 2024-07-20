@@ -41,6 +41,7 @@ class AgentManager:
                 Tool.CodeInterpreter,
                 Tool.ShellTool,
                 Tool.MakePlan,
+                Tool.BrowseWeb,
             ],
         )
 
