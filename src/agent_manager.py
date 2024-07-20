@@ -40,6 +40,7 @@ class AgentManager:
                 Tool.CheckFolder,
                 Tool.CodeInterpreter,
                 Tool.ShellTool,
+                Tool.MakePlan,
             ],
         )
 

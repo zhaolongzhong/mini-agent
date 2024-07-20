@@ -4,6 +4,7 @@ from pathlib import Path
 
 from llm_client.llm_model import ChatModel
 from tools.execute_shell_command import execute_shell_command
+from tools.make_plan import make_plan
 from tools.read_file import read_file
 from tools.run_python_script import run_python_script
 from tools.scan_folder import scan_folder
@@ -19,6 +20,7 @@ class Tool(Enum):
     CheckFolder = "scan_folder"
     CodeInterpreter = "run_python_script"
     ShellTool = "execute_shell_command"
+    MakePlan = "make_plan"
 
 
 class ToolManager:
@@ -29,6 +31,7 @@ class ToolManager:
             Tool.CheckFolder.value: scan_folder,
             Tool.CodeInterpreter.value: run_python_script,
             Tool.ShellTool.value: execute_shell_command,
+            Tool.MakePlan.value: make_plan,
         }
 
         self.tools_path = Path(__file__).parent

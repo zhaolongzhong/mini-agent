@@ -190,5 +190,8 @@ class OpenAIClient(LLMRequest):
         return tool_responses
 
     async def run_tool(self, tool_func, *args):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, tool_func, *args)
+        if asyncio.iscoroutinefunction(tool_func):
+            return await tool_func(*args)
+        else:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, tool_func, *args)

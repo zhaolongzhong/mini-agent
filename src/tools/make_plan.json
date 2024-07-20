@@ -1,0 +1,19 @@
+{
+    "type": "function",
+    "function": {
+        "name": "make_plan",
+        "description": "Ask sub-assistant to make a plan.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "The request and context about the plan."
+                }
+            },
+            "required": [
+                "content"
+            ]
+        }
+    }
+}
