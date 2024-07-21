@@ -10,6 +10,8 @@ from schemas.message import Message as SchemaMessage
 from schemas.message_param import MessageLike
 from schemas.tool_call import AssistantMessage, ToolMessage
 
+max_messages = 15
+
 
 class StorageType(Enum):
     IN_MEMORY = "in_memory"
@@ -22,7 +24,7 @@ class MemoryInterface(ABC):
         self.messages: list[MessageLike] = []
 
     @abstractmethod
-    async def init_messages(self, limit=20):
+    async def init_messages(self, limit=max_messages):
         """Load messages from the storage."""
         pass
 
@@ -55,7 +57,7 @@ class InMemoryStorage(MemoryInterface):
     def __init__(self):
         super().__init__()
 
-    async def init_messages(self, limit=20):
+    async def init_messages(self, limit=max_messages):
         return self.messages
 
     async def save(self, message: MessageLike):
@@ -89,7 +91,7 @@ class FileStorage(MemoryInterface):
         messages = load_from_memory(self.file_path, model)
         self.messages = messages
 
-    async def init_messages(self, limit=20):
+    async def init_messages(self, limit=max_messages):
         return self.messages
 
     async def save(self, message: MessageLike):
@@ -108,7 +110,7 @@ class FileStorage(MemoryInterface):
         pass
 
     def get_message_params(self):
-        return self.messages
+        return self.messages[-max_messages:]
 
 
 class DatabaseStorage(MemoryInterface):
@@ -116,7 +118,7 @@ class DatabaseStorage(MemoryInterface):
         super().__init__()
         self.messagesOps = MessageOperations()
 
-    async def init_messages(self, limit=20):
+    async def init_messages(self, limit=max_messages):
         db_messages = await self.messagesOps.get_latest_messages(limit)
         db_messages.reverse()
         self.messages.clear()
