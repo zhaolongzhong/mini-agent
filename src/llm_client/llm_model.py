@@ -19,20 +19,32 @@ class ChatModel(Enum):
     GPT_4_TURBO_24_04_09 = ("gpt-4-turbo-2024-04-09", True, "openai")
 
     # LLAMA
-    ## https://console.groq.com/docs/tool-use#models
-    LLAMA3_70B_8192_GROQ = ("llama3-70b-8192", True, "groq")  # only model we currently recommend using for tool use
+    # https://ai.meta.com/blog/meta-llama-3-1/
+
+    # Groq
+    # https://console.groq.com/docs/tool-use#models
+    # https://wow.groq.com/introducing-llama-3-groq-tool-use-models/
+    LLAMA3_1_405B_GROQ = ("llama-3.1-405b-reasoning", True, "groq")
+    LLAMA3_1_70B_GROQ = ("llama-3.1-70b-versatile", True, "groq")
+    LLAMA3_1_8B_GROQ = ("llama-3.1-8b-instant", True, "groq")
+
+    LLAMA3_70B_8192_GROQ = ("llama3-70b-8192", True, "groq")
     LLAMA3_8B_8192_GROQ = ("llama3-8b-8192", True, "groq")
+
+    GEMMA2_9B_IT_GROQ = ("gemma2-9b-it", False, "groq")
+
+    # Together
+    # https://docs.together.ai/docs/json-mode#supported-models
+    # https://docs.together.ai/docs/function-calling#supported-models
+    LLAMA_3_1_405B_TURBO_TOGETHER = ("meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", False, "together")
+    LLAMA_3_1_70B_TURBO_TOGETHER = ("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", False, "together")
+    LLAMA_3_1_8B_TURBO_TOGETHER = ("meta-llama/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", False, "together")
     LLAMA_3_70B_CHAT_HF_TOGETHER = ("meta-llama/Llama-3-70b-chat-hf", False, "together")
     LLAMA_3_70B_TOGETHER = ("meta-llama/Meta-Llama-3-70B", False, "together")
 
-    # MIXTRAL
     MIXTRAL_8X7B_32768_TOGETHER = ("mixtral-8x7b-32768", True, "together")
     MISTRALAI_MISTRAL_8X7B_INSTRUCT_V0_1_TOGETHER = ("mistralai/mixtral-8x7b-instruct-v0.1", True, "together")
 
-    # GEMMA
-    GEMMA2_9B_IT_GROQ = ("gemma2-9b-it", False, "groq")
-
-    # Qwen
     QWEN_2_72B_INSTRUCT_TOGETHER = ("qwen/qwen2-72b-instruct", False, "together")
 
     def __init__(self, id, allows_tool_use, key_prefix):
