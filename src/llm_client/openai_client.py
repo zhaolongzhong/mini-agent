@@ -1,7 +1,6 @@
 import asyncio
 import json
 
-import httpx
 import openai
 from llm_client.llm_request import LLMRequest
 from memory.memory import MemoryInterface
@@ -25,9 +24,9 @@ class OpenAIClient(LLMRequest):
         api_key,
         config: AgentConfig,
     ):
-        self.http_client = httpx.AsyncClient(timeout=60)
-        self.chat_completions_url = "https://api.openai.com/v1/chat/completions"
-        self.api_key = api_key
+        self.client = openai.AsyncOpenAI(
+            api_key=api_key,
+        )
         self.model = config.model
         self.tools = config.tools
         self.tool_manager = ToolManager()
@@ -35,10 +34,6 @@ class OpenAIClient(LLMRequest):
             self.tool_json = self.tool_manager.get_tool_definitions(self.model, self.tools)
         else:
             self.tool_json = None
-        self.headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
 
         logger.info(f"[OpenAIClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]}")
 
@@ -50,33 +45,37 @@ class OpenAIClient(LLMRequest):
         for idx, message in enumerate(messages):
             logger.debug(f"{_tag}send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
 
-        body = {
-            "model": self.model.model_id,
-            "messages": [
-                msg.model_dump(exclude={"tool_calls"})
-                if hasattr(msg, "tool_calls") and not msg.tool_calls
-                else msg.model_dump()
-                for msg in messages
-            ],
-            "max_tokens": 2048,
-            "temperature": 0.8,
-            "response_format": {"type": "text"},
-        }
-
-        if self.tool_json and len(self.tool_json) > 0:
-            body["tools"] = self.tool_json
-            body["tool_choice"] = "auto"
-
         try:
-            response = await self.http_client.post(self.chat_completions_url, headers=self.headers, json=body)
+            if self.tool_json and len(self.tool_json) > 0:
+                response = await self.client.chat.completions.create(
+                    messages=[
+                        msg.model_dump(exclude={"tool_calls"})
+                        if hasattr(msg, "tool_calls") and not msg.tool_calls
+                        else msg.model_dump()
+                        for msg in messages
+                    ],
+                    model=self.model.model_id,
+                    max_tokens=2048,
+                    temperature=0.8,
+                    tool_choice="auto",
+                    tools=self.tool_json,
+                    response_format={"type": "text"},
+                )
+            else:
+                response = await self.client.chat.completions.create(
+                    messages=[
+                        msg.model_dump(exclude={"tool_calls"})
+                        if hasattr(msg, "tool_calls") and not msg.tool_calls
+                        else msg.model_dump()
+                        for msg in messages
+                    ],
+                    model=self.model.model_id,
+                    max_tokens=2048,
+                    temperature=0.8,
+                    response_format={"type": "text"},
+                )
 
-            if response.status_code != 200:
-                logger.error(f"{_tag}send_completion_request error:\n{response.text}")
-                raise Exception(response.text)
-
-            response_data = response.json()
-            logger.debug(f"{_tag}send_completion_request response:\n{json.dumps(response_data, indent=2)}")
-            chat_completion = ChatCompletion(**response_data)
+            chat_completion = ChatCompletion(**response.model_dump())
             logger.info(f"send_completion_request usage: {chat_completion.usage.model_dump()}")
             return chat_completion
         except openai.APIConnectionError as e:

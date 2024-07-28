@@ -89,7 +89,7 @@ nodeenv==1.9.1
     # via pyright
 oauthlib==3.2.2
     # via requests-oauthlib
-openai==1.23.0
+openai==1.37.1
     # via mini-agent
 packaging==24.1
     # via pytest
