@@ -46,3 +46,33 @@ Check a full list of supported models at `src/llm_client/llm_model.py`.
     - gemma-7b-it
  - [Together](https://docs.together.ai/docs/function-calling#supported-models): 
     - mistralai/Mixtral-8x7B-Instruct-v0.1  
+
+## Docker Support
+
+### Building the Docker Image
+
+To build the Docker image for mini-agent, run the following command in the project root directory:
+
+```bash
+docker build -t mini-agent .
+```
+
+### Running the mini-agent in a Docker Container
+
+After building the image, you can run the mini-agent in a Docker container using:
+
+```bash
+docker run -it --env-file .env mini-agent
+```
+
+Note: Make sure your `.env` file is properly configured with the necessary API keys before running the container.
+
+### Development with Docker
+
+For development purposes, you can mount your local directory to the container:
+
+```bash
+docker run -it --env-file .env -v $(pwd):/app mini-agent
+```
+
+This allows you to make changes to the code on your host machine and have them reflected in the container.
