@@ -112,6 +112,8 @@ pydantic-settings==2.2.1
     # via mini-agent
 pyparsing==3.1.2
     # via httplib2
+pypdf==4.3.1
+    # via mini-agent
 pyreqwest-impersonate==0.5.0
     # via duckduckgo-search
 pytest==8.2.2

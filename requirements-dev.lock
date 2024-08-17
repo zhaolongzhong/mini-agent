@@ -123,6 +123,8 @@ pygments==2.18.0
     # via rich
 pyparsing==3.1.2
     # via httplib2
+pypdf==4.3.1
+    # via mini-agent
 pyreqwest-impersonate==0.5.0
     # via duckduckgo-search
 pyright==1.1.370

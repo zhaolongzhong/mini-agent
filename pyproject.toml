@@ -23,7 +23,8 @@ dependencies = [
     "blobfile==2.1.1",
     "pytest-asyncio==0.23.7",
     "bs4==0.0.1",
-    "duckduckgo-search==6.1.12"
+    "duckduckgo-search==6.1.12",
+    "pypdf==4.3.1",
 ]
 
 [tool.rye]
