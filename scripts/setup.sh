@@ -21,4 +21,4 @@ check_rye_installed
 rye config --set-bool behavior.use-uv=true
 
 # Sync dependencies
-rye sync
+rye sync --all-features

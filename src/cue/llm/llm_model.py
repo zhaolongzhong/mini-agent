@@ -1,0 +1,46 @@
+import os
+from enum import Enum
+
+
+class ChatModel(Enum):
+    # Claude https://docs.anthropic.com/en/docs/about-claude/models#model-names
+    CLAUDE_3_OPUS_20240229 = ("claude-3-opus-20240229", True, "anthropic")
+    CLAUDE_3_5_SONNET_20240620 = ("claude-3-5-sonnet-20240620", True, "anthropic")
+
+    # Gemini https://ai.google.dev/gemini-api/docs/models/gemini#model-variations
+    # https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library#supported_models
+    GEMINI_1_5_FLASH = ("gemini-1.5-flash", True, "google")
+    GEMINI_1_5_PRO = ("gemini-1.5-pro", True, "google")
+
+    # OpenAI https://platform.openai.com/docs/models/overview
+    GPT_4O = ("gpt-4o", True, "openai")
+    GPT_4O_MINI = ("gpt-4o-mini", True, "openai")
+    O1_MINI = ("o1-mini", False, "openai")
+    O1_PREVIEW = ("o1-preview", False, "openai")
+
+    def __init__(self, id, tool_use_support, key_prefix):
+        self.id = id
+        self.tool_use_support = tool_use_support
+        self.key_prefix = key_prefix
+
+    @property
+    def model_id(self) -> str:
+        return self.id
+
+    @property
+    def api_key_env(self) -> str:
+        return f"{self.key_prefix.upper()}_API_KEY"
+
+    @classmethod
+    def from_model_id(cls, model_id: str) -> "ChatModel":
+        for model in cls:
+            if model.model_id == model_id:
+                return model
+        raise ValueError(f"Model with id '{model_id}' not found.")
+
+    @classmethod
+    def get_api_key(self) -> str:
+        api_key = os.getenv(self.api_key_env)
+        if not api_key:
+            raise ValueError(f"API key for {self.model.api_key_env} not found in environment variables")
+        return api_key

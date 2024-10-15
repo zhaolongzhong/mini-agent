@@ -26,7 +26,7 @@ class TaskFamily:
         pass
 
     @staticmethod
-    def score(t: str, submission: str) -> float | None:
+    def score(t: str, submission: str) -> float:
         raise NotImplementedError("Must implement score")
 
     @staticmethod

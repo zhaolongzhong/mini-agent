@@ -1,12 +1,12 @@
 [project]
-name = "mini-agent"
-version = "0.0.1"
+name = "cue"
+version = "0.1.0"
 description = ""
 authors = [
     { name = "Zhaolong Zhong" }
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = [
     "openai==1.37.1",
     "groq==0.9.0",
@@ -20,12 +20,16 @@ dependencies = [
     "sqlalchemy==2.0.30",
     "psycopg2==2.9.9",
     "asyncpg==0.29.0",
+    "rich==13.7.1", 
     "blobfile==2.1.1",
     "pytest-asyncio==0.23.7",
     "bs4==0.0.1",
     "duckduckgo-search==6.1.12",
     "pypdf==4.3.1",
 ]
+
+[project.scripts]
+cue = "cue.cli:main"
 
 [tool.rye]
 managed = true
@@ -35,7 +39,6 @@ dev-dependencies = [
     "ruff>=0.5.0",
     "pytest",
     "pytest-asyncio",
-    "rich==13.7.1",
 ]
 
 [tool.rye.scripts]
@@ -92,6 +95,8 @@ ignore = [
     "B006",  # mutable defaults
     "B904",  # Allow raising exceptions without from e, for HTTPException
     "B024",  # Allow an abstract base class has no abstract methods
+    "UP007",  # Ignore use of `X | Y` for type annotations
+    "UP035",  # Ignore use of Dict, List
 ]
 
 [tool.ruff.format]

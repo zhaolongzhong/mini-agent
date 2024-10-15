@@ -1,9 +1,5 @@
-import logging
-
 import pytest
 from cue import AgentConfig, AgentManager, ChatModel, StorageType, Tool
-
-logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
@@ -52,13 +48,13 @@ class TestAgentManager:
         input_prompt = f"Under {tmp_path}, can you create a fibonacci function in {file_name}?"
 
         response = await agent_manager.handle_input(input_prompt)
-        logger.debug(f"Response: {response}")
+        print(f"Response: {response}")  # Consider using logging instead
 
         assert response is not None, "Expected a non-None response from handle_input."
         assert "fibo" in response.lower(), "Response does not mention 'fibo'."
         assert file_path.exists(), f"Expected file '{file_path}' to be created."
 
         content = file_path.read_text()
-        logger.debug(f"File Content: {content}")
+        print(f"File Content: {content}")  # Consider using logging instead
 
         assert "def fibonacci" in content, "Fibonacci function not found in the created file."

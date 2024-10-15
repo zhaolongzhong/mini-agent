@@ -3,8 +3,7 @@ import time
 import unittest
 
 import pytest
-
-from src.tools.execute_shell_command import execute_shell_command
+from cue.tools.execute_shell_command import execute_shell_command
 
 
 @pytest.mark.unit
