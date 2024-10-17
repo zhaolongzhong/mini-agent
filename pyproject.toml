@@ -1,12 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "cue"
 version = "0.1.0"
-description = ""
+description = "A description of package."
 authors = [
-    { name = "Zhaolong Zhong" }
+    { name = "Zhaolong Zhong", email = "hello@example.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.9"
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "openai==1.37.1",
     "groq==0.9.0",
@@ -18,14 +28,16 @@ dependencies = [
     "pydantic==2.7.0",
     "pydantic-settings==2.2.1",
     "sqlalchemy==2.0.30",
-    "psycopg2==2.9.9",
+    "psycopg2-binary==2.9.9",
     "asyncpg==0.29.0",
-    "rich==13.7.1", 
+    "rich==13.7.1",
     "blobfile==2.1.1",
     "pytest-asyncio==0.23.7",
     "bs4==0.0.1",
     "duckduckgo-search==6.1.12",
     "pypdf==4.3.1",
+    "docker>=7.1",
+    "tqdm>=4.66.5",
 ]
 
 [project.scripts]
@@ -42,17 +54,12 @@ dev-dependencies = [
 ]
 
 [tool.rye.scripts]
-format = { chain = [
-  "format:ruff",
-  "fix:ruff",
-]}
+format = { chain = ["format:ruff", "fix:ruff"] }
 "format:black" = "black ."
 "format:ruff" = "ruff format ."
 "format:isort" = "isort ."
 
-lint = { chain = [
-  "check:ruff",
-]}
+lint = { chain = ["check:ruff"] }
 "check:ruff" = "ruff check ."
 "fix:ruff" = "ruff check --fix ."
 test = "pytest"
@@ -66,7 +73,7 @@ addopts = "--tb=short"
 xfail_strict = true
 asyncio_mode = "auto"
 filterwarnings = [
-  "error"
+    "error"
 ]
 
 [tool.mypy]
@@ -101,3 +108,11 @@ ignore = [
 
 [tool.ruff.format]
 docstring-code-format = true
+
+# Configure setuptools to include package data
+[tool.setuptools]
+packages = { find = { where = ["src"] } }
+
+# Specify package data using setuptools
+[tool.setuptools.package-data]
+"cue" = ["*.env", "tools/*.json"]

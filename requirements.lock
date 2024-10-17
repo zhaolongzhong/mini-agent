@@ -38,6 +38,8 @@ click==8.1.7
 distro==1.9.0
     # via groq
     # via openai
+docker==7.1.0
+    # via cue
 duckduckgo-search==6.1.12
     # via cue
 exceptiongroup==1.2.2
@@ -134,6 +136,7 @@ python-dotenv==1.0.0
     # via pydantic-settings
 requests==2.32.3
     # via cue
+    # via docker
     # via google-api-core
     # via requests-oauthlib
 requests-oauthlib==2.0.0
@@ -153,7 +156,8 @@ sqlalchemy==2.0.30
     # via cue
 tomli==2.0.2
     # via pytest
-tqdm==4.66.4
+tqdm==4.66.5
+    # via cue
     # via openai
 typing-extensions==4.12.2
     # via anyio
@@ -167,4 +171,5 @@ uritemplate==4.1.1
     # via google-api-python-client
 urllib3==2.2.2
     # via blobfile
+    # via docker
     # via requests
