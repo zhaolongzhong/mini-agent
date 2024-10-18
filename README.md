@@ -82,6 +82,31 @@ You can also run using the following script:
 
 For more detailed documentation or troubleshooting, please refer to the project documentation.
 
+## Deployment
+
+To build the package, run:
+
+```
+rye build
+```
+
+This command will generate distribution files in the `dist` directory, such as:
+
+- `dist/cue-0.1.0-py3-none-any.whl`
+- `dist/cue-0.1.0.tar.gz`
+
+You can use these files in your CI/CD workflow (e.g., GitHub Actions):
+
+```
+pip install -q ./dist/cue-0.1.0-py3-none-any.whl
+
+which cue
+
+cue -v
+```
+
+This installs the package and verifies its installation and version.
+
 ## Testing
 
 Run tests located in the `tests` directory using `./scripts/test.sh`.

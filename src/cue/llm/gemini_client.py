@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 import google.auth
@@ -25,6 +26,7 @@ def create_gemini_api_key() -> str:
     # https://cloud.google.com/vertex-ai/docs/start/cloud-environment
     service_account_key_file = os.getenv("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY_FILE")
     service_account_key_file = f"credentials/{service_account_key_file}"
+    service_account_key_file = Path(__file__).parent.parent.parent.parent / service_account_key_file
     SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
     creds = service_account.Credentials.from_service_account_file(service_account_key_file, scopes=SCOPES)
     # Refresh the access token
@@ -49,10 +51,11 @@ def create_client(api_key: str) -> openai.OpenAI:
 class GeminiClient(LLMRequest, BaseClient):
     def __init__(
         self,
-        api_key,
         config: AgentConfig,
     ):
-        api_key = create_gemini_api_key()
+        api_key = config.api_key or create_gemini_api_key()
+        if not api_key:
+            raise ValueError("API key is missing in both config and settings.")
         self.client = create_client(api_key)
         self.model = config.model
         self.tools = config.tools

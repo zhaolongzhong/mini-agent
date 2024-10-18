@@ -26,11 +26,11 @@ class OpenAIClient(LLMRequest):
         config: AgentConfig,
     ):
         settings = get_settings()
-        if not hasattr(settings, "OPENAI_API_KEY") or not settings.OPENAI_API_KEY:
-            raise ValueError("API key is missing in the settings.")
-        self.client = openai.AsyncOpenAI(
-            api_key=settings.OPENAI_API_KEY,
-        )
+        api_key = config.api_key or settings.OPENAI_API_KEY
+        if not api_key:
+            raise ValueError("API key is missing in both config and settings.")
+
+        self.client = openai.AsyncOpenAI(api_key=api_key)
         self.model = config.model
         self.tools = config.tools
         self.tool_manager = ToolManager()

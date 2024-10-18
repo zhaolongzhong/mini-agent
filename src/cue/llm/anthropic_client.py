@@ -37,11 +37,13 @@ class AnthropicClient:
         config: AgentConfig,
     ):
         settings = get_settings()
-        if not hasattr(settings, "ANTRHOPIC_API_KEY") or not settings.ANTRHOPIC_API_KEY:
-            raise ValueError("API key is missing in the settings.")
+        api_key = config.api_key or settings.ANTRHOPIC_API_KEY
+        if not api_key:
+            raise ValueError("API key is missing in both config and settings.")
+
         self.http_client = httpx.AsyncClient(timeout=60)
         self.chat_completions_url = "https://api.anthropic.com/v1/messages"
-        self.api_key = settings.ANTRHOPIC_API_KEY
+        self.api_key = api_key
         self.model = config.model
         self.tools = config.tools
         self.tool_manager: ToolManager = ToolManager()
