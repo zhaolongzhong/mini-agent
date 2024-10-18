@@ -1,7 +1,4 @@
 import logging
-import os
-import shutil
-import traceback
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -51,37 +48,10 @@ def close_logger(logger):
         logger.removeHandler(handler)
 
 
-def copy_file_or_directory(src, dest):
-    """
-    Helper function to copy either a file or directory to the destination.
-    """
-    try:
-        if Path(src).is_dir():
-            shutil.copytree(src, dest, dirs_exist_ok=True)
-            print(f"Copied directory '{src}' to '{dest}'.")
-        else:
-            shutil.copy(src, dest)
-            print(f"Copied file '{src}' to '{dest}'.")
-    except Exception as e:
-        print(f"Failed to copy '{src}' to '{dest}': {e}")
-        traceback.print_exc()
-
-
-def copy_folder(src_folder, dest_folder):
-    """
-    Helper function to copy all contents from a foler
-    """
-    # Ensure source and destination exist
-    if not os.path.exists(src_folder):
-        print(f"Source folder '{src_folder}' does not exist.")
-        return
-
-    if not os.path.exists(dest_folder):
-        os.makedirs(dest_folder)
-
-    # Copy contents of the source folder to the destination folder
-    try:
-        shutil.copytree(src_folder, dest_folder, dirs_exist_ok=True)
-        print(f"Successfully copied '{src_folder}' to '{dest_folder}'")
-    except Exception as e:
-        print(f"Error during copying: {e}")
+def setup_logging(log_dir: Path, run_id: str, task_id: str) -> logging.Logger:
+    log_dir = log_dir / run_id / task_id
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "run_task.log"
+    task_logger = setup_logger(task_id, log_file)
+    task_logger.setLevel(logging.DEBUG)
+    return task_logger

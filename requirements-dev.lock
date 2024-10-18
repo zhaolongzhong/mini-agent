@@ -106,7 +106,7 @@ protobuf==5.27.2
     # via google-api-core
     # via googleapis-common-protos
     # via proto-plus
-psycopg2==2.9.9
+psycopg2-binary==2.9.9
     # via cue
 pyasn1==0.6.0
     # via pyasn1-modules

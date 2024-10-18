@@ -103,7 +103,6 @@ ignore = [
     "B904",  # Allow raising exceptions without from e, for HTTPException
     "B024",  # Allow an abstract base class has no abstract methods
     "UP007",  # Ignore use of `X | Y` for type annotations
-    "UP035",  # Ignore use of Dict, List
 ]
 
 [tool.ruff.format]

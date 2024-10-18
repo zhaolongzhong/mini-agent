@@ -1,8 +1,18 @@
-# Cue
+# Cue (mini)
 
 A lightweight multi-agent system.
 
 Cue is designed to explore the potential of multi-agent systems powered by Large Language Models (LLMs) in a minimal and efficient format. This project aims to showcase how a small-scale, yet powerful, architecture can leverage LLMs to orchestrate intelligent agents.
+
+## Table of Contents
+
+- [Getting Started](#getting-started)
+- [Testing](#testing)
+- [Evals](#evals)
+- [Evals Environment](#evals-environment)
+- [Deployment](#deployment)
+- [File Structure](#file-structure)
+- [Support LLM Client](#support-llm-client)
 
 ## Getting Started
 
@@ -82,31 +92,6 @@ You can also run using the following script:
 
 For more detailed documentation or troubleshooting, please refer to the project documentation.
 
-## Deployment
-
-To build the package, run:
-
-```
-rye build
-```
-
-This command will generate distribution files in the `dist` directory, such as:
-
-- `dist/cue-0.1.0-py3-none-any.whl`
-- `dist/cue-0.1.0.tar.gz`
-
-You can use these files in your CI/CD workflow (e.g., GitHub Actions):
-
-```
-pip install -q ./dist/cue-0.1.0-py3-none-any.whl
-
-which cue
-
-cue -v
-```
-
-This installs the package and verifies its installation and version.
-
 ## Testing
 
 Run tests located in the `tests` directory using `./scripts/test.sh`.
@@ -132,36 +117,74 @@ Examples:
   ./scripts/test.sh -u -e       # Run unit and evaluation tests
 ```
 
-## Evaluation
+Here's an improved version of the section:
 
-Run full evaluations from the `evals` directory using `./scripts/run_evals.sh`. For more details, refer to `evals/README.md`.
+## Evals
+
+We currently support two types of evaluations:
+
+1. **Basic Evaluation** (`tests/evaluation`): This lightweight evaluation setup runs using pytest. You can execute it via:
+
+   ```bash
+   ./scripts/test.sh -e
+   ```
+
+2. **Detailed Evaluation** (`evals`): This is a standalone package designed for comprehensive evaluations. For detailed instructions on how to run it, please refer to [evals/README.md](evals/README.md).
+
+The detailed evaluations are executed within the `evals` environment.
+
+## Evals Environment
+
+The [environment](environment/README.md) package provides a standalone setup for running evaluation tasks in Docker containers. It supports parallel execution, making it easy to manage and monitor evaluation results efficiently.
+
+## Deployment
+
+To build the package, run:
+
+```
+rye build
+```
+
+This command will generate distribution files in the `dist` directory, such as:
+
+- `dist/cue-0.1.0-py3-none-any.whl`
+- `dist/cue-0.1.0.tar.gz`
+
+You can use these files in your CI/CD workflow (e.g., GitHub Actions):
+
+```
+pip install -q ./dist/cue-0.1.0-py3-none-any.whl
+
+which cue
+
+cue -v
+```
+
+This installs the package and verifies its installation and version.
 
 ## Agent Capacities
 
 - [Operating System (OS)](./docs/os.md)
 - [Coding](./docs/coding.md)
 
-## Model Configuration
+## Support LLM Client
 
-Go to `src/agent_manager.py` to specify a different model.
+Check a full list of supported clients at `src/cue/llm/`.
 
-## Support Models
-
-Check a full list of supported models at `src/cue/llm/llm_model.py`.
-
-- [GPT-4o](https://platform.openai.com/docs/models)
-- [Claude 3.5](https://docs.anthropic.com/en/docs/about-claude/models)
-- [Gemini 1.5 Pro](https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library#supported_models)
+- [Anthropic](https://docs.anthropic.com/en/docs/about-claude/models)
+- [OpenAI](https://platform.openai.com/docs/models)
+- [Gemini](https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library#supported_models)
 
 ## Project Structure
 
 ```
 - credentials/       # Contains authentication files and keys
 - docs/              # Documentation for the project
-- evals/             # Evaluation scripts and results
+- environment/       # Evals Environment
+- evals/             # Full evaluations for this project
 - logs/              # Log files for debugging and analysis
 - src/cue/           # Main source code
-  - cli/             # Interactive async client
+  - cli/             # Interactive command-line interface
   - _client          # Asynchronous client module
 - tests/             # Test cases for various modules
 ```
