@@ -1,7 +1,6 @@
 **/results/
 **/output/
 logs
-temp
 
 **/assets/*.whl
 **/assets/tasks

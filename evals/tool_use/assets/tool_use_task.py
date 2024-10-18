@@ -1,4 +1,4 @@
-from evals.task_family import TaskFamily
+from task_family import TaskFamily
 
 
 class Task:
