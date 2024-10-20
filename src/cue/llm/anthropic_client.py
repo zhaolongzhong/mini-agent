@@ -1,10 +1,10 @@
 import asyncio
 import json
 import logging
+import os
 
 import httpx
 
-from ..config import get_settings
 from ..memory.memory import MemoryInterface
 from ..schemas import AgentConfig
 from ..schemas.anthropic import (
@@ -36,8 +36,7 @@ class AnthropicClient:
         self,
         config: AgentConfig,
     ):
-        settings = get_settings()
-        api_key = config.api_key or settings.ANTRHOPIC_API_KEY
+        api_key = config.api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             raise ValueError("API key is missing in both config and settings.")
 

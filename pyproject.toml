@@ -29,6 +29,7 @@ dependencies = [
     "pydantic-settings==2.2.1",
     "sqlalchemy==2.0.30",
     "psycopg2-binary==2.9.9",
+    "greenlet>=3.1.1",
     "asyncpg==0.29.0",
     "rich==13.7.1",
     "blobfile==2.1.1",
@@ -114,4 +115,4 @@ packages = { find = { where = ["src"] } }
 
 # Specify package data using setuptools
 [tool.setuptools.package-data]
-"cue" = ["*.env", "tools/*.json"]
+"cue" = ["tools/*.json"]

@@ -2,6 +2,7 @@
 import logging
 
 import pytest
+
 from cue.utils.logs import setup_logging
 
 

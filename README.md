@@ -1,4 +1,4 @@
-# Cue (mini)
+# Cue (mini-agent)
 
 A lightweight multi-agent system.
 
@@ -35,34 +35,44 @@ This script will:
 - Check if Rye is installed and install it if necessary.
 - Configure Rye and sync project dependencies.
 
-### Step 3: Create the `.env` File
+### Step 3: Set Up API Keys
 
-```
-cp .env.example src/cue/.env
+**Option 1:** Use a `.env` file to store your API keys:
+
+1. Copy the example file:
+   ```bash
+   cp .env.example .env
+   ```
+2. Update the `.env` file with your API keys.
+
+**Option 2:** Set the API key directly using the terminal:
+
+```bash
+export OPENAI_API_KEY="your_api_key"
 ```
 
-Update the API keys in the `.env` file with your own credentials.
+Choose the option that best fits your workflow.
 
 ### Step 4: Run command line
 
 Start the command line:
 
-```
+```bash
 rye run cue -r
 ```
 
 or activiate virtual environment and run `cue` command directly.
 
-```
+```bash
 source .venv/bin/activate
 ```
 
-```
+```bash
 $ cue -v
 version 0.1.0
 ```
 
-```
+```bash
 $ cue -h
 usage: cue [-h] [-v] [-r] [-c] [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--log-file LOG_FILE]
 
@@ -80,7 +90,7 @@ optional arguments:
 
 You can also run using the following script:
 
-```
+```bash
 ./scripts/run.sh
 ```
 
@@ -98,7 +108,7 @@ Run tests located in the `tests` directory using `./scripts/test.sh`.
 
 **Note**: Running basic evaluation test requires `OPENAI_API_KEY` in `src/cue/.env`
 
-```
+```bash
 $ ./scripts/test.sh -h
 Usage: ./scripts/test.sh [options]
 
@@ -141,7 +151,7 @@ The [environment](environment/README.md) package provides a standalone setup for
 
 To build the package, run:
 
-```
+```bash
 rye build
 ```
 

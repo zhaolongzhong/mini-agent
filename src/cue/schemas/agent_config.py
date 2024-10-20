@@ -20,6 +20,6 @@ class AgentConfig(BaseModel):
     conversation_id: Optional[str] = None
     max_actions: Optional[int] = 10
     system_message: Optional[str] = None
-    storage_type: Optional[Any] = StorageType.FILE
+    storage_type: Optional[Any] = StorageType.IN_MEMORY
     feature_flag: FeatureFlag = Field(default_factory=FeatureFlag)
     is_test: bool = False

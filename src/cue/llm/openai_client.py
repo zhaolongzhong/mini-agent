@@ -1,11 +1,11 @@
 import asyncio
 import json
 import logging
+import os
 from typing import Optional
 
 import openai
 
-from ..config import get_settings
 from ..memory import MemoryInterface
 from ..schemas import AgentConfig, ErrorResponse, Metadata
 from ..schemas.chat_completion import ChatCompletion
@@ -25,8 +25,7 @@ class OpenAIClient(LLMRequest):
         self,
         config: AgentConfig,
     ):
-        settings = get_settings()
-        api_key = config.api_key or settings.OPENAI_API_KEY
+        api_key = config.api_key or os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("API key is missing in both config and settings.")
 

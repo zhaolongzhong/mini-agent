@@ -5,21 +5,13 @@ from typing import Any, Optional
 from pydantic import PostgresDsn, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .llm.llm_model import ChatModel
-
 
 class Settings(BaseSettings):
-    OPENAI_API_KEY: Optional[str] = None
-    ANTHROPIC_API_KEY: Optional[str] = None
-    GEMINI_API_KEY: Optional[str] = None
-
-    chat_model: ChatModel = ChatModel.GPT_4O_MINI.value
-
-    POSTGRES_HOST: Optional[str] = None
-    POSTGRES_USER: Optional[str] = None
-    POSTGRES_PASSWORD: Optional[str] = None
-    POSTGRES_DB: Optional[str] = None
-    POSTGRES_PORT: Optional[int] = None
+    POSTGRES_HOST: Optional[str] = "127.0.0.1"
+    POSTGRES_USER: Optional[str] = "postgres"
+    POSTGRES_PASSWORD: Optional[str] = "password"
+    POSTGRES_DB: Optional[str] = "agent_db"
+    POSTGRES_PORT: Optional[int] = "5432"
     DATABASE_URI: Optional[str] = None
 
     @field_validator("DATABASE_URI", mode="before")

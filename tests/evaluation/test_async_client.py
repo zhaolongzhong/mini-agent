@@ -3,6 +3,7 @@ import shutil
 import tempfile
 
 import pytest
+
 from cue import AgentConfig, AsyncCueClient, ChatModel, StorageType, Tool
 
 logger = logging.getLogger(__name__)

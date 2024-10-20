@@ -39,26 +39,13 @@ class CLI:
             feature_flag=FeatureFlag(is_cli=True, is_eval=False),
             tools=[
                 Tool.FileRead,
+                Tool.FileWrite,
                 Tool.ShellTool,
             ],
         )
         self.agent_manager = AgentManager(config=self.agent_config)
         self.executor = ThreadPoolExecutor()
         self.agent = None
-
-    def get_default_config(self):
-        return {
-            "name": self.agent_config.name,
-            "model": self.agent_config.model,
-            "temperature": self.agent_config.temperature,
-            "max_tokens": self.agent_config.max_tokens,
-            "conversation_id": self.agent_config.conversation_id,
-            "feature_flag": {
-                "is_cli": self.agent_config.feature_flag.is_cli,
-                "is_eval": self.agent_config.feature_flag.is_eval,
-            },
-            "tools": [tool.name for tool in self.agent_config.tools],
-        }
 
     async def run(self):
         self.logger.info("Running the CLI. Type 'exit' or 'quit' to exit.")
@@ -136,8 +123,8 @@ def async_main():
 
     if args.config:
         cli_temp = CLI()
-        config = cli_temp.get_default_config()
-        for key, value in config.items():
+        config = cli_temp.agent_config
+        for key, value in config.model_dump().items():
             print(f"{key}: {value}")
         return
 

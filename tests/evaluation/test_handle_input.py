@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+
 from cue import AgentConfig, AgentManager, ChatModel, StorageType, Tool
 
 logger = logging.getLogger(__name__)

@@ -3,6 +3,7 @@ import time
 import unittest
 
 import pytest
+
 from cue.tools.execute_shell_command import execute_shell_command
 
 
