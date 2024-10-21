@@ -1,4 +1,3 @@
-# src/cue/_cli_async.py
 import argparse
 import asyncio
 import logging
@@ -13,7 +12,7 @@ from .._agent_manager import AgentManager
 from ..llm.llm_model import ChatModel
 from ..schemas import AgentConfig, CompletionResponse, FeatureFlag
 from ..tools._tool import Tool
-from ..utils.logs import _logger, setup_logging
+from ..utils.logs import setup_logging
 
 setup_logging()
 
@@ -25,32 +24,22 @@ custom_theme = Theme(
     }
 )
 
+logger = logging.getLogger(__name__)
+
 
 class CLI:
     def __init__(self):
-        self.logger = _logger
+        self.logger = logger
         self.console = Console(theme=custom_theme)
-        self.agent_config = AgentConfig(
-            name="cue_cli",
-            model=ChatModel.GPT_4O_MINI,
-            temperature=0.8,
-            max_tokens=2000,
-            conversation_id="",
-            feature_flag=FeatureFlag(is_cli=True, is_eval=False),
-            tools=[
-                Tool.FileRead,
-                Tool.FileWrite,
-                Tool.ShellTool,
-            ],
-        )
-        self.agent_manager = AgentManager(config=self.agent_config)
+
+        self.agent_manager = AgentManager()
         self.executor = ThreadPoolExecutor()
         self.agent = None
 
     async def run(self):
         self.logger.info("Running the CLI. Type 'exit' or 'quit' to exit.")
         try:
-            self.agent = await self.agent_manager.set_up(self.agent_config)
+            self._config_agents()
             while True:
                 user_prompt = Text("[User]: ", style="user")
                 user_input = await self.get_user_input_async(user_prompt)
@@ -63,7 +52,7 @@ class CLI:
                     self.logger.info("Exit command received. Shutting down.")
                     break
                 self.logger.debug(f"{user_input}")
-                response = await self.agent.send_message(user_input)
+                response = await self.agent_manager.run(self.agent_a.id, user_input)
                 if response:
                     if isinstance(response, CompletionResponse):
                         response = response.get_text()
@@ -80,6 +69,41 @@ class CLI:
     async def get_user_input_async(self, prompt: str):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(self.executor, lambda: self.console.input(prompt))
+
+    def _config_agents(self):
+        self.agent_a_config = AgentConfig(
+            id="agent_a",
+            name="agent_a",
+            system_message="Your name is agent_a",
+            model=ChatModel.GPT_4O_MINI,
+            temperature=0.8,
+            max_tokens=2000,
+            conversation_id="",
+            feature_flag=FeatureFlag(is_cli=True, is_eval=False),
+            tools=[
+                Tool.FileRead,
+                # Tool.FileWrite,
+                # Tool.ShellTool,
+                # Tool.CallAgent,
+            ],
+        )
+
+        self.agent_b_config = AgentConfig(
+            id="agent_b",
+            name="agent_b",
+            system_message="Your name is agent_b",
+            model=ChatModel.GPT_4O_MINI,
+            conversation_id="",
+            feature_flag=FeatureFlag(is_cli=True, is_eval=False),
+            tools=[
+                Tool.FileRead,
+                Tool.FileWrite,
+                Tool.ShellTool,
+            ],
+        )
+        self.agent_a = self.agent_manager.register_agent(self.agent_a_config)
+        self.agent_manager.add_tool_to_agent(self.agent_a.id, self.agent_manager.call_agent)
+        self.agent_b = self.agent_manager.register_agent(self.agent_b_config)
 
 
 def _parse_args():
@@ -129,7 +153,7 @@ def async_main():
         return
 
     if args.log_level:
-        _logger.setLevel(getattr(logging, args.log_level.upper(), logging.INFO))
+        logger.setLevel(getattr(logging, args.log_level.upper(), logging.DEBUG))
         logging.getLogger("httpx").setLevel(getattr(logging, logging.WARN, logging.WARN))
 
     if args.log_file:
@@ -139,8 +163,8 @@ def async_main():
             datefmt="%Y-%m-%d %H:%M:%S",
         )
         file_handler.setFormatter(formatter)
-        file_handler.setLevel(logging.DEBUG if _logger.level <= logging.DEBUG else _logger.level)
-        _logger.addHandler(file_handler)
+        file_handler.setLevel(logging.DEBUG if logger.level <= logging.DEBUG else logger.level)
+        logger.addHandler(file_handler)
 
     cli = CLI()
 
@@ -150,7 +174,7 @@ def async_main():
         sys.stderr.write("\nKeyboard interrupt detected. Exiting...\n")
         sys.exit(1)
     except Exception as e:
-        _logger.exception(f"Unexpected error: {e}")
+        logger.exception(f"Unexpected error: {e}")
         sys.exit(1)
 
 

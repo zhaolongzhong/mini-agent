@@ -13,9 +13,6 @@ echo "Entrypoint script is running."
 OUTPUT_DIR=${OUTPUT_DIR:-/home/output}
 mkdir -p "$OUTPUT_DIR"
 
-# Build the cue client
-rye build 
-
 # Install cue client, remove -q to see full installation log
 pip install -q ./cue-0.1.0-py3-none-any.whl
 

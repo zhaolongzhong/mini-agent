@@ -1,4 +1,3 @@
-# src/cue/utils/logs.py
 import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
@@ -45,6 +44,7 @@ def _basic_config() -> None:
 
 
 def _setup_development_config() -> None:
+    env = os.environ.get("CUE_LOG", "info")
     environment = os.getenv("ENVIRONMENT", "development")
 
     # use dedicated logger for development
@@ -65,8 +65,7 @@ def _setup_development_config() -> None:
     )
     console_handler.setFormatter(formatter)
     handlers.append(console_handler)
-
-    if environment in ("development", "testing"):
+    if environment.lower() in ("development", "testing"):
         # Determine the base directory (three levels up)
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
         log_dir = os.path.join(base_dir, "logs")
@@ -89,15 +88,18 @@ def _setup_development_config() -> None:
         debug_log_handler.setFormatter(formatter)
         handlers.append(debug_log_handler)
 
-        logging.getLogger("asyncio").setLevel(logging.WARN)
-        logging.getLogger("httpcore").setLevel(logging.INFO)
-        logging.getLogger("httpx").setLevel(logging.INFO)
-        logging.getLogger("passlib").setLevel(logging.INFO)
-        logging.getLogger("urllib3").setLevel(logging.ERROR)
-
     # Add all handlers to the root logger
     for handler in handlers:
         logger.addHandler(handler)
+    # **Set the root logger level here**
+    logger.setLevel(logging.DEBUG if env == "debug" else logging.INFO)
+    logging.getLogger("asyncio").setLevel(logging.WARN)
+    logging.getLogger("httpcore").setLevel(logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.INFO)
+    logging.getLogger("passlib").setLevel(logging.INFO)
+    logging.getLogger("urllib3").setLevel(logging.ERROR)
+    logging.getLogger("anthropic").setLevel(logging.INFO)
+    logging.getLogger("openai").setLevel(logging.INFO)
 
 
 def setup_logging() -> None:
@@ -105,7 +107,7 @@ def setup_logging() -> None:
     if env == "debug":
         _basic_config()
         _logger.setLevel(logging.DEBUG)
-        httpx_logger.setLevel(logging.DEBUG)
+        httpx_logger.setLevel(logging.INFO)
     elif env == "info":
         _basic_config()
         _logger.setLevel(logging.INFO)

@@ -112,7 +112,7 @@ if $RUN_EVALUATION; then
   echo "Running evaluation tests ..."
 
   # Load the main .env file to get the API keys
-  load_env "src/cue/.env"
+  load_env ".env"
 
   # Check if OPENAI_API_KEY is set
   if [ -z "${OPENAI_API_KEY:-}" ]; then
@@ -130,7 +130,7 @@ if $RUN_SINGLE_TEST; then
   # Check if TEST_PATH contains "evaluation" and load the .env file if necessary
   if [[ "$TEST_PATH" == *"evaluation"* ]]; then
     echo "Loading environment variables for evaluation tests..."
-    load_env "src/cue/.env"
+    load_env ".env"
   fi
   
   rye run pytest -s "$TEST_PATH"

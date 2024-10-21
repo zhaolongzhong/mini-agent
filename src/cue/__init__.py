@@ -1,4 +1,3 @@
-# src/cue/__init__.py
 from pathlib import Path
 
 from dotenv import load_dotenv

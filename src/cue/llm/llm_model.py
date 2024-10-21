@@ -18,10 +18,10 @@ class ChatModel(Enum):
     O1_MINI = ("o1-mini", False, "openai")
     O1_PREVIEW = ("o1-preview", False, "openai")
 
-    def __init__(self, id, tool_use_support, key_prefix):
+    def __init__(self, id, tool_use_support, provider):
         self.id = id
         self.tool_use_support = tool_use_support
-        self.key_prefix = key_prefix
+        self.provider = provider
 
     @property
     def model_id(self) -> str:
@@ -29,7 +29,7 @@ class ChatModel(Enum):
 
     @property
     def api_key_env(self) -> str:
-        return f"{self.key_prefix.upper()}_API_KEY"
+        return f"{self.provider.upper()}_API_KEY"
 
     @classmethod
     def from_model_id(cls, model_id: str) -> "ChatModel":

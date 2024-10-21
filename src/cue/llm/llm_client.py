@@ -1,8 +1,6 @@
 import logging
 
-from ..memory.memory import MemoryInterface
-from ..schemas.agent_config import AgentConfig
-from ..schemas.request_metadata import Metadata
+from ..schemas import AgentConfig, CompletionRequest, CompletionResponse
 from .anthropic_client import AnthropicClient
 from .gemini_client import GeminiClient
 from .llm_request import LLMRequest
@@ -23,12 +21,12 @@ class LLMClient(LLMRequest):
             "google": GeminiClient,
         }
 
-        client_class = client_class_mapping.get(model.key_prefix)
+        client_class = client_class_mapping.get(model.provider)
         if not client_class:
-            logger.error(f"Client class for key prefix {model.key_prefix} not found")
-            raise ValueError(f"Client class for key prefix {model.key_prefix} not found")
+            logger.error(f"Client class for key prefix {model.provider} not found")
+            raise ValueError(f"Client class for key prefix {model.provider} not found")
 
         return client_class(config=config)
 
-    async def send_completion_request(self, memory: MemoryInterface, metadata: Metadata) -> dict:
-        return await self.llm_client.send_completion_request(memory=memory, metadata=metadata)
+    async def send_completion_request(self, request: CompletionRequest) -> CompletionResponse:
+        return await self.llm_client.send_completion_request(request=request)

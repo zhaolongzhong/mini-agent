@@ -1,14 +1,9 @@
 from abc import ABC, abstractmethod
 
-from ..memory import MemoryInterface
-from ..schemas import Metadata
+from ..schemas import CompletionRequest
 
 
 class LLMRequest(ABC):
     @abstractmethod
-    async def send_completion_request(
-        self,
-        memory: MemoryInterface,
-        metadata: Metadata,
-    ):
+    async def send_completion_request(self, request: CompletionRequest):
         pass

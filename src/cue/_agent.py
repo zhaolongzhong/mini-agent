@@ -1,171 +1,153 @@
+import asyncio
+import json
 import logging
-from typing import Optional, Union
+from typing import Dict, List, Optional, Union
 
-from .llm import LLMClient
-from .memory.memory import MemoryInterface, setup_memory_storage
-from .schemas import (
-    AgentConfig,
-    ChatCompletion,
-    CompletionResponse,
-    ErrorResponse,
-    Message,
-    Metadata,
-    anthropic,
-)
-from .utils.id_generator import generate_session_id
+from pydantic import BaseModel
+
+from .llm.llm_client import LLMClient
+from .memory.memory import InMemoryStorage
+from .schemas import AgentConfig, CompletionRequest, CompletionResponse, Metadata, SystemMessage
+from .schemas.anthropic import ToolResultContent, ToolResultMessage, ToolUseContent
+from .schemas.chat_completion import ToolCall, ToolMessage
+from .tool_manager import ToolManager
 
 logger = logging.getLogger(__name__)
 
 
 class Agent:
-    """
-    Represents an agent that interacts with an LLM (Large Language Model) client,
-    manages session-based memory storage, and handles message exchanges.
-    """
-
-    _tag = "[Agent]"
-
-    def __init__(
-        self,
-        config: AgentConfig,
-        memory: MemoryInterface,
-        session_id: str,
-    ) -> None:
-        """
-        Initializes the Agent instance.
-
-        Args:
-            config (AgentConfig): Configuration for the agent.
-            memory (MemoryInterface): Memory storage interface.
-            session_id (str): Unique session identifier.
-        """
-        self.id: str = config.id
-        self.session_id: str = session_id
-        self.config: AgentConfig = config
-        self.memory: MemoryInterface = memory
-        self.llm_client: LLMClient = LLMClient(self.config)
+    def __init__(self, config: AgentConfig, agent_manager: "AgentManager"):  # type: ignore # noqa: F821
+        self.id = config.id
+        self.config = config
+        self.tool_manager = ToolManager()
+        self.memory = InMemoryStorage()
+        self.client: LLMClient = LLMClient(self.config)
         self.metadata: Optional[Metadata] = None
+        self.agent_manager = agent_manager
+        self.description = self._generate_description()
+        self.other_agents_info = ""
 
-        logger.info(f"{self._tag} Created agent: {self.config.model_dump(exclude=['tools'])}")
+    def get_system_message(self) -> SystemMessage:
+        instruction = f"{self.config.system_message}"
+        instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info}"
+        return SystemMessage(role="system", name=self.config.name, content=instruction)
 
-    @classmethod
-    async def create(cls, config: AgentConfig) -> "Agent":
-        """
-        Asynchronously creates an Agent instance with initialized memory storage.
+    def get_messages(self) -> List:
+        return self.memory.get_message_params(self.config.model.id)
 
-        Args:
-            config (AgentConfig): Configuration for the agent.
+    def _generate_description(self) -> str:
+        description = ""
+        if self.config.description:
+            description = self.config.description
+        tool_names = [tool.value for tool in self.config.tools]
+        if not tool_names:
+            return description
+        description += f"Agent {self.config.id} is able to use these tools: {', '.join(tool_names)}"
+        return description
 
-        Returns:
-            Agent: An instance of the Agent class.
-        """
-        session_id = generate_session_id()
-        memory_storage: MemoryInterface = setup_memory_storage(
-            storage_type=config.storage_type, config=config, session_id=session_id
+    def _get_tool_json(self) -> Optional[List[Dict]]:
+        if self.config.tools:
+            return self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
+        else:
+            return None
+
+    async def send_messages(
+        self, messages: List[Union[BaseModel, Dict]], metadata: Optional[Metadata] = None
+    ) -> CompletionResponse:
+        logger.debug(f"{self.config.id} send_messages: {messages}")
+        if not self.metadata:
+            self.metadata = metadata
+
+        messages_dict = [
+            msg.model_dump(exclude_none=True, exclude_unset=True) if isinstance(msg, BaseModel) else msg
+            for msg in messages
+        ]
+        # Add system message if it doesn't exist
+        if messages_dict[0]["role"] != "system":
+            messages_dict.insert(0, self.get_system_message().model_dump(exclude_none=True))
+
+        completion_request = CompletionRequest(
+            model=self.config.model.id,
+            messages=messages_dict,
+            metadata=metadata,
+            tool_json=self._get_tool_json(),
         )
-        await memory_storage.init_messages()
-        return cls(
-            config=config,
-            memory=memory_storage,
-            session_id=session_id,
-        )
+        response = await self.client.send_completion_request(completion_request)
+        await self.memory.save(response)
 
-    async def send_message(self, content: str) -> CompletionResponse:
-        """
-        Sends a user message to the LLM client and processes the response.
+        tool_calls = response.get_tool_calls()
+        if not tool_calls:
+            return response
 
-        Args:
-            content (str): The message content from the user.
+        tool_result = await self.process_tools_with_timeout(tool_calls=tool_calls)
+        if "claude" in self.config.model.id:
+            tool_result = ToolResultMessage(role="user", content=tool_result)
+            await self.memory.save(tool_result)
+        else:
+            await self.memory.saveList(tool_result)
 
-        Returns:
-            CompletionResponse: The response from the LLM client.
-        """
-        self.metadata = Metadata(last_user_message=content, session_id=self.session_id)
-        user_message = Message(role="user", content=content)
-        await self.memory.save(user_message)
-        logger.info(f"{self._tag} Saved user message to memory: {content}")
+        new_messages = self.memory.get_message_params(model=self.config.model.id)
+        return await self.send_messages(new_messages)
 
-        try:
-            response = await self.llm_client.send_completion_request(
-                memory=self.memory,
-                metadata=self.metadata,
-            )
-            logger.debug(f"{self._tag} Received response: {response}")
+    async def process_tools_with_timeout(
+        self, tool_calls: Union[List[ToolCall], List[ToolUseContent]], timeout: int = 30
+    ) -> Union[List[ToolMessage], List[ToolResultContent]]:
+        tool_responses = []
+        tasks = []
 
-            if isinstance(response, ErrorResponse):
-                logger.error(f"{self._tag} LLM returned an error: {response.message}")
-                return CompletionResponse(model=self.config.model.model_id, error=response)
-            elif isinstance(response, ChatCompletion) or isinstance(response, anthropic.Message):
-                return CompletionResponse(model=self.config.model.model_id, response=response)
+        for tool_call in tool_calls:
+            if isinstance(tool_call, ToolCall):
+                tool_name = tool_call.function.name
+                tool_id = tool_call.id
+                args = tuple(json.loads(tool_call.function.arguments).values())
+            elif isinstance(tool_call, ToolUseContent):
+                tool_name = tool_call.name
+                tool_id = tool_call.id
+                args = tuple(tool_call.input.values())
             else:
-                logger.error(f"{self._tag} Unexpected response type: {type(response)} with content: {response}")
-                return CompletionResponse(
-                    model=self.config.model.model_id,
-                    error=ErrorResponse(
-                        message=f"Unexpected response type: {type(response)}",
-                        detail=f"Response content: {response}",
-                    ),
-                )
-        except Exception as e:
-            logger.exception(f"{self._tag} Exception during send_message: {e}")
-            return CompletionResponse(
-                model=self.config.model.model_id,
-                error=ErrorResponse(
-                    message="Error in processing the response.",
-                    detail=str(e),
-                ),
-            )
+                raise ValueError(f"Unsupported tool call type: {type(tool_call)}")
 
-    async def send_request(self, memory: Optional[MemoryInterface] = None) -> CompletionResponse:
-        """
-        Sends a one-time completion request to the LLM model.
+            if tool_name not in self.tool_manager.tools and tool_name not in "call_agent":
+                error_message = f"Tool '{tool_name}' not found. {self.tool_manager.tools.keys()}"
+                logger.error(error_message)
+                tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
+                continue
 
-        Args:
-            memory (Optional[MemoryInterface]): Optional memory interface to use for the request.
-
-        Returns:
-            CompletionResponse: The response from the LLM client.
-        """
-        memory_to_use = memory or self.memory
-        try:
-            response = await self.llm_client.send_completion_request(
-                memory=memory_to_use,
-                metadata=Metadata(session_id=self.session_id),
-            )
-            logger.debug(f"{self._tag} Received one-time response: {response}")
-
-            if isinstance(response, ErrorResponse):
-                logger.error(f"{self._tag} LLM returned an error on one-time request: {response.message}")
-                return CompletionResponse(model=self.config.model.model_id, error=response)
-            elif isinstance(response, Union(ChatCompletion, anthropic.Message)):
-                return CompletionResponse(model=self.config.model.model_id, response=response)
+            if tool_name == "call_agent":
+                tool_func = self.agent_manager.call_agent
             else:
-                logger.error(
-                    f"{self._tag} Unexpected response type in send_request: {type(response)} with content: {response}"
-                )
-                return CompletionResponse(
-                    model=self.config.model.model_id,
-                    error=ErrorResponse(
-                        message=f"Unexpected response type: {type(response)}",
-                        detail=f"Response content: {response}",
-                    ),
-                )
-        except Exception as e:
-            logger.exception(f"{self._tag} Exception during send_request: {e}")
-            return CompletionResponse(
-                model=self.config.model.model_id,
-                error=ErrorResponse(
-                    message="Exception occurred while sending request.",
-                    detail=str(e),
-                ),
-            )
+                tool_func = self.tool_manager.tools[tool_name]
+            task = asyncio.create_task(self.run_tool(tool_func, *args))
+            tasks.append((task, tool_id, tool_name))
 
-    def get_metadata(self) -> Optional[Metadata]:
-        """
-        Retrieves the current metadata of the agent.
+        for task, tool_id, tool_name in tasks:
+            try:
+                tool_response = await asyncio.wait_for(task, timeout=timeout)
+                tool_responses.append(self.create_success_response(tool_id, tool_name, str(tool_response)))
+            except asyncio.TimeoutError:
+                error_message = f"Timeout while calling tool <{tool_name}> after {timeout}s."
+                tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
+            except Exception as e:
+                error_message = f"Error while calling tool <{tool_name}>: {e}"
+                tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
 
-        Returns:
-            Optional[Metadata]: The metadata if available, else None.
-        """
-        logger.debug(f"{self._tag} Retrieving metadata: {self.metadata}")
-        return self.metadata
+        return tool_responses
+
+    async def run_tool(self, tool_func, *args):
+        if asyncio.iscoroutinefunction(tool_func):
+            return await tool_func(*args)
+        else:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, tool_func, *args)
+
+    def create_success_response(self, tool_id: str, tool_name: str, content: str):
+        if "claude" in self.config.model.id:
+            return ToolResultContent(tool_use_id=tool_id, content=content)
+        else:
+            return ToolMessage(tool_call_id=tool_id, name=tool_name, role="tool", content=content)
+
+    def create_error_response(self, tool_id: str, tool_name: str, error_message: str):
+        if "claude" in self.config.model.id:
+            return ToolResultContent(tool_use_id=tool_id, content=error_message, is_error=True)
+        else:
+            return ToolMessage(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)

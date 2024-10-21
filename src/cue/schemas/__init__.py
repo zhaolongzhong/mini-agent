@@ -1,12 +1,13 @@
 from .agent_config import AgentConfig
 from .anthropic import AnthropicMessageParam, ToolResultContent, ToolResultMessage, ToolUseContent
 from .chat_completion import ChatCompletion, ToolCall, ToolMessage
+from .completion_request import CompletionRequest
 from .completion_respone import CompletionResponse
 from .conversation import Conversation
 from .error import ErrorResponse
 from .event_message import EventMessage, EventMessageType
 from .feature_flag import FeatureFlag
-from .message import Message
+from .message import Message, SystemMessage, UserMessage
 from .request_metadata import Metadata
 from .run_usage import RunUsage, RunUsageAndLimits
 from .storage_type import StorageType
@@ -19,6 +20,7 @@ __all__ = [
     "AnthropicMessageParam",
     "AssistantMessage",
     "ChatCompletion",
+    "CompletionRequest",
     "CompletionResponse",
     "Conversation",
     "ErrorResponse",
@@ -30,6 +32,8 @@ __all__ = [
     "RunUsage",
     "RunUsageAndLimits",
     "StorageType",
+    "SystemMessage",
+    "UserMessage",
     "ToolResultContent",
     "ToolResultMessage",
     "ToolUseContent",

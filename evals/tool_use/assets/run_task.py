@@ -68,8 +68,8 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
         tools=[Tool.FileRead, Tool.ShellTool, Tool.FileWrite],
         is_test=True,
     )
-    manager = AgentManager(config=agent_config)
-    agent: Agent = await manager.create_agents(agent_config)
+    manager = AgentManager()
+    agent: Agent = await manager.register_agent(agent_config)
 
     # set up task
     init_cmd = task["start"]["code"]
@@ -77,7 +77,7 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
         run_command(f"cd {temp_dir} && {init_cmd}")
 
     instruction = task_family.get_instructions(task, temp_dir)
-    response = await agent.send_message(instruction)
+    response = await agent.send_messages(instruction)
     metadata = agent.get_metadata()
     print(f"task:{task['id']}, metadata: {metadata}, agent response: {response}")
     if isinstance(response, CompletionResponse):

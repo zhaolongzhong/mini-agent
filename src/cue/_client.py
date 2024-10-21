@@ -1,7 +1,6 @@
 import asyncio
 from typing import Optional
 
-from ._agent import Agent
 from ._agent_manager import AgentManager
 from .llm import ChatModel
 from .schemas import AgentConfig, CompletionResponse
@@ -16,11 +15,11 @@ class AsyncCueClient:
         self.logger = _logger
         self.config = config
         self.agent_config = self._create_agent_config(config)
-        self.agent_manager = AgentManager(self.agent_config)
-        self.agent: Agent = None
+        self.agent_manager = AgentManager()
 
     def _create_agent_config(self, config: Optional[AgentConfig] = None) -> AgentConfig:
         default_config = AgentConfig(
+            id="cue_async_client",
             name="cue_async_client",
             model=ChatModel.GPT_4O_MINI,
             temperature=0.8,
@@ -42,14 +41,11 @@ class AsyncCueClient:
 
     async def initialize(self):
         self.logger.info("Initializing AsyncCueClient")
-        self.agent = await self.agent_manager.set_up(self.agent_config)
+        self.agent_manager.register_agent(self.agent_config)
 
     async def send_message(self, message: str) -> str:
-        if not self.agent:
-            raise RuntimeError("AsyncCueClient not initialized. Call initialize() first.")
-
         self.logger.debug(f"Sending message: {message}")
-        response = await self.agent.send_message(message)
+        response = await self.agent_manager.run(self.agent_config.name, message)
 
         if isinstance(response, CompletionResponse):
             return response.get_text()

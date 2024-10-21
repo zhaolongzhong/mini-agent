@@ -3,9 +3,15 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel
 
 from ..llm.llm_model import ChatModel
-from ..schemas import AgentConfig, AssistantMessage, StorageType, ToolMessage
+from ..schemas import AgentConfig, AssistantMessage, CompletionResponse, StorageType, ToolMessage
+from ..schemas.anthropic import AnthropicAssistantMessage, ToolResultMessage
+from ..schemas.anthropic import Message as AnthropicMessage
+from ..schemas.chat_completion import ChatCompletion
 from ..schemas.message import Message as SchemaMessage
 from ..schemas.message_param import MessageLike
 from .memory_utils import load_from_memory
@@ -18,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class MemoryInterface(ABC):
     def __init__(self):
-        self.messages: list[MessageLike] = []
+        self.messages: list[Dict] = []
 
     @abstractmethod
     async def init_messages(self, limit=max_messages):
@@ -46,7 +52,7 @@ class MemoryInterface(ABC):
         pass
 
     @abstractmethod
-    def get_message_params(self):
+    def get_message_params(self, model: Optional[str] = None):
         pass
 
 
@@ -57,10 +63,10 @@ class InMemoryStorage(MemoryInterface):
     async def init_messages(self, limit=max_messages):
         return self.messages
 
-    async def save(self, message: MessageLike):
+    async def save(self, message: Any):
         self.messages.append(message)
 
-    async def saveList(self, messages: list[MessageLike]):
+    async def saveList(self, messages: list[Any]):
         self.messages.extend(messages)
 
     async def get_message(self, id):
@@ -69,8 +75,31 @@ class InMemoryStorage(MemoryInterface):
     async def set_message(self, id, message):
         pass
 
-    def get_message_params(self):
-        return self.messages
+    def get_message_params(self, model: Optional[str] = None) -> List[BaseModel]:
+        result = []
+        for msg in self.messages:
+            if model and "claude" in model:
+                if isinstance(msg, CompletionResponse):
+                    if isinstance(msg.response, AnthropicMessage):
+                        result.append(AnthropicAssistantMessage(**msg.response.model_dump()))
+                    else:
+                        logger.debug(f"Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
+                elif isinstance(msg, ToolResultMessage) or isinstance(msg, SchemaMessage):
+                    result.append(msg)
+                else:
+                    logger.debug(f"Unexpected message type: {type(msg)}, {msg}, {model}")
+            else:
+                if isinstance(msg, CompletionResponse):
+                    if isinstance(msg.response, ChatCompletion):
+                        result.append(msg.response.choices[0].message)
+                    else:
+                        logger.debug(f"[DEBUG] Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
+                elif isinstance(msg, ToolMessage) or isinstance(msg, SchemaMessage):
+                    result.append(msg)
+                else:
+                    raise Exception(f"Unexpected message type: {type(msg)}, {msg}, {model}")
+
+        return result
 
 
 class FileStorage(MemoryInterface):
@@ -109,7 +138,7 @@ class FileStorage(MemoryInterface):
     async def set_message(self, id, message):
         pass
 
-    def get_message_params(self):
+    def get_message_params(self, model: Optional[str] = None):
         return self.messages[-max_messages:]
 
 
@@ -143,7 +172,7 @@ class DatabaseStorage(MemoryInterface):
         # self.messagesOps.update_message(id, db_message)
         pass
 
-    def get_message_params(self) -> list[MessageLike]:
+    def get_message_params(self, model: Optional[str] = None) -> list[MessageLike]:
         schema_messages = []
         for msg in self.messages:
             try:
