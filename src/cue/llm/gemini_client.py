@@ -9,7 +9,7 @@ import openai
 from google.oauth2 import service_account
 
 from ..memory import MemoryInterface
-from ..schemas import AgentConfig, ErrorResponse, Metadata
+from ..schemas import AgentConfig, ErrorResponse, RunMetadata
 from ..schemas.chat_completion import ChatCompletion
 from ..schemas.message_param import ChatCompletionMessageParam
 from ..schemas.tool_call import AssistantMessage, convert_to_assistant_message
@@ -57,6 +57,7 @@ class GeminiClient(LLMRequest, BaseClient):
         if not api_key:
             raise ValueError("API key is missing in both config and settings.")
         self.client = create_client(api_key)
+        self.confi = config
         self.model = config.model
         self.tools = config.tools
         self.tool_manager = ToolManager()
@@ -65,7 +66,9 @@ class GeminiClient(LLMRequest, BaseClient):
         else:
             self.tool_json = None
 
-        logger.info(f"[GeminiClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]}")
+        logger.info(
+            f"[GeminiClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]} {self.config.id}"
+        )
 
     async def _send_completion_request(
         self,
@@ -126,15 +129,15 @@ class GeminiClient(LLMRequest, BaseClient):
     async def send_completion_request(
         self,
         memory: MemoryInterface,
-        metadata: Metadata,
+        metadata: RunMetadata,
     ) -> Optional[dict]:
         if metadata is None:
-            metadata = Metadata()
+            metadata = RunMetadata()
         else:
             logger.debug(f"Metadata: {metadata.model_dump_json()}")
 
-        if metadata.current_depth >= metadata.max_depth:
-            response = input(f"Maximum depth of {metadata.max_depth} reached. Continue?" " (y/n): ")
+        if metadata.current_depth >= metadata.max_turns:
+            response = input(f"Maximum depth of {metadata.max_turns} reached. Continue?" " (y/n): ")
             if response.lower() in ["y", "yes"]:
                 metadata.current_depth = 0
             else:
@@ -155,8 +158,8 @@ class GeminiClient(LLMRequest, BaseClient):
         tool_responses = await self.process_tools_with_timeout(tool_calls, timeout=5)
         await memory.saveList(tool_responses)
 
-        metadata = Metadata(
-            last_user_message=metadata.last_user_message,
+        metadata = RunMetadata(
+            user_messages=metadata.user_messages,
             current_depth=metadata.current_depth + 1,
             total_depth=metadata.total_depth + 1,
         )

@@ -7,8 +7,6 @@ from pydantic import BaseModel
 class RunUsage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
-    actions: int = 0
-    action_detail: list[str] = []
     cost: float = 0
 
 

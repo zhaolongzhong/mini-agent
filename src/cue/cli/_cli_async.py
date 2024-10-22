@@ -9,9 +9,8 @@ from rich.text import Text
 from rich.theme import Theme
 
 from .._agent_manager import AgentManager
-from ..llm.llm_model import ChatModel
-from ..schemas import AgentConfig, CompletionResponse, FeatureFlag
-from ..tools._tool import Tool
+from ..cli._agents import get_agent_configs
+from ..schemas import CompletionResponse, RunMetadata
 from ..utils.logs import setup_logging
 
 setup_logging()
@@ -36,13 +35,30 @@ class CLI:
         self.executor = ThreadPoolExecutor()
         self.agent = None
 
+    def _config_agents(self) -> str:
+        configs, activate_agent_id = get_agent_configs()
+
+        # Register all agents
+        self.agents = {agent_id: self.agent_manager.register_agent(config) for agent_id, config in configs.items()}
+
+        # Add transfer tool to all agents
+        for agent_id in self.agents:
+            self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.transfer_to_agent)
+        return activate_agent_id
+
+    async def _get_user_input_async(self, prompt: str):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self.executor, lambda: self.console.input(prompt))
+
     async def run(self):
         self.logger.info("Running the CLI. Type 'exit' or 'quit' to exit.")
         try:
-            self._config_agents()
+            active_agent_id = self._config_agents()
+            run_metdata = RunMetadata()
             while True:
+                active_agent_id = self.agent_manager.active_agent.id
                 user_prompt = Text("[User]: ", style="user")
-                user_input = await self.get_user_input_async(user_prompt)
+                user_input = await self._get_user_input_async(user_prompt)
                 if len(user_input) < 3:
                     error_message = Text("[Cue ]: ", style="cue")
                     error_message.append("Message must be at least 3 characters long.", style="error")
@@ -52,11 +68,19 @@ class CLI:
                     self.logger.info("Exit command received. Shutting down.")
                     break
                 self.logger.debug(f"{user_input}")
-                response = await self.agent_manager.run(self.agent_a.id, user_input)
+
+                run_metdata.user_messages.append(user_input)
+                response = await self.agent_manager.run(active_agent_id, user_input, run_metdata)
                 if response:
+                    agent_id = self.agent_manager.active_agent.id
                     if isinstance(response, CompletionResponse):
                         response = response.get_text()
-                    self.console.print(f"[Cue ]: {response}", style="cue")
+                    else:
+                        logger.error(f"Unexpected response: {response}")
+                    message = Text()
+                    message.append(f"[{agent_id}]: ", style="cue")
+                    message.append(str(response), style="cue")
+                    self.console.print(message)
         except Exception as e:
             self.logger.exception(f"An error occurred: {e}")
             raise
@@ -65,45 +89,6 @@ class CLI:
             await self.agent_manager.clean_up()
             self.executor.shutdown(wait=True)
             self.logger.debug("Cleanup complete.")
-
-    async def get_user_input_async(self, prompt: str):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(self.executor, lambda: self.console.input(prompt))
-
-    def _config_agents(self):
-        self.agent_a_config = AgentConfig(
-            id="agent_a",
-            name="agent_a",
-            system_message="Your name is agent_a",
-            model=ChatModel.GPT_4O_MINI,
-            temperature=0.8,
-            max_tokens=2000,
-            conversation_id="",
-            feature_flag=FeatureFlag(is_cli=True, is_eval=False),
-            tools=[
-                Tool.FileRead,
-                # Tool.FileWrite,
-                # Tool.ShellTool,
-                # Tool.CallAgent,
-            ],
-        )
-
-        self.agent_b_config = AgentConfig(
-            id="agent_b",
-            name="agent_b",
-            system_message="Your name is agent_b",
-            model=ChatModel.GPT_4O_MINI,
-            conversation_id="",
-            feature_flag=FeatureFlag(is_cli=True, is_eval=False),
-            tools=[
-                Tool.FileRead,
-                Tool.FileWrite,
-                Tool.ShellTool,
-            ],
-        )
-        self.agent_a = self.agent_manager.register_agent(self.agent_a_config)
-        self.agent_manager.add_tool_to_agent(self.agent_a.id, self.agent_manager.call_agent)
-        self.agent_b = self.agent_manager.register_agent(self.agent_b_config)
 
 
 def _parse_args():

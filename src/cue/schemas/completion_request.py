@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from .request_metadata import Metadata
+from .run_metadata import RunMetadata
 
 
 class CompletionRequest(BaseModel):
@@ -18,4 +18,4 @@ class CompletionRequest(BaseModel):
         default=True,
         description="Whether to enable parallel function calling during tool use. Defaults to true.",
     )
-    metadata: Optional[Metadata] = None
+    metadata: Optional[RunMetadata] = None

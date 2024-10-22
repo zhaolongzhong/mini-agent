@@ -1,9 +1,9 @@
 import copy
 import logging
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 from ._agent import Agent
-from .schemas import AgentConfig, CompletionResponse, UserMessage
+from .schemas import AgentConfig, CompletionResponse, RunMetadata, UserMessage
 from .tools._tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -13,13 +13,13 @@ class AgentManager:
     def __init__(self):
         logger.info("AgentManager initialized")
         self.agents: Dict[str, Agent] = {}
-        self.main_agent: Optional[Agent] = None
+        self.active_agent: Optional[Agent] = None
 
-    async def call_agent(self, from_agent_id: str, to_agent_id: str, message: str) -> Any:
-        """Call an agent with the given ID."""
-        logger.debug(f"call_agent from_agent_id: {from_agent_id}, to_agent_id: {to_agent_id}, message: {message}")
-
+    async def transfer_to_agent(self, from_agent_id: str, to_agent_id: str, message: str) -> str:
+        logger.info(f"transfer_to_agent from_agent_id: {from_agent_id}, to_agent_id: {to_agent_id}, message: {message}")
         try:
+            # overwrite by using active agent id
+            from_agent_id = self.active_agent.id
             from_agent = self.agents[from_agent_id]
             to_agent = self.agents[to_agent_id]
             if not to_agent:
@@ -27,21 +27,18 @@ class AgentManager:
                 logger.error(error_message)
                 return error_message
             history = copy.deepcopy(from_agent.get_messages())
-            # remove last tool call message which is call_agent
-            history.pop()
-
-            messages = [
-                to_agent.get_system_message(),
-                *history,
-                {"role": "assistant", "name": from_agent.config.name, "content": message},
-            ]
-
-            response = await to_agent.send_messages(messages)
-            result = {"role": "assistant", "name": to_agent.config.name, "content": response.get_text()}
-            return result
+            messages = [*history]
+            to_agent.memory.messages.clear()
+            await to_agent.memory.saveList(messages)
+            self.active_agent = to_agent
+            logger.info(
+                f"transfer_to_agent done, active agent is {self.active_agent.id}, messages: {len(self.active_agent.memory.messages)}, last message: {messages[-1]}"
+            )
+            return f"transfer from {from_agent_id} to {self.active_agent.id} successfully, current active agent is {self.active_agent.id} who now starts interacting with the user."
         except Exception as e:
-            logger.error(f"Error when calling {to_agent_id}. Error: \n{e}")
-            return f"Error when calling {to_agent_id}"
+            error_msg = f"transfer_to_agent failed due to: {e}"
+            logger.error(error_msg)
+            return error_msg
 
     def register_agent(self, config: AgentConfig) -> Agent:
         if config.id in self.agents:
@@ -50,7 +47,7 @@ class AgentManager:
 
         agent = Agent(config=config, agent_manager=self)
         self.agents[agent.config.id] = agent
-        self.main_agent = agent
+        self.active_agent = agent
         logger.info(
             f"register_agent {agent.config.id} (name: {config.name}), available agents: {list(self.agents.keys())}"
         )
@@ -63,24 +60,63 @@ class AgentManager:
             agent.other_agents_info = other_agents_info
             logger.debug(f"{agent_id} other_agents_info: {other_agents_info}")
 
-    async def run(self, agent_identifier: str, message: str) -> CompletionResponse:
+    async def run(
+        self,
+        agent_identifier: str,
+        message: str,
+        run_metadata: RunMetadata = RunMetadata(),
+    ) -> CompletionResponse:
         agent = self.get_agent(agent_identifier)
         if not agent:
             raise ValueError(f"Agent with identifier '{agent_identifier}' not found. Register an agent first.")
 
-        self.main_agent = agent
+        self.active_agent = agent
         user_message = UserMessage(role="user", content=message)
-        await self.main_agent.memory.save(user_message)
+        await self.active_agent.memory.save(user_message)
 
-        # Prepare messages list and append latest user message
-        messages = self.main_agent.get_messages()
-        history = copy.deepcopy(messages)
-        history.append(user_message)
-        return await self.main_agent.send_messages(history)
+        response = None
+        turns_count = 0
+        while True:
+            turns_count += 1
+            if turns_count >= run_metadata.max_turns:
+                logger.warning(f"Run reaches max turn: {run_metadata.max_turns}")
+                break
+            messages = self.active_agent.get_message_params()  # convert message params
+            logger.debug(f"run_count: {turns_count}, {self.active_agent.id}, size: {len(messages)}")
+            history = copy.deepcopy(messages)
+            response: CompletionResponse = await self.active_agent.send_messages(history)
+
+            if isinstance(response, CompletionResponse):
+                if response.error:
+                    logger.error(response.error.model_dump())
+                    # Even if there's an error, store the interaction in memory
+                    # This preserves the tool call/response pair for:
+                    # - Maintaining conversation context
+                    # - Avoiding repeated failed attempts
+                    await self.active_agent.memory.save(response)
+                    continue
+
+                await self.active_agent.memory.save(response)
+                tool_calls = response.get_tool_calls()
+                if not tool_calls:
+                    break
+
+                tool_result_wrapper = await self.active_agent.process_tools_with_timeout(tool_calls, 30)
+                if tool_result_wrapper.tool_result_message:
+                    await self.active_agent.memory.saveList([tool_result_wrapper.tool_result_message])
+                elif tool_result_wrapper.tool_messages:
+                    await self.active_agent.memory.saveList(tool_result_wrapper.tool_messages)
+                else:
+                    raise Exception(f"Unexpected response: {tool_result_wrapper}")
+
+            else:
+                raise Exception(f"Unexpected response: {response}")
+
+        return response
 
     async def clean_up(self):
         self.agents.clear()
-        self.main_agent = None
+        self.active_agent = None
         logger.info("All agents cleaned up and removed.")
 
     def get_agent(self, identifier: str) -> Optional[Agent]:

@@ -24,7 +24,7 @@ class OpenAIClient(LLMRequest):
         self.client = openai.AsyncOpenAI(api_key=api_key)
         self.config = config
         self.model = config.model
-        logger.info(f"[OpenAIClient] initialized with model: {self.model}")
+        logger.info(f"[OpenAIClient] initialized with model: {self.model} {self.config.id}")
 
     async def send_completion_request(self, request: CompletionRequest) -> CompletionResponse:
         self.tool_json = request.tool_json
@@ -40,7 +40,7 @@ class OpenAIClient(LLMRequest):
                 response = await self.client.chat.completions.create(
                     messages=messages,
                     model=self.model.model_id,
-                    max_tokens=request.max_tokens,
+                    max_completion_tokens=request.max_tokens,
                     temperature=request.temperature,
                     response_format=request.response_format,
                     tool_choice=request.tool_choice,
@@ -50,13 +50,12 @@ class OpenAIClient(LLMRequest):
                 response = await self.client.chat.completions.create(
                     messages=messages,
                     model=self.model.model_id,
-                    max_tokens=request.max_tokens,
+                    max_completion_tokens=request.max_tokens,
                     temperature=request.temperature,
                     response_format=request.response_format,
                 )
 
             response = ChatCompletion(**response.model_dump())
-            logger.debug(f"usage: {response.usage.model_dump()}")
         except openai.APIConnectionError as e:
             error = ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
         except openai.RateLimitError as e:

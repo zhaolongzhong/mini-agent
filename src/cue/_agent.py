@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from .llm.llm_client import LLMClient
 from .memory.memory import InMemoryStorage
-from .schemas import AgentConfig, CompletionRequest, CompletionResponse, Metadata, SystemMessage
+from .schemas import AgentConfig, CompletionRequest, CompletionResponse, RunMetadata, SystemMessage, ToolResponseWrapper
 from .schemas.anthropic import ToolResultContent, ToolResultMessage, ToolUseContent
 from .schemas.chat_completion import ToolCall, ToolMessage
 from .tool_manager import ToolManager
@@ -22,17 +22,34 @@ class Agent:
         self.tool_manager = ToolManager()
         self.memory = InMemoryStorage()
         self.client: LLMClient = LLMClient(self.config)
-        self.metadata: Optional[Metadata] = None
+        self.metadata: Optional[RunMetadata] = None
         self.agent_manager = agent_manager
         self.description = self._generate_description()
         self.other_agents_info = ""
 
     def get_system_message(self) -> SystemMessage:
-        instruction = f"{self.config.system_message}"
+        instruction = f"{self.config.instruction} Your idenity is id: {self.config.id}, name: {self.config.name}"
         instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info}"
         return SystemMessage(role="system", name=self.config.name, content=instruction)
 
     def get_messages(self) -> List:
+        """
+        Retrieve the original list of messages from the Pydantic model.
+
+        Returns:
+            List: A list of message objects stored in the memory.
+        """
+        return self.memory.messages
+
+    def get_message_params(self) -> List[Dict]:
+        """
+        Retrieve a list of message parameter dictionaries for the completion API call.
+
+        Returns:
+            List[Dict]: A list of dictionaries containing message parameters
+                        required for the completion API call, based on the model ID
+                        from the current configuration.
+        """
         return self.memory.get_message_params(self.config.model.id)
 
     def _generate_description(self) -> str:
@@ -52,9 +69,8 @@ class Agent:
             return None
 
     async def send_messages(
-        self, messages: List[Union[BaseModel, Dict]], metadata: Optional[Metadata] = None
-    ) -> CompletionResponse:
-        logger.debug(f"{self.config.id} send_messages: {messages}")
+        self, messages: List[Union[BaseModel, Dict]], metadata: Optional[RunMetadata] = None
+    ) -> Union[CompletionResponse, ToolCall, ToolUseContent]:
         if not self.metadata:
             self.metadata = metadata
 
@@ -73,25 +89,14 @@ class Agent:
             tool_json=self._get_tool_json(),
         )
         response = await self.client.send_completion_request(completion_request)
-        await self.memory.save(response)
-
-        tool_calls = response.get_tool_calls()
-        if not tool_calls:
-            return response
-
-        tool_result = await self.process_tools_with_timeout(tool_calls=tool_calls)
-        if "claude" in self.config.model.id:
-            tool_result = ToolResultMessage(role="user", content=tool_result)
-            await self.memory.save(tool_result)
-        else:
-            await self.memory.saveList(tool_result)
-
-        new_messages = self.memory.get_message_params(model=self.config.model.id)
-        return await self.send_messages(new_messages)
+        usage = response.get_usage()
+        if usage:
+            logger.debug(f"completion response usage: {usage.model_dump(exclude_none=True)}")
+        return response
 
     async def process_tools_with_timeout(
         self, tool_calls: Union[List[ToolCall], List[ToolUseContent]], timeout: int = 30
-    ) -> Union[List[ToolMessage], List[ToolResultContent]]:
+    ) -> ToolResponseWrapper:
         tool_responses = []
         tasks = []
 
@@ -107,14 +112,14 @@ class Agent:
             else:
                 raise ValueError(f"Unsupported tool call type: {type(tool_call)}")
 
-            if tool_name not in self.tool_manager.tools and tool_name not in "call_agent":
+            if tool_name not in self.tool_manager.tools and tool_name not in ["call_agent", "transfer_to_agent"]:
                 error_message = f"Tool '{tool_name}' not found. {self.tool_manager.tools.keys()}"
                 logger.error(error_message)
                 tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
                 continue
 
-            if tool_name == "call_agent":
-                tool_func = self.agent_manager.call_agent
+            if tool_name == "transfer_to_agent":
+                tool_func = self.agent_manager.transfer_to_agent
             else:
                 tool_func = self.tool_manager.tools[tool_name]
             task = asyncio.create_task(self.run_tool(tool_func, *args))
@@ -131,7 +136,14 @@ class Agent:
                 error_message = f"Error while calling tool <{tool_name}>: {e}"
                 tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
 
-        return tool_responses
+        response = None
+        if "claude" in self.config.model.id:
+            tool_result_message = ToolResultMessage(role="user", content=tool_response)
+            response = ToolResponseWrapper(tool_result_message == tool_result_message)
+        else:
+            response = ToolResponseWrapper(tool_messages=tool_responses)
+
+        return response
 
     async def run_tool(self, tool_func, *args):
         if asyncio.iscoroutinefunction(tool_func):

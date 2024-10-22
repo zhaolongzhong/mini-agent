@@ -9,7 +9,6 @@ from .llm.llm_model import ChatModel
 from .tools import (
     Tool,
     browse_web,
-    # call_agent,
     execute_shell_command,
     make_plan,
     manage_drive,
@@ -33,7 +32,6 @@ class ToolManager:
         self.tools = {
             Tool.FileRead.value: read_file,
             Tool.FileWrite.value: write_to_file,
-            # Tool.CallAgent.value: call_agent,
             Tool.CheckFolder.value: scan_folder,
             Tool.CodeInterpreter.value: run_python_script,
             Tool.ShellTool.value: execute_shell_command,
@@ -79,10 +77,13 @@ class ToolManager:
             return tools_configs
 
         for tool in tools:
+            config = None
             if isinstance(tool, Tool):
                 config = self._get_tool_definition(tool.value, model)
             elif isinstance(tool, Callable):
                 config = function_to_json(tool)
+            else:
+                logger.error(f"Unexpected type: {tool}")
             if config:
                 tools_configs.append(config)
         return tools_configs

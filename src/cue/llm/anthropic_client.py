@@ -29,7 +29,7 @@ class AnthropicClient:
         self.config = config
         self.model = config.model
         self.message_from_template = """[message_from_{agent_id}]"""
-        logger.info(f"[AnthropicClient] initialized with model: {self.model}")
+        logger.info(f"[AnthropicClient] initialized with model: {self.model} {self.config.id}")
 
     async def send_completion_request(self, request: CompletionRequest) -> CompletionResponse:
         response = None

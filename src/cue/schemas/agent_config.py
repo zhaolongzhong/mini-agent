@@ -12,13 +12,15 @@ from .storage_type import StorageType
 class AgentConfig(BaseModel):
     id: Optional[str] = "default_id"
     name: Optional[str] = "default_name"
+    # Detailed description of agent's role, capabilities, and collaboration patterns
     description: Optional[str] = None
+    # System message defining agent's behavior, collaboration guidelines, and boundaries
+    instruction: Optional[str] = None
     model: Optional[ChatModel] = None
     api_key: Optional[str] = None
     temperature: Optional[float] = 0.8
     max_tokens: Optional[int] = 1000
     stop_sequences: Optional[list[str]] = None
-    system_message: Optional[str] = None
     tools: Optional[list[Tool]] = None
     conversation_id: Optional[str] = None
     max_actions: Optional[int] = 10

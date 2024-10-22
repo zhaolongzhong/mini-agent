@@ -8,11 +8,12 @@ from .error import ErrorResponse
 from .event_message import EventMessage, EventMessageType
 from .feature_flag import FeatureFlag
 from .message import Message, SystemMessage, UserMessage
-from .request_metadata import Metadata
+from .run_metadata import RunMetadata
 from .run_usage import RunUsage, RunUsageAndLimits
 from .storage_type import StorageType
 from .token import Token
 from .tool_call import AssistantMessage
+from .tool_response_wrapper import ToolResponseWrapper
 from .user import User, UserCreate
 
 __all__ = [
@@ -28,12 +29,13 @@ __all__ = [
     "EventMessageType",
     "FeatureFlag",
     "Message",
-    "Metadata",
+    "RunMetadata",
     "RunUsage",
     "RunUsageAndLimits",
     "StorageType",
     "SystemMessage",
     "UserMessage",
+    "ToolResponseWrapper",
     "ToolResultContent",
     "ToolResultMessage",
     "ToolUseContent",

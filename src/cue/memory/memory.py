@@ -12,7 +12,8 @@ from ..schemas import AgentConfig, AssistantMessage, CompletionResponse, Storage
 from ..schemas.anthropic import AnthropicAssistantMessage, ToolResultMessage
 from ..schemas.anthropic import Message as AnthropicMessage
 from ..schemas.chat_completion import ChatCompletion
-from ..schemas.message import Message as SchemaMessage
+from ..schemas.error import ErrorResponse
+from ..schemas.message import Message
 from ..schemas.message_param import MessageLike
 from .memory_utils import load_from_memory
 from .messages_operations import MessageOperations
@@ -82,9 +83,11 @@ class InMemoryStorage(MemoryInterface):
                 if isinstance(msg, CompletionResponse):
                     if isinstance(msg.response, AnthropicMessage):
                         result.append(AnthropicAssistantMessage(**msg.response.model_dump()))
+                    elif isinstance(msg.error, ErrorResponse):
+                        result.append(AnthropicAssistantMessage(role="assistant", content=msg.error.model_dump_json()))
                     else:
                         logger.debug(f"Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
-                elif isinstance(msg, ToolResultMessage) or isinstance(msg, SchemaMessage):
+                elif isinstance(msg, ToolResultMessage) or isinstance(msg, Message):
                     result.append(msg)
                 else:
                     logger.debug(f"Unexpected message type: {type(msg)}, {msg}, {model}")
@@ -92,9 +95,11 @@ class InMemoryStorage(MemoryInterface):
                 if isinstance(msg, CompletionResponse):
                     if isinstance(msg.response, ChatCompletion):
                         result.append(msg.response.choices[0].message)
+                    elif isinstance(msg.error, ErrorResponse):
+                        result.append(AssistantMessage(role="assistant", content=msg.error.model_dump_json()))
                     else:
-                        logger.debug(f"[DEBUG] Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
-                elif isinstance(msg, ToolMessage) or isinstance(msg, SchemaMessage):
+                        logger.debug(f"Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
+                elif isinstance(msg, ToolMessage) or isinstance(msg, Message):
                     result.append(msg)
                 else:
                     raise Exception(f"Unexpected message type: {type(msg)}, {msg}, {model}")
@@ -189,12 +194,12 @@ class DatabaseStorage(MemoryInterface):
                     message = ToolMessage(**message_dict)
                     schema_messages.append(message)
                 elif role in ["system", "user"]:
-                    message = SchemaMessage(**message_dict)
+                    message = Message(**message_dict)
                     schema_messages.append(message)
                 else:
                     print(f"Invalid message_dict. msg: {msg}")
                     message_dict.update({"role": msg.role, "content": msg.content})
-                    message = SchemaMessage(**message_dict)
+                    message = Message(**message_dict)
                     schema_messages.append(message)
             except json.JSONDecodeError:
                 print(f"Failed to decode JSON for msg: {msg}")
