@@ -1,28 +1,9 @@
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 
-class MessageBase(BaseModel):
+class MessageParam(BaseModel):
     content: str
     role: str
     name: Optional[str] = None
-    """An optional name for the participant.
-
-    Provides the model information to differentiate between participants of the same
-    role.
-    """
-
-    @field_validator("role", mode="before")
-    def check_role(cls, value):
-        if value not in ["user", "system", "assistant"]:
-            raise ValueError('Role must be either "user", "system" or "assistant"')
-        return value
-
-
-class Message(MessageBase):
-    pass
-
-
-UserMessage = Message
-SystemMessage = Message

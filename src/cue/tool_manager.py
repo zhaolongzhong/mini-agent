@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 from typing_extensions import Callable
 
@@ -51,39 +51,48 @@ class ToolManager:
 
         try:
             with definition_path.open("r", encoding="utf-8") as file:
-                function_definition_json = json.load(file)
+                func_definition = json.load(file)
         except json.JSONDecodeError as e:
             logger.error(f"{_tag} Invalid JSON in {definition_path}: {e}")
             return None
 
-        model_id = model.model_id.lower()
-
-        if "claude" in model_id:
-            function_data = function_definition_json.get("function")
-            if function_data:
-                return {
-                    "name": function_data.get("name"),
-                    "description": function_data.get("description"),
-                    "input_schema": function_data.get("parameters"),
-                }
-
-        return function_definition_json
+        return self.sanitize_tool_config(func_definition, model.id)
 
     def get_tool_definitions(self, model: ChatModel, tools: Optional[list[Tool]] = None) -> list[dict]:
         """Iterate through the tools and gather their JSON configurations."""
-        tools_configs = []
+        func_definitions = []
         if tools is None or len(tools) == 0:
             logger.debug(f"{_tag} No tools selected for definition retrieval.")
-            return tools_configs
+            return func_definitions
 
         for tool in tools:
-            config = None
+            func_definition = None
             if isinstance(tool, Tool):
-                config = self._get_tool_definition(tool.value, model)
+                func_definition = self._get_tool_definition(tool.value, model)
             elif isinstance(tool, Callable):
-                config = function_to_json(tool)
+                func_definition = function_to_json(tool)
+                func_definition = self.sanitize_tool_config(func_definition, model.id)
             else:
                 logger.error(f"Unexpected type: {tool}")
-            if config:
-                tools_configs.append(config)
-        return tools_configs
+            if func_definition:
+                func_definitions.append(func_definition)
+        return func_definitions
+
+    def sanitize_tool_config(self, config: Dict, model: str) -> Dict:
+        if "claude" not in model:
+            return config
+
+        # If the tool already has the Claude format, return as is
+        if "input_schema" in config:
+            return config
+
+        # If the tool has a nested function structure, convert it
+        function_data = config.get("function")
+        if function_data:
+            return {
+                "name": function_data.get("name"),
+                "description": function_data.get("description"),
+                "input_schema": function_data.get("parameters"),
+            }
+
+        return config

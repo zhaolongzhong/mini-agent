@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import google.auth
 import google.auth.transport.requests
@@ -10,8 +10,6 @@ from google.oauth2 import service_account
 
 from ..memory import MemoryInterface
 from ..schemas import AgentConfig, ErrorResponse, RunMetadata
-from ..schemas.chat_completion import ChatCompletion
-from ..schemas.message_param import ChatCompletionMessageParam
 from ..schemas.tool_call import AssistantMessage, convert_to_assistant_message
 from ..tool_manager import ToolManager
 from .base_client import BaseClient
@@ -72,8 +70,8 @@ class GeminiClient(LLMRequest, BaseClient):
 
     async def _send_completion_request(
         self,
-        messages: list[ChatCompletionMessageParam],
-    ) -> ChatCompletion:
+        messages: List[Dict],
+    ):
         length = len(messages)
         for idx, message in enumerate(messages):
             logger.debug(f"{_tag}send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
@@ -104,9 +102,8 @@ class GeminiClient(LLMRequest, BaseClient):
                     max_tokens=2048,
                     temperature=0.8,
                 )
-            chat_completion = ChatCompletion(**response.model_dump())
-            logger.debug(f"usage: {chat_completion.usage.model_dump()}")
-            return chat_completion
+            logger.debug(f"usage: {response.usage.model_dump()}")
+            return response
         except openai.APIConnectionError as e:
             return ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
         except openai.RateLimitError as e:

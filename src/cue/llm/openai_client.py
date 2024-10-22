@@ -5,7 +5,6 @@ import openai
 from pydantic import BaseModel
 
 from ..schemas import AgentConfig, CompletionRequest, CompletionResponse, ErrorResponse
-from ..schemas.chat_completion import ChatCompletion
 from ..utils.debug_utils import debug_print_messages
 from .llm_request import LLMRequest
 
@@ -55,7 +54,6 @@ class OpenAIClient(LLMRequest):
                     response_format=request.response_format,
                 )
 
-            response = ChatCompletion(**response.model_dump())
         except openai.APIConnectionError as e:
             error = ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
         except openai.RateLimitError as e:

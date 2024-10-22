@@ -4,7 +4,6 @@ import os
 import anthropic
 
 from ..schemas import AgentConfig, CompletionRequest, CompletionResponse, ErrorResponse
-from ..schemas.anthropic import Message
 from ..utils.debug_utils import debug_print_messages
 
 logger = logging.getLogger(__name__)
@@ -40,6 +39,7 @@ class AnthropicClient:
         messages = [msg for msg in request.messages if msg["role"] != "system"]
         messages = self.process_messages(messages)
         logger.debug(f"system_message_content: {system_message_content}")
+        logger.debug(f"tools_json: {request.tool_json}")
         debug_print_messages(messages, tag=f"{self.config.id} send_completion_request clean messages")
         try:
             response = await self.client.with_options(max_retries=2).messages.create(
@@ -50,7 +50,6 @@ class AnthropicClient:
                 temperature=request.temperature,
                 tools=request.tool_json,
             )
-            response = Message(**response.model_dump())
         except anthropic.APIConnectionError as e:
             error = ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
         except anthropic.RateLimitError as e:
@@ -74,7 +73,7 @@ class AnthropicClient:
         Formats a single message based on whether it has a name.
         """
         new_message = {"role": message["role"]}
-        if "name" in message and "system" not in message["role"]:
+        if "name" in message and message["name"] and "system" not in message["role"]:
             message_from = self.message_from_template.format(agent_id=message["name"])
             new_message["content"] = f"{message_from}: {message['content']}"
 

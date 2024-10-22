@@ -1,11 +1,12 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
+from anthropic.types import MessageParam as AnthropicMessageParam
+from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
 
 from .anthropic import ToolResultMessage
-from .chat_completion import ToolMessage
 
 
 class ToolResponseWrapper(BaseModel):
-    tool_messages: Optional[List[ToolMessage]] = None
-    tool_result_message: Optional[ToolResultMessage] = None
+    tool_messages: Optional[List[ToolMessageParam]] = None
+    tool_result_message: Optional[Union[AnthropicMessageParam, ToolResultMessage]] = None

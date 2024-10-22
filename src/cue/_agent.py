@@ -3,13 +3,23 @@ import json
 import logging
 from typing import Dict, List, Optional, Union
 
+from anthropic.types import ToolUseBlock
+from openai.types.chat import ChatCompletionMessageToolCall as ToolCall
+from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
 
 from .llm.llm_client import LLMClient
 from .memory.memory import InMemoryStorage
-from .schemas import AgentConfig, CompletionRequest, CompletionResponse, RunMetadata, SystemMessage, ToolResponseWrapper
-from .schemas.anthropic import ToolResultContent, ToolResultMessage, ToolUseContent
-from .schemas.chat_completion import ToolCall, ToolMessage
+from .schemas import (
+    AgentConfig,
+    CompletionRequest,
+    CompletionResponse,
+    MessageParam,
+    RunMetadata,
+    ToolCallToolUseBlock,
+    ToolResponseWrapper,
+)
+from .schemas.anthropic import ToolResultContent, ToolResultMessage
 from .tool_manager import ToolManager
 
 logger = logging.getLogger(__name__)
@@ -27,10 +37,10 @@ class Agent:
         self.description = self._generate_description()
         self.other_agents_info = ""
 
-    def get_system_message(self) -> SystemMessage:
+    def get_system_message(self) -> MessageParam:
         instruction = f"{self.config.instruction} Your idenity is id: {self.config.id}, name: {self.config.name}"
         instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info}"
-        return SystemMessage(role="system", name=self.config.name, content=instruction)
+        return MessageParam(role="system", name=self.config.name, content=instruction)
 
     def get_messages(self) -> List:
         """
@@ -70,7 +80,7 @@ class Agent:
 
     async def send_messages(
         self, messages: List[Union[BaseModel, Dict]], metadata: Optional[RunMetadata] = None
-    ) -> Union[CompletionResponse, ToolCall, ToolUseContent]:
+    ) -> Union[CompletionResponse, ToolCallToolUseBlock]:
         if not self.metadata:
             self.metadata = metadata
 
@@ -95,7 +105,7 @@ class Agent:
         return response
 
     async def process_tools_with_timeout(
-        self, tool_calls: Union[List[ToolCall], List[ToolUseContent]], timeout: int = 30
+        self, tool_calls: List[ToolCallToolUseBlock], timeout: int = 30
     ) -> ToolResponseWrapper:
         tool_responses = []
         tasks = []
@@ -105,7 +115,7 @@ class Agent:
                 tool_name = tool_call.function.name
                 tool_id = tool_call.id
                 args = tuple(json.loads(tool_call.function.arguments).values())
-            elif isinstance(tool_call, ToolUseContent):
+            elif isinstance(tool_call, ToolUseBlock):
                 tool_name = tool_call.name
                 tool_id = tool_call.id
                 args = tuple(tool_call.input.values())
@@ -138,8 +148,8 @@ class Agent:
 
         response = None
         if "claude" in self.config.model.id:
-            tool_result_message = ToolResultMessage(role="user", content=tool_response)
-            response = ToolResponseWrapper(tool_result_message == tool_result_message)
+            tool_result_message = ToolResultMessage(role="user", content=tool_responses)
+            response = ToolResponseWrapper(tool_result_message=tool_result_message)
         else:
             response = ToolResponseWrapper(tool_messages=tool_responses)
 
@@ -154,12 +164,16 @@ class Agent:
 
     def create_success_response(self, tool_id: str, tool_name: str, content: str):
         if "claude" in self.config.model.id:
-            return ToolResultContent(tool_use_id=tool_id, content=content)
+            # return ToolResultBlockParam(tool_use_id=tool_id, content=content, type="tool_result", is_error=False)
+            return ToolResultContent(tool_use_id=tool_id, content=content, type="tool_result", is_error=False)
         else:
-            return ToolMessage(tool_call_id=tool_id, name=tool_name, role="tool", content=content)
+            return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=content)
 
     def create_error_response(self, tool_id: str, tool_name: str, error_message: str):
         if "claude" in self.config.model.id:
-            return ToolResultContent(tool_use_id=tool_id, content=error_message, is_error=True)
+            result_param = ToolResultContent(
+                tool_use_id=tool_id, content=error_message, type="tool_result", is_error=True
+            )
+            return result_param.mode
         else:
-            return ToolMessage(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)
+            return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)

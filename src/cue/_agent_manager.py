@@ -3,7 +3,7 @@ import logging
 from typing import Callable, Dict, List, Optional, Union
 
 from ._agent import Agent
-from .schemas import AgentConfig, CompletionResponse, RunMetadata, UserMessage
+from .schemas import AgentConfig, CompletionResponse, MessageParam, RunMetadata
 from .tools._tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class AgentManager:
             raise ValueError(f"Agent with identifier '{agent_identifier}' not found. Register an agent first.")
 
         self.active_agent = agent
-        user_message = UserMessage(role="user", content=message)
+        user_message = MessageParam(role="user", content=message)
         await self.active_agent.memory.save(user_message)
 
         response = None
@@ -83,7 +83,10 @@ class AgentManager:
                 break
             messages = self.active_agent.get_message_params()  # convert message params
             logger.debug(f"run_count: {turns_count}, {self.active_agent.id}, size: {len(messages)}")
-            history = copy.deepcopy(messages)
+            history = [
+                msg.model_dump() if hasattr(msg, "model_dump") else msg.dict() if hasattr(msg, "dict") else msg
+                for msg in messages
+            ]
             response: CompletionResponse = await self.active_agent.send_messages(history)
 
             if isinstance(response, CompletionResponse):

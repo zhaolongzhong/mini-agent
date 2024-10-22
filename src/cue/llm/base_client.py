@@ -2,12 +2,12 @@ import asyncio
 import json
 import logging
 
-from ..schemas import AgentConfig, ToolCall, ToolMessage
+from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
+
+from ..schemas import AgentConfig, ToolCallToolUseBlock
 from ..tool_manager import ToolManager
 
 logger = logging.getLogger(__name__)
-
-_tag = ""
 
 
 class BaseClient:
@@ -20,16 +20,18 @@ class BaseClient:
         else:
             self.tool_json = None
 
-    async def process_tools_with_timeout(self, tool_calls: list[ToolCall], timeout=5) -> list[ToolMessage]:
+    async def process_tools_with_timeout(
+        self, tool_calls: list[ToolCallToolUseBlock], timeout=5
+    ) -> list[ToolMessageParam]:
         logger.debug(f"[chat_completion] process tool calls count: {len(tool_calls)}, timeout: {timeout}")
-        tool_responses: list[ToolMessage] = []
+        tool_responses: list[ToolMessageParam] = []
 
         tasks = []
         for tool_call in tool_calls:
             tool_name = tool_call.function.name
             if tool_name not in self.tool_manager.tools:
                 logger.error(f"Tool '{tool_name}' not found.")
-                tool_response_message = ToolMessage(
+                tool_response_message = ToolMessageParam(
                     tool_call_id=tool_call.id,
                     name=tool_name,
                     content="Tool not found",
@@ -47,7 +49,7 @@ class BaseClient:
             function_name = tool_call.function.name
             try:
                 tool_response = await asyncio.wait_for(task, timeout=timeout)
-                tool_response_message = ToolMessage(
+                tool_response_message = ToolMessageParam(
                     tool_call_id=tool_call_id,
                     name=function_name,
                     content=str(tool_response),
@@ -56,7 +58,7 @@ class BaseClient:
             except asyncio.TimeoutError:
                 logger.error(f"Timeout while calling tool <{function_name}>")
                 tool_response = f"Timeout while calling tool <{function_name}> after {timeout}s."
-                tool_response_message = ToolMessage(
+                tool_response_message = ToolMessageParam(
                     tool_call_id=tool_call_id,
                     name=function_name,
                     content=tool_response,
@@ -65,7 +67,7 @@ class BaseClient:
             except Exception as e:
                 logger.error(f"Error while calling tool <{function_name}>: {e}")
                 tool_response = f"Error while calling tool <{function_name}>: {e}"
-                tool_response_message = ToolMessage(
+                tool_response_message = ToolMessageParam(
                     tool_call_id=tool_call_id,
                     name=function_name,
                     content=tool_response,

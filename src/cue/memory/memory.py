@@ -5,16 +5,17 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from anthropic.types import Message as AnthropicMessage
+from anthropic.types import MessageParam as AntropicMessageParam
+from openai.types.chat import ChatCompletion
+from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
 
 from ..llm.llm_model import ChatModel
-from ..schemas import AgentConfig, AssistantMessage, CompletionResponse, StorageType, ToolMessage
-from ..schemas.anthropic import AnthropicAssistantMessage, ToolResultMessage
-from ..schemas.anthropic import Message as AnthropicMessage
-from ..schemas.chat_completion import ChatCompletion
+from ..schemas import AgentConfig, AssistantMessage, CompletionResponse, StorageType
+from ..schemas.anthropic import ToolResultMessage
 from ..schemas.error import ErrorResponse
-from ..schemas.message import Message
-from ..schemas.message_param import MessageLike
+from ..schemas.message import MessageParam
 from .memory_utils import load_from_memory
 from .messages_operations import MessageOperations
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class MemoryInterface(ABC):
     def __init__(self):
-        self.messages: list[Dict] = []
+        self.messages: List[Dict] = []
 
     @abstractmethod
     async def init_messages(self, limit=max_messages):
@@ -33,12 +34,12 @@ class MemoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def save(self, message: MessageLike):
+    async def save(self, message: Dict):
         """Save message to the storage."""
         pass
 
     @abstractmethod
-    async def saveList(self, messages: list[MessageLike]):
+    async def saveList(self, messages: List[Dict]):
         """Save messages to the storage."""
         pass
 
@@ -82,12 +83,17 @@ class InMemoryStorage(MemoryInterface):
             if model and "claude" in model:
                 if isinstance(msg, CompletionResponse):
                     if isinstance(msg.response, AnthropicMessage):
-                        result.append(AnthropicAssistantMessage(**msg.response.model_dump()))
+                        result.append(msg.response)
                     elif isinstance(msg.error, ErrorResponse):
-                        result.append(AnthropicAssistantMessage(role="assistant", content=msg.error.model_dump_json()))
+                        result.append(AntropicMessageParam(role="assistant", content=msg.error.model_dump_json()))
                     else:
                         logger.debug(f"Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
-                elif isinstance(msg, ToolResultMessage) or isinstance(msg, Message):
+                elif isinstance(msg, MessageParam):
+                    result.append(msg)
+                elif isinstance(msg, ToolResultMessage):
+                    result.append(msg)
+                elif isinstance(msg, dict) and "role" in msg and "content" in msg:
+                    # AntropicMessageParam
                     result.append(msg)
                 else:
                     logger.debug(f"Unexpected message type: {type(msg)}, {msg}, {model}")
@@ -99,7 +105,10 @@ class InMemoryStorage(MemoryInterface):
                         result.append(AssistantMessage(role="assistant", content=msg.error.model_dump_json()))
                     else:
                         logger.debug(f"Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
-                elif isinstance(msg, ToolMessage) or isinstance(msg, Message):
+                elif isinstance(msg, MessageParam):
+                    result.append(msg)
+                elif isinstance(msg, dict) and "role" in msg and "content" in msg:
+                    # ToolMessageParam
                     result.append(msg)
                 else:
                     raise Exception(f"Unexpected message type: {type(msg)}, {msg}, {model}")
@@ -128,12 +137,12 @@ class FileStorage(MemoryInterface):
     async def init_messages(self, limit=max_messages):
         return self.messages
 
-    async def save(self, message: MessageLike):
+    async def save(self, message: Dict):
         self.messages.append(message)
         with self.file_path.open("a", encoding="utf-8") as file:
             file.write(json.dumps(message.model_dump()) + "\n")
 
-    async def saveList(self, messages: list[MessageLike]):
+    async def saveList(self, messages: List[Dict]):
         for message in messages:
             await self.save(message)
 
@@ -160,11 +169,11 @@ class DatabaseStorage(MemoryInterface):
         self.messages.extend(db_messages)  # order by created at asc
         return db_messages
 
-    async def save(self, message: MessageLike):
+    async def save(self, message: Dict):
         db_message = await self.messagesOps.add_message(message.role, message.content, message.model_dump_json())
         self.messages.append(db_message)
 
-    async def saveList(self, messages: list[MessageLike]):
+    async def saveList(self, messages: List[Dict]):
         for message in messages:
             await self.save(message)
 
@@ -177,7 +186,7 @@ class DatabaseStorage(MemoryInterface):
         # self.messagesOps.update_message(id, db_message)
         pass
 
-    def get_message_params(self, model: Optional[str] = None) -> list[MessageLike]:
+    def get_message_params(self, model: Optional[str] = None) -> List[Dict]:
         schema_messages = []
         for msg in self.messages:
             try:
@@ -191,15 +200,15 @@ class DatabaseStorage(MemoryInterface):
                     message = AssistantMessage(**message_dict)
                     schema_messages.append(message)
                 elif role == "tool":
-                    message = ToolMessage(**message_dict)
+                    message = ToolMessageParam(**message_dict)
                     schema_messages.append(message)
                 elif role in ["system", "user"]:
-                    message = Message(**message_dict)
+                    message = MessageParam(**message_dict)
                     schema_messages.append(message)
                 else:
                     print(f"Invalid message_dict. msg: {msg}")
                     message_dict.update({"role": msg.role, "content": msg.content})
-                    message = Message(**message_dict)
+                    message = MessageParam(**message_dict)
                     schema_messages.append(message)
             except json.JSONDecodeError:
                 print(f"Failed to decode JSON for msg: {msg}")

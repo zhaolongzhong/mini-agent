@@ -1,11 +1,15 @@
 from typing import Any, Optional, Union
 
+from anthropic.types import (
+    Message as AnthropicMessage,
+)
+from anthropic.types import ToolUseBlock
+from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
 from pydantic import BaseModel, Field
 
-from ..schemas.anthropic import Message as AnthropicMessage
-from ..schemas.anthropic import ToolUseContent
-from ..schemas.chat_completion import ChatCompletion
 from ..schemas.error import ErrorResponse
+
+ToolCallToolUseBlock = Union[ChatCompletionMessageToolCall, ToolUseBlock]
 
 
 class CompletionUsage(BaseModel):
@@ -54,7 +58,7 @@ class CompletionResponse:
     def get_tool_calls(self) -> Optional[list[Any]]:
         if isinstance(self.response, AnthropicMessage):
             tool_calls = [
-                content_item for content_item in self.response.content if isinstance(content_item, ToolUseContent)
+                content_item for content_item in self.response.content if isinstance(content_item, ToolUseBlock)
             ]
             return tool_calls
         elif isinstance(self.response, ChatCompletion):

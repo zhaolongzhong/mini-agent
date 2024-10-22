@@ -11,7 +11,7 @@
 -e file:.
 annotated-types==0.7.0
     # via pydantic
-anthropic==0.36.0
+anthropic==0.37.0
     # via cue
 anyio==4.6.2.post1
     # via anthropic
