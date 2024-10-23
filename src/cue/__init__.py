@@ -7,8 +7,8 @@ from ._agent_manager import AgentManager
 from ._client import AsyncCueClient
 from ._version import __title__, __version__
 from .llm import ChatModel
-from .schemas import AgentConfig, CompletionResponse, FeatureFlag, StorageType
-from .tool_manager import Tool
+from .schemas import AgentConfig, CompletionResponse, FeatureFlag, RunMetadata, StorageType
+from .tools import Tool
 from .utils.logs import setup_logging as _setup_logging
 
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
@@ -24,6 +24,7 @@ __all__ = [
     "ChatModel",
     "CompletionResponse",
     "FeatureFlag",
+    "RunMetadata",
     "StorageType",
     "Tool",
 ]

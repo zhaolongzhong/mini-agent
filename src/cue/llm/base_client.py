@@ -5,7 +5,7 @@ import logging
 from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 
 from ..schemas import AgentConfig, ToolCallToolUseBlock
-from ..tool_manager import ToolManager
+from ..tools import ToolManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class BaseClient:
         self.tools = config.tools
         self.tool_manager = ToolManager()
         if config.model.tool_use_support and len(self.tools) > 0:
-            self.tool_json = self.tool_manager.get_tool_definitions(self.model, self.tools)
+            self.tool_json = self.tool_manager.get_tool_definitions(self.model.id, self.tools)
         else:
             self.tool_json = None
 

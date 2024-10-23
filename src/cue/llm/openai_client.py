@@ -63,6 +63,7 @@ class OpenAIClient(LLMRequest):
             )
         except openai.APIStatusError as e:
             message = f"Another non-200-range status code was received. {e.response}, {e.response.text}"
+            debug_print_messages(request.tool_json, tag=f"{self.config.id} send_completion_request")
             debug_print_messages(messages, tag=f"{self.config.id} send_completion_request")
             error = ErrorResponse(
                 message=message,

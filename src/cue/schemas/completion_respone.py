@@ -5,7 +5,7 @@ from anthropic.types import (
 )
 from anthropic.types import ToolUseBlock
 from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..schemas.error import ErrorResponse
 
@@ -19,9 +19,10 @@ class CompletionUsage(BaseModel):
     cached_tokens: int = 0
     reasoning_tokens: int = 0
 
-    class Config:
-        populate_by_name = True  # Allows both alias and field name to be used
-        extra = "ignore"  # Ignores extra fields in the input data
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allows both alias and field name to be used
+        extra="ignore",  # Ignores extra fields in the input data
+    )
 
 
 class InvalidResponseTypeError(Exception):

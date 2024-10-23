@@ -16,6 +16,7 @@ class AgentManager:
         self.active_agent: Optional[Agent] = None
 
     async def transfer_to_agent(self, from_agent_id: str, to_agent_id: str, message: str) -> str:
+        """Transfer message list to target agent and make the target agent as active agent"""
         logger.info(f"transfer_to_agent from_agent_id: {from_agent_id}, to_agent_id: {to_agent_id}, message: {message}")
         try:
             # overwrite by using active agent id
@@ -47,7 +48,6 @@ class AgentManager:
 
         agent = Agent(config=config, agent_manager=self)
         self.agents[agent.config.id] = agent
-        self.active_agent = agent
         logger.info(
             f"register_agent {agent.config.id} (name: {config.name}), available agents: {list(self.agents.keys())}"
         )
@@ -131,6 +131,9 @@ class AgentManager:
                 return agent
 
         return None
+
+    def set_active_agent(self, agent_id: str):
+        self.active_agent = self.get_agent(agent_id)
 
     def add_tool_to_agent(self, agent_id: str, tool: Union[Callable, Tool]) -> None:
         if agent_id in self.agents:

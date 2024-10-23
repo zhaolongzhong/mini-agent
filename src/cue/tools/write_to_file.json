@@ -10,7 +10,7 @@
                     "type": "string",
                     "description": "Full file name with path where the content will be written."
                 },
-                "text": {
+                "content": {
                     "type": "string",
                     "description": "Text content to be written into the file."
                 },
@@ -22,7 +22,7 @@
             },
             "required": [
                 "file_path",
-                "text"
+                "content"
             ]
         }
     }

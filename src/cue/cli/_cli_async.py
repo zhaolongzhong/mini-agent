@@ -54,6 +54,7 @@ class CLI:
         self.logger.info("Running the CLI. Type 'exit' or 'quit' to exit.")
         try:
             active_agent_id = self._config_agents()
+            self.agent_manager.set_active_agent(active_agent_id)
             run_metdata = RunMetadata()
             while True:
                 active_agent_id = self.agent_manager.active_agent.id

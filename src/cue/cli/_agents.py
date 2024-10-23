@@ -4,42 +4,67 @@ from ..llm.llm_model import ChatModel
 from ..schemas import AgentConfig
 from ..tools._tool import Tool
 
+default_model = ChatModel.GPT_4O_MINI
+
+main_agent = AgentConfig(
+    id="main",
+    name="main",
+    description="Is main task executor and coordinator with other agents.",
+    instruction="Analyze requests, delegate to specialists, maintain context, and synthesize outputs. Avoid using specialist tools directly.",
+    model=ChatModel.GPT_4O,
+    temperature=0.8,
+    max_tokens=2000,
+    tools=[Tool.Read],
+)
+
+system_operator = AgentConfig(
+    id="system_operator",
+    name="system_operator",
+    description="Is system operations specialist, be able to read file, write content to file, run python code or script, and execute bash command..",
+    instruction="You are able to read file, write content to file, run python code or script, and execute bash command.",
+    model=default_model,
+    tools=[Tool.Read, Tool.Write, Tool.Python, Tool.Bash],
+)
+
+browse_agent = AgentConfig(
+    id="browse_agent",
+    name="browse_agent",
+    description="Is able to search internet and browse web page or search news.",
+    instruction="Search internet, extract relevant information, verify reliability, report limitations.",
+    model=default_model,
+    tools=[Tool.Browse],
+)
+
+email_agent = AgentConfig(
+    id="email_manager",
+    name="email_manager",
+    description="Is able to read and sand emails and other email operations.",
+    instruction="Manage email operations using available Gmail commands.",
+    model=default_model,
+    tools=[Tool.Email],
+)
+
+drive_agent = AgentConfig(
+    id="google_drive_manager",
+    name="google_drive_manager",
+    description="Is able to access google drive, read file from drive or upload file to drive, or other operations.",
+    instruction="Manage Google Drive operations using available commands.",
+    model=default_model,
+    tools=[Tool.Drive],
+)
+
 
 def get_agent_configs() -> tuple[Dict[str, AgentConfig], str]:
-    """
-    Returns a dictionary of predefined agent configurations and the default main(orchestrator) agent ID.
-    Each configuration defines an agent's specialized capabilities, collaboration patterns, and operating parameters.
+    """Get predefined agent configurations and main agent ID.
 
     Returns:
-        tuple[Dict[str, AgentConfig], str]: Dictionary mapping agent IDs to their configurations and the main agent ID
+        Agent configurations dictionary and main agent ID
     """
     configs = {
-        "main": AgentConfig(
-            id="main",
-            name="main",
-            description="Lead coordinator that analyzes tasks, delegates to specialized agents (File Operator and browser), manages information flow, and synthesizes results. Acts as the central hub for team collaboration.",
-            instruction="""Coordinate the team by analyzing requests, delegating tasks to specialists (File Operator and browser), maintaining context, and synthesizing outputs. Provide clear instructions to agents, facilitate collaboration, and avoid using specialist tools directly.""",
-            model=ChatModel.GPT_4O_MINI,
-            temperature=0.8,
-            max_tokens=2000,
-            tools=[Tool.FileRead],
-        ),
-        "file_operator": AgentConfig(
-            id="file_operator",
-            name="file_operator",
-            description="System operations specialist managing file operations, command execution, and local resources. Collaborates with main and browser for task coordination.",
-            instruction="""Execute system operations as directed by main. Collaborate with browser when tasks require both system operations and internet data. Provide operation feedback, alert on risks, maintain security, and handle errors gracefully.""",
-            model=ChatModel.GPT_4O_MINI,
-            tools=[Tool.FileRead, Tool.FileWrite, Tool.ShellTool],
-        ),
-        "browser": AgentConfig(
-            id="browser",
-            name="browser",
-            description="Internet research specialist handling web searches, content analysis, and information synthesis. Collaborates with main and file_operator to support tasks with data gathering and verification.",
-            instruction="""Conduct web research as directed by main. Collaborate with file_operator when tasks involve both internet data and local system operations. Extract and summarize relevant information, verify reliability, and report access limitations.""",
-            model=ChatModel.GPT_4O_MINI,
-            tools=[Tool.BrowseWeb],
-        ),
+        "main": main_agent,
+        "system_operator": system_operator,
+        "browse_agent": browse_agent,
+        "email_manager": email_agent,
+        "google_drive_manager": drive_agent,
     }
-
     return (configs, "main")

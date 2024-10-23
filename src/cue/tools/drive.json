@@ -1,7 +1,7 @@
 {
     "type": "function",
     "function": {
-        "name": "manage_drive",
+        "name": "drive",
         "description": "Manage Google Drive operations, including listing files or folders, getting files by folder ID, downloading files, creating folders, and uploading files to folders. You must provide the 'command' and 'args' in arguments.",
         "parameters": {
             "type": "object",

@@ -27,9 +27,9 @@ class AsyncCueClient:
             max_tokens=2000,
             conversation_id="",
             tools=[
-                Tool.FileRead,
-                Tool.FileWrite,
-                Tool.ShellTool,
+                Tool.Read,
+                Tool.Write,
+                Tool.Bash,
             ],
         )
 

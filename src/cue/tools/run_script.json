@@ -1,0 +1,73 @@
+{
+  "type": "function",
+  "function": {
+      "name": "run_script",
+      "description": "A secure Python script runner with sandboxing capabilities",
+      "parameters": {
+          "type": "object",
+          "required": ["script"],
+          "properties": {
+              "script": {
+                  "type": "string",
+                  "description": "Either the Python script content as a string or the path to a script file"
+              },
+              "is_file": {
+                  "type": "boolean",
+                  "description": "If true, the script parameter is treated as a file path",
+                  "default": false
+              }
+          }
+      },
+      "returns": {
+          "type": "object",
+          "properties": {
+              "success": {
+                  "type": "boolean",
+                  "description": "Whether the script execution was successful"
+              },
+              "stdout": {
+                  "type": "string",
+                  "description": "Standard output from the script execution"
+              },
+              "stderr": {
+                  "type": "string",
+                  "description": "Standard error output from the script execution"
+              },
+              "exception": {
+                  "type": "string",
+                  "description": "Exception message if an error occurred",
+                  "nullable": true
+              },
+              "exit_code": {
+                  "type": "integer",
+                  "description": "Exit code from the script execution",
+                  "nullable": true
+              }
+          }
+      },
+      "constraints": {
+          "timeout": "30 seconds",
+          "memory_limit": "256MB",
+          "file_size_limit": "1MB",
+          "allowed_modules": [
+              "math",
+              "random",
+              "datetime",
+              "json",
+              "collections",
+              "itertools",
+              "functools",
+              "time"
+          ],
+          "prohibited_operations": [
+              "open",
+              "exec",
+              "eval",
+              "system",
+              "popen",
+              "spawn",
+              "fork"
+          ]
+      }
+  }
+}

@@ -20,7 +20,7 @@ from .schemas import (
     ToolResponseWrapper,
 )
 from .schemas.anthropic import ToolResultContent, ToolResultMessage
-from .tool_manager import ToolManager
+from .tools import ToolManager
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,8 @@ class Agent:
 
     def get_system_message(self) -> MessageParam:
         instruction = f"{self.config.instruction} Your idenity is id: {self.config.id}, name: {self.config.name}"
-        instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info}"
+        if self.other_agents_info:
+            instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info}"
         return MessageParam(role="system", name=self.config.name, content=instruction)
 
     def get_messages(self) -> List:
@@ -69,12 +70,13 @@ class Agent:
         tool_names = [tool.value for tool in self.config.tools]
         if not tool_names:
             return description
-        description += f"Agent {self.config.id} is able to use these tools: {', '.join(tool_names)}"
+        description += f" Agent {self.config.id} is able to use these tools: {', '.join(tool_names)}"
         return description
 
     def _get_tool_json(self) -> Optional[List[Dict]]:
         if self.config.tools:
-            return self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
+            res = self.tool_manager.get_tool_definitions(self.config.model.id, self.config.tools)
+            return res
         else:
             return None
 
@@ -114,17 +116,17 @@ class Agent:
             if isinstance(tool_call, ToolCall):
                 tool_name = tool_call.function.name
                 tool_id = tool_call.id
-                args = tuple(json.loads(tool_call.function.arguments).values())
+                kwargs = json.loads(tool_call.function.arguments)
             elif isinstance(tool_call, ToolUseBlock):
                 tool_name = tool_call.name
                 tool_id = tool_call.id
-                args = tuple(tool_call.input.values())
+                kwargs = tool_call.input
             else:
                 raise ValueError(f"Unsupported tool call type: {type(tool_call)}")
 
             if tool_name not in self.tool_manager.tools and tool_name not in ["call_agent", "transfer_to_agent"]:
                 error_message = f"Tool '{tool_name}' not found. {self.tool_manager.tools.keys()}"
-                logger.error(error_message)
+                logger.error(f"{error_message}, tool_call: {tool_call}")
                 tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
                 continue
 
@@ -132,7 +134,7 @@ class Agent:
                 tool_func = self.agent_manager.transfer_to_agent
             else:
                 tool_func = self.tool_manager.tools[tool_name]
-            task = asyncio.create_task(self.run_tool(tool_func, *args))
+            task = asyncio.create_task(self.run_tool(tool_func, **kwargs))
             tasks.append((task, tool_id, tool_name))
 
         for task, tool_id, tool_name in tasks:
@@ -155,12 +157,8 @@ class Agent:
 
         return response
 
-    async def run_tool(self, tool_func, *args):
-        if asyncio.iscoroutinefunction(tool_func):
-            return await tool_func(*args)
-        else:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, tool_func, *args)
+    async def run_tool(self, tool_func, **kwargs):
+        return await tool_func(**kwargs)
 
     def create_success_response(self, tool_id: str, tool_name: str, content: str):
         if "claude" in self.config.model.id:

@@ -1,18 +1,18 @@
 {
     "type": "function",
     "function": {
-        "name": "browse_web",
-        "description": "Browse the web to perform different actions like search, open URLs, or fetch news.",
+        "name": "email",
+        "description": "Manage emails, including reading inbox, reading email details, and sending emails.",
         "parameters": {
             "type": "object",
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "The command to execute. Can be 'search', 'open_url', or 'news'."
+                    "description": "The command to execute. Can be 'read_inbox', 'read_detail', or 'send'."
                 },
                 "args": {
                     "type": "array",
-                    "description": "The arguments for the command. For 'search' and 'news', provide a list of search keywords. For 'open_url', provide a list of URLs.",
+                    "description": "The arguments for the command. For 'read_inbox', provide the max count of emails. For 'read_detail', provide the email ID. For 'send', provide (recipient, subject, and content).",
                     "items": {
                         "type": "string"
                     }

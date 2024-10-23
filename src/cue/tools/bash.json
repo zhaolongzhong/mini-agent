@@ -1,0 +1,30 @@
+{
+    "type": "function",
+    "function": {
+        "name": "bash",
+        "description": "Run bash commands.\n\nThis tool allows the agent to execute bash commands.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "command (Optional[str]): The bash command to execute. If None, defaults to an empty command.",
+                    "default": null
+                },
+                "restart": {
+                    "type": "boolean",
+                    "description": "restart (bool): Whether to restart the process after executing the command. Defaults to False.",
+                    "default": false
+                },
+                "kwargs": {
+                    "type": "object",
+                    "description": "**kwargs: Additional keyword arguments for further customization.",
+                    "additionalProperties": true
+                }
+            },
+            "required": [
+                "kwargs"
+            ]
+        }
+    }
+}

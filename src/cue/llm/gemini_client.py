@@ -11,7 +11,7 @@ from google.oauth2 import service_account
 from ..memory import MemoryInterface
 from ..schemas import AgentConfig, ErrorResponse, RunMetadata
 from ..schemas.tool_call import AssistantMessage, convert_to_assistant_message
-from ..tool_manager import ToolManager
+from ..tools import ToolManager
 from .base_client import BaseClient
 from .llm_request import LLMRequest
 
@@ -60,7 +60,7 @@ class GeminiClient(LLMRequest, BaseClient):
         self.tools = config.tools
         self.tool_manager = ToolManager()
         if len(self.tools) > 0:
-            self.tool_json = self.tool_manager.get_tool_definitions(self.model, self.tools)
+            self.tool_json = self.tool_manager.get_tool_definitions(self.model.id, self.tools)
         else:
             self.tool_json = None
 

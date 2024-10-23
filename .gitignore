@@ -2,6 +2,7 @@
 __pycache__/
 .mypy_cache
 *.egg-info
+.cache
 dist/
 
 venv/
@@ -11,4 +12,3 @@ logs/
 **/*memory.jsonl*
 
 credentials/
-

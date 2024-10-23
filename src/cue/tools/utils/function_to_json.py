@@ -1,5 +1,5 @@
 import inspect
-from typing import Any, get_type_hints
+from typing import Any, Optional, get_type_hints
 
 
 def function_to_json(func) -> dict:
@@ -21,7 +21,7 @@ def function_to_json(func) -> dict:
         bool: "boolean",
         list: "array",
         dict: "object",
-        Any: "any",
+        # Remove Any from type_map
         type(None): "null",
     }
 
@@ -36,20 +36,53 @@ def function_to_json(func) -> dict:
     required = []
 
     for param_name, param in signature.parameters.items():
+        # Handle **kwargs separately
+        if param.kind == inspect.Parameter.VAR_KEYWORD:
+            # Define kwargs as an object with additionalProperties
+            param_info = {
+                "type": "object",
+                "description": f"Parameter '{param_name}' for function '{func.__name__}'.",
+                "additionalProperties": True,
+            }
+            parameters[param_name] = param_info
+            continue
+
         param_type = type_hints.get(param_name, Any)
-        json_type = type_map.get(param_type, "string")
+
+        # Determine if the parameter is Optional
+        is_optional = False
+        origin = getattr(param_type, "__origin__", None)
+        if origin is Optional:
+            is_optional = True
+            # Extract the actual type from Optional
+            args = getattr(param_type, "__args__", [])
+            if args:
+                param_type = args[0]
+
+        # Map the parameter type
+        json_type = type_map.get(param_type, "string")  # Default to "string" if type not found
+
         param_info = {
             "type": json_type,
             "description": f"Parameter '{param_name}' for function '{func.__name__}'.",
         }
 
+        # Handle default values
         if param.default != inspect.Parameter.empty:
             param_info["default"] = param.default
         else:
-            required.append(param_name)
+            if not is_optional:
+                required.append(param_name)
+
+        # Handle complex types
+        if param_type == Any:
+            # Replace "Any" with "object" allowing additional properties
+            param_info["type"] = "object"
+            param_info["additionalProperties"] = True
 
         parameters[param_name] = param_info
 
+    # Handle the 'required' list: Only include parameters that are not optional and have no default
     return {
         "type": "function",
         "function": {

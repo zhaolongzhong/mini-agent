@@ -65,7 +65,7 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
         conversation_id="",
         feature_flag=FeatureFlag(is_cli=True, is_eval=False),
         storage_type=StorageType.IN_MEMORY,
-        tools=[Tool.FileRead, Tool.ShellTool, Tool.FileWrite],
+        tools=[Tool.Read, Tool.ShellTool, Tool.Write],
         is_test=True,
     )
     manager = AgentManager()

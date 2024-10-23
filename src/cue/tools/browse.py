@@ -1,9 +1,10 @@
 import logging
-from typing import Union
+from typing import Any, ClassVar, List, Literal, Union
 
 import requests
 from bs4 import BeautifulSoup
 
+from .base import BaseTool
 from .utils.search import duckduckgo_search, search_news
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -13,18 +14,6 @@ commands = {
     "open_url": "open_url",
     "news": "news",
 }
-
-
-def browse_web(command: str, args: list[str]) -> Union[str, list[any]]:
-    logger.debug(f"browse_web: {command}, {args}")
-    if command == commands["search"]:
-        return search(args)  # return a list search results with title, url, and snippet
-    elif command == commands["open_url"]:  # return web page contents
-        return [open_url(url) for url in args]
-    elif command == commands["news"]:
-        return news(args)  # return a list news
-    else:
-        return "Command not found."
 
 
 def search(args: list[str]) -> Union[str, list[any]]:
@@ -132,7 +121,7 @@ def find_publish_date(soup):
             if publish_date:
                 publish_date = publish_date.get("datetime", publish_date.text)
     except Exception as e:
-        logger.warn("Error finding publish date: %s", e)
+        logger.warning("Error finding publish date: %s", e)
         publish_date = None
 
     return publish_date
@@ -160,8 +149,50 @@ def extract_text_and_links(soup):
     return " ".join(texts), hyperlinks
 
 
+class BrowseTool(BaseTool):
+    """A tool that allows the agent to search and browse internet."""
+
+    name: ClassVar[Literal["browse"]] = "browse"
+
+    def __init__(self):
+        super().__init__()
+
+    async def __call__(self, command: str, args: list[str]) -> Union[str, List[Any]]:
+        return await self.browse(command, args)
+
+    async def browse(self, command: str, args: list[str]) -> Union[str, List[Any]]:
+        """Browse the web to perform different actions like search, open URLs, or fetch news.
+
+        Args:
+            command (str): The command to execute. Valid options are:
+                - 'search': Perform a web search using provided keywords
+                - 'open_url': Open and fetch content from specified URLs
+                - 'news': Search for news articles using provided keywords
+            args (list[str]): The arguments for the command:
+                - For 'search': List of search keywords (e.g., ["python", "programming"])
+                - For 'open_url': List of URLs to fetch (e.g., ["https://example.com"])
+                - For 'news': List of news search keywords (e.g., ["technology"])
+
+        Returns:
+            Union[str, List[Any]]: Operation result, either:
+                - str: Error message if the operation fails
+                - List[Any]: List of search results, webpage content, or news articles
+
+        """
+        logger.debug(f"browse_web: {command}, {args}")
+        if command == commands["search"]:
+            return search(args)  # return a list search results with title, url, and snippet
+        elif command == commands["open_url"]:  # return web page contents
+            return [open_url(url) for url in args]
+        elif command == commands["news"]:
+            return news(args)  # return a list news
+        else:
+            return "Command not found."
+
+
 if __name__ == "__main__":
-    browse_open_url_result = browse_web("open_url", ["https://en.wikipedia.org/wiki/Artificial_intelligence"])
-    browse_search_result = browse_web("search", ["Today's major AI news"])
+    browse = BrowseTool()
+    browse_open_url_result = browse.browse("open_url", ["https://en.wikipedia.org/wiki/Artificial_intelligence"])
+    browse_search_result = browse.browse("search", ["Today's major AI news"])
     print(f"browse open_url:\n{browse_open_url_result}")
     print(f"browse search:\n{browse_search_result}")

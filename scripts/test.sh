@@ -29,6 +29,7 @@ RUN_INTEGRATION=false
 RUN_EVALUATION=false
 RUN_SINGLE_TEST=false
 TEST_PATH=""
+PYTEST_ARGS=""
 
 # Function to display usage instructions
 usage() {
@@ -37,9 +38,10 @@ usage() {
   echo "Options:"
   echo "  -u    Run unit tests only"
   echo "  -i    Run integration tests only"
-  echo "  -a    Run both unit and integration tests"
+  echo "  -a    Run unit, integration and evaluation tests"
   echo "  -e    Run evaluation tests (requires OPENAI_API_KEY)"
   echo "  -t <test_path> Run a single test specified by the test path"
+  echo "  -p <pytest_args> Additional pytest arguments (e.g., '-s -v -x')"
   echo "  -h    Show this help message and exit"
   echo ""
   echo "Examples:"
@@ -47,13 +49,14 @@ usage() {
   echo "  $0 -i          # Run integration tests only"
   echo "  $0 -a          # Run both unit and integration tests"
   echo "  $0 -e          # Run evaluation tests"
-  echo "  $0 -t tests/evaluation/test_async_client.py::TestClientManager::test_async_client  # Run a single test"
+  echo "  $0 -t tests/evaluation/test_async_client.py::TestClientManager::test_async_client  # Run a single test, e.g. ./scripts/test.sh -t tests/evaluation/test_basic_tool_use.py"
   echo "  $0 -u -e       # Run unit and evaluation tests"
+  echo "  $0 -u -p '-v -x'  # Run unit tests with verbose output and exit on first failure"
   exit 1
 }
 
 # Parse command-line options
-while getopts ":uiaet:h" opt; do
+while getopts ":uiaet:p:h" opt; do
   case ${opt} in
     u )
       RUN_UNIT=true
@@ -64,6 +67,7 @@ while getopts ":uiaet:h" opt; do
     a )
       RUN_UNIT=true
       RUN_INTEGRATION=true
+      RUN_EVALUATION=true
       ;;
     e )
       RUN_EVALUATION=true
@@ -71,6 +75,9 @@ while getopts ":uiaet:h" opt; do
     t )
       RUN_SINGLE_TEST=true
       TEST_PATH="$OPTARG"
+      ;;
+    p )
+      PYTEST_ARGS="$OPTARG"
       ;;
     h )
       usage
@@ -90,37 +97,60 @@ done
 shift $((OPTIND -1))
 
 # If no options are provided, default to running both unit and integration tests
-if ! $RUN_UNIT && ! $RUN_INTEGRATION && ! $RUN_EVALUATION; then
+if ! $RUN_UNIT && ! $RUN_INTEGRATION && ! $RUN_EVALUATION && ! $RUN_SINGLE_TEST; then
   RUN_UNIT=true
   RUN_INTEGRATION=true
 fi
 
+# Function to run pytest and handle empty test suites
+run_pytest() {
+  local test_type="$1"
+  local pytest_args="$2"
+  local extra_args="${3:-}"
+  
+  echo "Running $test_type tests ..."
+  # Use set +e to prevent script from exiting if pytest returns non-zero
+  set +e
+  rye run pytest $pytest_args $extra_args
+  local exit_code=$?
+  set -e
+  
+  # Exit codes:
+  # 0 = tests passed
+  # 1 = tests failed
+  # 5 = no tests collected
+  if [ $exit_code -eq 5 ]; then
+    echo "No $test_type tests found (this is OK if you haven't created any yet)"
+    return 0
+  elif [ $exit_code -ne 0 ]; then
+    echo "$test_type tests failed with exit code $exit_code"
+    exit $exit_code
+  fi
+}
+
 # Run unit tests if flagged
 if $RUN_UNIT; then
-  echo "Running unit tests ..."
-  rye run pytest -s -m unit
+  run_pytest "unit" "$PYTEST_ARGS" "-m unit"
 fi
 
 # Run integration tests if flagged
 if $RUN_INTEGRATION; then
-  echo "Running integration tests ..."
-  rye run pytest -s -m integration
+  run_pytest "integration" "$PYTEST_ARGS" "-m integration"
 fi
 
 # Run evaluation tests if flagged
 if $RUN_EVALUATION; then
-  echo "Running evaluation tests ..."
-
+  
   # Load the main .env file to get the API keys
   load_env ".env"
-
+  
   # Check if OPENAI_API_KEY is set
   if [ -z "${OPENAI_API_KEY:-}" ]; then
     echo "Error: OPENAI_API_KEY is not set. Please set it in the .env file or as an environment variable." >&2
     exit 1
   fi
-
-  rye run pytest -s tests/evaluation
+  
+  run_pytest "evaluation" "$PYTEST_ARGS" "tests/evaluation"
 fi
 
 # Run a single test if flagged
@@ -133,7 +163,7 @@ if $RUN_SINGLE_TEST; then
     load_env ".env"
   fi
   
-  rye run pytest -s "$TEST_PATH"
+  run_pytest "single" "$PYTEST_ARGS" "$TEST_PATH"
 fi
 
 echo "All requested tests have been executed successfully."
