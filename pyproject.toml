@@ -107,6 +107,7 @@ ignore = [
     "UP007",  # Ignore use of `X | Y` for type annotations
     "UP006",  # Ignore use of Dict
     "UP035",  # Ignore use of Dict or List
+    "UP038",  # Ignore (X, Y)
 ]
 
 [tool.ruff.format]

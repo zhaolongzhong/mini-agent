@@ -51,7 +51,7 @@ class ToolManager:
         """Cache a tool definition."""
         self._definition_cache[self._get_cache_key(tool_id, model)] = definition
 
-    def get_tool_definitions(self, model: str, tools: Optional[Union[List[Tool], List[str]]] = None) -> list[dict]:
+    def get_tool_definitions(self, model: str, tools: Optional[Union[List[Tool], List[str]]] = None) -> List[dict]:
         """Iterate through the tools and gather their JSON configurations.
 
         Args:

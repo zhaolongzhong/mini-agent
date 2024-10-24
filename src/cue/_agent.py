@@ -43,7 +43,7 @@ class Agent:
             f"{self.config.instruction} \n\n### IMPORTANT: Your name is {self.config.name} and id is {self.config.id}."
         )
         if self.other_agents_info:
-            instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info}"
+            instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info} \n\nYou must use chat_with_agent when you talk to other agents, if you don't use it, the default is to user."
         return MessageParam(role="system", name=self.config.name, content=instruction)
 
     def get_messages(self) -> List:
@@ -196,6 +196,6 @@ class Agent:
             result_param = ToolResultContent(
                 tool_use_id=tool_id, content=error_message, type="tool_result", is_error=True
             )
-            return result_param.mode
+            return result_param
         else:
             return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)

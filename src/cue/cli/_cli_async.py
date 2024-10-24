@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class CLI:
-    def __init__(self):
+    def __init__(self, args):
         self.logger = logger
         self.console = Console(theme=custom_theme)
 
@@ -38,14 +38,16 @@ class CLI:
         self.configs = configs
         self.active_agent_id = active_agent_id
         self._config_agents()
+        self.enable_debug_turn = args.enable_debug_turn
 
     def _config_agents(self) -> str:
         # Register all agents
         self.agents = {config.id: self.agent_manager.register_agent(config) for _, config in self.configs.items()}
 
         # Add transfer tool to all agents
-        for agent_id in self.agents:
-            self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
+        if len(self.agents) > 0:
+            for agent_id in self.agents:
+                self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
         return self.active_agent_id
 
     async def _get_user_input_async(self, prompt: str):
@@ -56,7 +58,7 @@ class CLI:
         self.logger.info("Running the CLI. Type 'exit' or 'quit' to exit.")
         try:
             self.agent_manager.set_active_agent(self.active_agent_id)
-            run_metdata = RunMetadata()
+            run_metdata = RunMetadata(enable_turn_debug=self.enable_debug_turn)
             while True:
                 active_agent_id = self.agent_manager.active_agent.id
                 user_prompt = Text("[User]: ", style="user")
@@ -98,6 +100,7 @@ def _parse_args():
     parser.add_argument("-v", "--version", action="store_true", help="Print the version of the Cue client.")
     parser.add_argument("-r", "--run", action="store_true", help="Run the interactive CLI.")
     parser.add_argument("-c", "--config", action="store_true", help="Print the default configuration.")
+    parser.add_argument("-d", "--enable_debug_turn", action="store_true", help="Pause for each run loop turn.")
     parser.add_argument(
         "--log-level",
         type=str,
@@ -153,7 +156,7 @@ def async_main():
         file_handler.setLevel(logging.DEBUG if logger.level <= logging.DEBUG else logger.level)
         logger.addHandler(file_handler)
 
-    cli = CLI()
+    cli = CLI(args=args)
 
     try:
         asyncio.run(main(cli))

@@ -2,10 +2,8 @@ import copy
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
-from cue.schemas.author import Author
-
 from ._agent import Agent
-from .schemas import AgentConfig, CompletionResponse, MessageParam, RunMetadata, ToolResponseWrapper
+from .schemas import AgentConfig, Author, CompletionResponse, MessageParam, RunMetadata, ToolResponseWrapper
 from .tools._tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -102,12 +100,6 @@ class AgentManager:
                 self.active_agent = self.new_active_agent
                 self.new_active_agent = None
             turns_count += 1
-            if run_metadata.enable_turn_debug:
-                response = input(f"Maximum turn {run_metadata.max_turns} reached. Continue? (y/n): ")
-                if response.lower() not in ["y", "yes"]:
-                    logger.warning("Stopped by user.")
-                    break
-
             if not self.should_continue_run(turns_count, run_metadata):
                 break
 
@@ -153,14 +145,19 @@ class AgentManager:
         Returns:
             bool: True if the loop should continue, False otherwise
         """
+        if run_metadata.enable_turn_debug:
+            response = input(
+                f"Maximum turn {run_metadata.max_turns}, current: {turns_count}. Debug. Continue? (y/n, press Enter to continue): "
+            )
+            if response.lower() not in ["y", "yes", ""]:
+                logger.warning("Stopped by user.")
+                return False
         if turns_count >= run_metadata.max_turns:
             logger.warning(f"Run reaches max turn: {run_metadata.max_turns}")
-
-            if not run_metadata.enable_turn_debug:
-                return False
-
-            response = input(f"Maximum turn {run_metadata.max_turns} reached. Continue? (y/n): ")
-            if response.lower() not in ["y", "yes"]:
+            response = input(
+                f"Maximum turn {run_metadata.max_turns} reached. Continue? (y/n, press Enter to continue): "
+            )
+            if response.lower() not in ["y", "yes", ""]:
                 logger.warning("Stopped by user.")
                 return False
 

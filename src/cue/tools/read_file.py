@@ -8,7 +8,7 @@ from .base import BaseTool
 
 class ReadTool(BaseTool):
     """
-    A tool that allows the agent to read content from file.
+    A tool that allows the agent to read content from file or folder.
     """
 
     name: ClassVar[Literal["read_file"]] = "read_file"
@@ -24,7 +24,7 @@ class ReadTool(BaseTool):
         """Read and return the contents of a text or PDF file.
 
         Args:
-            file_path (str): Path to the file to read.
+            file_path (str): Full path to the file or directory.
             encoding (str, optional): File encoding. Defaults to 'utf-8'.
 
         Returns:
@@ -33,6 +33,13 @@ class ReadTool(BaseTool):
         """
         if not os.path.isfile(file_path):
             return f"Error: The file {file_path} does not exist."
+
+        if os.path.isdir(file_path):
+            try:
+                folder_contents = os.listdir(file_path)
+                return "\n".join(folder_contents)
+            except Exception as error:
+                return f"Error reading folder contents: {error}"
 
         try:
             if file_path.lower().endswith(".pdf"):

@@ -55,7 +55,6 @@ class OpenAIClient(LLMRequest):
                 _is_json, json_dict = self.extract_json_dict(content)
                 if json_dict:
                     response = self.convert_tool_call(response, json_dict)
-                    logger.debug(f"after response:{response}")
             else:
                 if self.tool_json:
                     response = await self.client.chat.completions.create(
@@ -75,6 +74,7 @@ class OpenAIClient(LLMRequest):
                         temperature=request.temperature,
                         response_format=request.response_format,
                     )
+                self.replace_tool_call_ids(response, request.model)
 
         except openai.APIConnectionError as e:
             error = ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
@@ -164,7 +164,6 @@ class OpenAIClient(LLMRequest):
             # Now the string is all on one line, we can safely parse it
             json_object = json.loads(json_str)
             is_json = isinstance(json_object, dict)
-            logger.debug(f"Valid JSON dictionary: {is_json}")
             return (is_json, json_object)
         except ValueError:
             # If first attempt fails, try with more aggressive normalization
@@ -182,9 +181,7 @@ class OpenAIClient(LLMRequest):
     def convert_tool_call(self, chat_completion: ChatCompletion, tool_dict: Dict) -> ChatCompletion:
         try:
             original = chat_completion.choices[0].message
-            tool_call_id = generate_id(prefix="call_")
-            logger.debug(f"tool_dict: {tool_dict}")
-
+            tool_call_id = self.generate_tool_id()
             adjusted_tool_dict = {
                 "name": tool_dict.get("name"),
                 "arguments": json.dumps(tool_dict.get("arguments", {})),  # Serialize arguments to JSON string
@@ -199,8 +196,23 @@ class OpenAIClient(LLMRequest):
                 original.tool_calls = [tool_call]
                 logger.debug("Initialized tool_calls as an empty array.")
 
-            logger.debug("Added tool_call to tool_calls.")
-
         except Exception as e:
             logger.error(f"Error in convert_tool_call: {e}, tool_dict: {tool_dict}")
         return chat_completion
+
+    def replace_tool_call_ids(self, response_data: ChatCompletion, model: str) -> None:
+        """
+        Replace tool call IDs in the response to:
+        1) Ensure uniqueness by generating new IDs from the server if duplicates exist.
+        2) Shorten IDs to save tokens (length optimization may be adjusted).
+        """
+        for choice in response_data.choices:
+            message = choice.message
+            tool_calls = message.tool_calls
+            if tool_calls:
+                for tool_call in tool_calls:
+                    tool_call.id = self.generate_tool_id()
+
+    def generate_tool_id(self) -> str:
+        tool_call_id = generate_id(prefix="call_", length=4)
+        return tool_call_id

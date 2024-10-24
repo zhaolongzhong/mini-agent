@@ -37,13 +37,13 @@ class AnthropicClient:
         try:
             # The Messages API accepts a top-level `system` parameter, not \"system\" as an input message role.
             system_message_content = " ".join([msg["content"] for msg in request.messages if msg["role"] == "system"])
-            system_message_content += "\n\nIf the role is user but the message content starts with something like [message_from_*], the message is from that agent."
+            system_message_content += "\n\nIf the role is user but the message content starts with something like `[*]:`, that is the author of the message."
             messages = [msg for msg in request.messages if msg["role"] != "system"]
             messages = self.process_messages(messages)
-            logger.debug(f"system_message_content: {system_message_content}")
-            logger.debug(f"tools_json: {request.tool_json}")
+            logger.debug(f"system_message_content: {system_message_content}" f"tools_json: {request.tool_json}")
             debug_print_messages(messages, tag=f"{self.config.id} send_completion_request clean messages")
-            response = await self.client.with_options(max_retries=2).messages.create(
+
+            response = await self.client.with_options(max_retries=2).beta.prompt_caching.messages.create(
                 model=request.model,
                 system=system_message_content,
                 messages=messages,

@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from anthropic.types import Message as AnthropicMessage
 from anthropic.types import MessageParam as AntropicMessageParam
+from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
@@ -81,7 +82,7 @@ class InMemoryStorage(MemoryInterface):
         for msg in self.messages:
             if model and "claude" in model:
                 if isinstance(msg, CompletionResponse):
-                    if isinstance(msg.response, AnthropicMessage):
+                    if isinstance(msg.response, (AnthropicMessage, PromptCachingBetaMessage)):
                         result.append(msg.response)
                     elif isinstance(msg.error, ErrorResponse):
                         result.append(AntropicMessageParam(role="assistant", content=msg.error.model_dump_json()))

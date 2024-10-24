@@ -14,7 +14,7 @@ main_agent = AgentConfig(
     model=ChatModel.GPT_4O,
     temperature=0.8,
     max_tokens=2000,
-    tools=[Tool.Read],
+    tools=[Tool.Read, Tool.Write],
 )
 
 agent_o = AgentConfig(
@@ -38,7 +38,7 @@ agent_claude = AgentConfig(
 system_operator = AgentConfig(
     id="system_operator",
     name="system_operator",
-    description="Is system operations specialist, be able to read file, write content to file, run python code or script, and execute bash command.",
+    description="Is system operations specialist, be able to run python code or script, and execute bash command.",
     instruction="You are able to read file, write content to file, run python code or script, and execute bash command.",
     model=ChatModel.GPT_4O_MINI,
     tools=[Tool.Read, Tool.Write, Tool.Python, Tool.Bash],
@@ -83,8 +83,8 @@ def get_agent_configs() -> tuple[Dict[str, AgentConfig], str]:
         "agent_o": agent_o,
         "agent_claude": agent_claude,
         "system_operator": system_operator,
-        "browse_agent": browse_agent,
-        "email_manager": email_agent,
-        "google_drive_manager": drive_agent,
+        # "browse_agent": browse_agent,
+        # "email_manager": email_agent,
+        # "google_drive_manager": drive_agent,
     }
     return (configs, "main")

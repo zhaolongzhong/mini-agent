@@ -2,13 +2,13 @@
     "type": "function",
     "function": {
         "name": "read_file",
-        "description": "Read a file and return its contents as a string.",
+        "description": "Read a file or folder from a full path.",
         "parameters": {
             "type": "object",
             "properties": {
                 "file_path": {
                     "type": "string",
-                    "description": "The full file name with path to read."
+                    "description": "The full path to read."
                 },
                 "encoding": {
                     "type": "string",

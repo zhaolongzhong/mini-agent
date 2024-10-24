@@ -94,6 +94,12 @@ You can also run using the following script:
 ./scripts/run.sh
 ```
 
+If you want to print debug log, set the following environment first,
+
+```bash
+export CUE_LOG="debug"
+```
+
 ## Additional Information
 
 - **Dependencies**: Dependencies are managed using Rye, which simplifies package management and setup.

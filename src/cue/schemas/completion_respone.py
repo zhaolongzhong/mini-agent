@@ -4,6 +4,7 @@ from anthropic.types import (
     Message as AnthropicMessage,
 )
 from anthropic.types import ToolUseBlock
+from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,9 +16,15 @@ ToolCallToolUseBlock = Union[ChatCompletionMessageToolCall, ToolUseBlock]
 class CompletionUsage(BaseModel):
     input_tokens: int = Field(default=0, alias="prompt_tokens")
     output_tokens: int = Field(default=0, alias="completion_tokens")
+
+    # https://platform.openai.com/docs/guides/prompt-caching/requirements
     total_tokens: int = 0
     cached_tokens: int = 0
     reasoning_tokens: int = 0
+
+    # https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
 
     model_config = ConfigDict(
         populate_by_name=True,  # Allows both alias and field name to be used
@@ -50,7 +57,7 @@ class CompletionResponse:
         if self.response is None:
             return str(self.error)
 
-        if isinstance(self.response, AnthropicMessage):
+        if isinstance(self.response, (AnthropicMessage, PromptCachingBetaMessage)):
             return self.response.content[0].text
         elif isinstance(self.response, ChatCompletion):
             return self.response.choices[0].message.content
@@ -59,7 +66,7 @@ class CompletionResponse:
         )
 
     def get_tool_calls(self) -> Optional[list[Any]]:
-        if isinstance(self.response, AnthropicMessage):
+        if isinstance(self.response, (AnthropicMessage, PromptCachingBetaMessage)):
             tool_calls = [
                 content_item for content_item in self.response.content if isinstance(content_item, ToolUseBlock)
             ]
@@ -76,7 +83,7 @@ class CompletionResponse:
         if self.response is None:
             return None
 
-        if isinstance(self.response, AnthropicMessage):
+        if isinstance(self.response, (AnthropicMessage, PromptCachingBetaMessage)):
             return CompletionUsage(**self.response.usage.model_dump())
         elif isinstance(self.response, ChatCompletion):
             usage = self.response.usage
@@ -88,7 +95,7 @@ class CompletionResponse:
                 completion_usage.cached_tokens = usage.prompt_tokens_details.cached_tokens
             return completion_usage
         raise InvalidResponseTypeError(
-            f"Expected AnthropicMessage or ChatCompletion, got {type(self.response).__name__}"
+            f"Expected AnthropicMessage or ChatCompletion, got {type(self.response).__name__}. Response: \n{self.response}"
         )
 
     def __str__(self):
