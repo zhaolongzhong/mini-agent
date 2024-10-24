@@ -58,25 +58,6 @@ class AgentManager:
             logger.error(error_msg)
             return error_msg
 
-    def register_agent(self, config: AgentConfig) -> Agent:
-        if config.id in self.agents:
-            logger.warning(f"Agent with id {config.id} already exists, returning existing agent.")
-            return self.agents[config.id]
-
-        agent = Agent(config=config, agent_manager=self)
-        self.agents[agent.config.id] = agent
-        logger.info(
-            f"register_agent {agent.config.id} (name: {config.name}), available agents: {list(self.agents.keys())}"
-        )
-        self.update_other_agents_info()
-        return agent
-
-    def update_other_agents_info(self):
-        for agent_id, agent in self.agents.items():
-            other_agents_info = self.list_agents(exclude=[agent_id])
-            agent.other_agents_info = other_agents_info
-            logger.debug(f"{agent_id} other_agents_info: {other_agents_info}")
-
     async def run(
         self,
         agent_identifier: str,
@@ -167,6 +148,25 @@ class AgentManager:
         self.agents.clear()
         self.active_agent = None
         logger.info("All agents cleaned up and removed.")
+
+    def register_agent(self, config: AgentConfig) -> Agent:
+        if config.id in self.agents:
+            logger.warning(f"Agent with id {config.id} already exists, returning existing agent.")
+            return self.agents[config.id]
+
+        agent = Agent(config=config, agent_manager=self)
+        self.agents[agent.config.id] = agent
+        logger.info(
+            f"register_agent {agent.config.id} (name: {config.name}), available agents: {list(self.agents.keys())}"
+        )
+        self.update_other_agents_info()
+        return agent
+
+    def update_other_agents_info(self):
+        for agent_id, agent in self.agents.items():
+            other_agents_info = self.list_agents(exclude=[agent_id])
+            agent.other_agents_info = other_agents_info
+            logger.debug(f"{agent_id} other_agents_info: {other_agents_info}")
 
     def get_agent(self, identifier: str) -> Optional[Agent]:
         if identifier in self.agents:

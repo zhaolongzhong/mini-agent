@@ -37,20 +37,21 @@ class AsyncCueClient:
         """Initialize the client with multiple agents."""
         self.logger.info("Initializing AsyncCueClient with multiple agents")
 
-        if configs:
-            # Use provided configurations
-            for config in configs:
-                agent_id = config.id
-                self.agents[agent_id] = self.agent_manager.register_agent(config)
-                self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
-            self.active_agent_id = configs[0].id  # Set first agent as active
+        active_agent_id = None
+        if not configs:
+            configs_dict, main_agent_id = get_agent_configs()
+            configs = configs_dict
+            active_agent_id = main_agent_id
         else:
-            # Use configurations from get_agent_configs()
-            configs_dict, active_id = get_agent_configs()
-            for agent_id, config in configs_dict.items():
-                self.agents[agent_id] = self.agent_manager.register_agent(config)
+            active_agent_id = configs[0].id
+        self.active_agent_id = active_agent_id
+
+        for config in configs:
+            agent_id = config.id
+            self.agents[agent_id] = self.agent_manager.register_agent(config)
+            if len(configs) > 1:
+                # only add it when there are multiple agents
                 self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
-            self.active_agent_id = active_id
 
         if not self.agents:
             # Fallback to default configuration if no agents are configured
@@ -88,7 +89,7 @@ class AsyncCueClient:
 
     def get_active_agent_id(self) -> str:
         """Get the current active agent ID."""
-        return self.active_agent_id
+        return self.agent_manager.active_agent.id
 
     async def cleanup(self):
         """Clean up resources used by the client."""

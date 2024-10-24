@@ -37,36 +37,26 @@ class Agent:
         self.agent_manager = agent_manager
         self.description = self._generate_description()
         self.other_agents_info = ""
+        self.tool_json = None
 
     def get_system_message(self) -> MessageParam:
-        instruction = (
-            f"{self.config.instruction} \n\n### IMPORTANT: Your name is {self.config.name} and id is {self.config.id}."
-        )
+        instruction = f"## IMPORTANT: Your name is {self.config.name} and id is {self.config.id}."
+        if self.config.instruction:
+            instruction = f"{self.config.instruction} \n\n{instruction}"
         if self.other_agents_info:
             instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info} \n\nYou must use chat_with_agent when you talk to other agents, if you don't use it, the default is to user."
         return MessageParam(role="system", name=self.config.name, content=instruction)
 
     def get_messages(self) -> List:
-        """
-        Retrieve the original list of messages from the Pydantic model.
-
-        Returns:
-            List: A list of message objects stored in the memory.
-        """
+        """Retrieve the original list of messages from the Pydantic model."""
         return self.memory.messages
 
     def get_message_params(self) -> List[Dict]:
-        """
-        Retrieve a list of message parameter dictionaries for the completion API call.
-
-        Returns:
-            List[Dict]: A list of dictionaries containing message parameters
-                        required for the completion API call, based on the model ID
-                        from the current configuration.
-        """
+        """Retrieve a list of message parameter dictionaries for the completion API call."""
         return self.memory.get_message_params(self.config.model.id)
 
     def _generate_description(self) -> str:
+        """Return the description about the agent."""
         description = ""
         if self.config.description:
             description = self.config.description
@@ -78,14 +68,10 @@ class Agent:
         description += f" Agent {self.config.id} is able to use these tools: {', '.join(tool_names)}"
         return description
 
-    def _get_tool_json(self) -> Optional[List[Dict]]:
-        if self.config.tools:
-            res = self.tool_manager.get_tool_definitions(self.config.model.id, self.config.tools)
-            return res
-        else:
-            return None
-
     async def run(self, author: Optional[Author] = None):
+        if not self.tool_json and self.config.tools:
+            # chat_with_agent is added later so we cannot initialize in init
+            self.tool_json = self.tool_manager.get_tool_definitions(self.config.model.id, self.config.tools)
         messages = self.get_message_params()  # convert message params
         logger.debug(f"{self.id}, size: {len(messages)}")
         history = [
@@ -116,7 +102,7 @@ class Agent:
             model=self.config.model.id,
             messages=messages_dict,
             metadata=metadata,
-            tool_json=self._get_tool_json(),
+            tool_json=self.tool_json,
         )
         response = await self.client.send_completion_request(completion_request)
         usage = response.get_usage()

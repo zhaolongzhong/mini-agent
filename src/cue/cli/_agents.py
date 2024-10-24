@@ -9,9 +9,9 @@ default_model = ChatModel.GPT_4O_MINI
 main_agent = AgentConfig(
     id="main",
     name="main",
-    description="Is main task executor and coordinator with other agents.",
-    instruction="Analyze requests, collaborate with specialists, maintain context, and synthesize outputs. Avoid using specialist tools directly.",
-    model=ChatModel.GPT_4O,
+    description="Is main task executor and collaborate with other agents.",
+    instruction="Analyze requests, collaborate with specialists when appropriate, maintain context, and synthesize outputs.",
+    model=ChatModel.GPT_4O_MINI,
     temperature=0.8,
     max_tokens=2000,
     tools=[Tool.Read, Tool.Write],
@@ -80,8 +80,8 @@ def get_agent_configs() -> tuple[Dict[str, AgentConfig], str]:
     """
     configs = {
         "main": main_agent,
-        "agent_o": agent_o,
-        "agent_claude": agent_claude,
+        # "agent_o": agent_o,
+        # "agent_claude": agent_claude,
         "system_operator": system_operator,
         # "browse_agent": browse_agent,
         # "email_manager": email_agent,

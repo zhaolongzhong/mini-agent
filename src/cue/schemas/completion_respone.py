@@ -99,4 +99,7 @@ class CompletionResponse:
         )
 
     def __str__(self):
-        return f"Text: {self.get_text()}, Tools: {self.get_tool_calls()}, Usage: {self.get_usage()}"
+        response = self.response.model_dump() if self.response else None
+        return (
+            f"Text: {self.get_text()}, Tools: {self.get_tool_calls()}, Usage: {self.get_usage()} Response: {response}"
+        )
