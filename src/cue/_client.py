@@ -42,14 +42,14 @@ class AsyncCueClient:
             for config in configs:
                 agent_id = config.id
                 self.agents[agent_id] = self.agent_manager.register_agent(config)
-                self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.transfer_to_agent)
+                self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
             self.active_agent_id = configs[0].id  # Set first agent as active
         else:
             # Use configurations from get_agent_configs()
             configs_dict, active_id = get_agent_configs()
             for agent_id, config in configs_dict.items():
                 self.agents[agent_id] = self.agent_manager.register_agent(config)
-                self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.transfer_to_agent)
+                self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
             self.active_agent_id = active_id
 
         if not self.agents:

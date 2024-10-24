@@ -10,19 +10,37 @@ main_agent = AgentConfig(
     id="main",
     name="main",
     description="Is main task executor and coordinator with other agents.",
-    instruction="Analyze requests, delegate to specialists, maintain context, and synthesize outputs. Avoid using specialist tools directly.",
+    instruction="Analyze requests, collaborate with specialists, maintain context, and synthesize outputs. Avoid using specialist tools directly.",
     model=ChatModel.GPT_4O,
     temperature=0.8,
     max_tokens=2000,
     tools=[Tool.Read],
 )
 
+agent_o = AgentConfig(
+    id="agent_o",
+    name="agent_o",
+    description="Is very good at readoning, analyzing problems, be able to deep dive on a topic.",
+    instruction="You are an expert AI assistant with advanced reasoning capabilities.",
+    model=ChatModel.O1_MINI,
+    tools=[Tool.Read, Tool.Write],
+)
+
+agent_claude = AgentConfig(
+    id="agent_claude",
+    name="agent_claude",
+    description="Is very good at coding and also provide detail reasoning on a topic.",
+    instruction="You are an expert AI assistant with advanced reasoning capabilities.",
+    model=ChatModel.CLAUDE_3_5_SONNET_20241022,
+    tools=[Tool.Read, Tool.Write],
+)
+
 system_operator = AgentConfig(
     id="system_operator",
     name="system_operator",
-    description="Is system operations specialist, be able to read file, write content to file, run python code or script, and execute bash command..",
+    description="Is system operations specialist, be able to read file, write content to file, run python code or script, and execute bash command.",
     instruction="You are able to read file, write content to file, run python code or script, and execute bash command.",
-    model=default_model,
+    model=ChatModel.GPT_4O_MINI,
     tools=[Tool.Read, Tool.Write, Tool.Python, Tool.Bash],
 )
 
@@ -62,6 +80,8 @@ def get_agent_configs() -> tuple[Dict[str, AgentConfig], str]:
     """
     configs = {
         "main": main_agent,
+        "agent_o": agent_o,
+        "agent_claude": agent_claude,
         "system_operator": system_operator,
         "browse_agent": browse_agent,
         "email_manager": email_agent,

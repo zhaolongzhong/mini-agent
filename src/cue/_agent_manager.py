@@ -2,11 +2,15 @@ import copy
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
+from cue.schemas.author import Author
+
 from ._agent import Agent
-from .schemas import AgentConfig, CompletionResponse, MessageParam, RunMetadata
+from .schemas import AgentConfig, CompletionResponse, MessageParam, RunMetadata, ToolResponseWrapper
 from .tools._tool import Tool
 
 logger = logging.getLogger(__name__)
+
+chat_with_agent = "chat_with_agent"
 
 
 class AgentManager:
@@ -14,13 +18,12 @@ class AgentManager:
         logger.info("AgentManager initialized")
         self.agents: Dict[str, Agent] = {}
         self.active_agent: Optional[Agent] = None
+        self.new_active_agent: Optional[Agent] = None
 
-    async def transfer_to_agent(self, from_agent_id: str, to_agent_id: str, message: str) -> str:
-        """Transfer message list to target agent and make the target agent as active agent"""
-        logger.info(f"transfer_to_agent from_agent_id: {from_agent_id}, to_agent_id: {to_agent_id}, message: {message}")
+    async def chat_with_agent(self, from_agent_id: str, to_agent_id: str, message: str) -> str:
+        """Chat with another agent"""
+        logger.debug(f"chat_with_agent from_agent_id: {from_agent_id}, to_agent_id: {to_agent_id}, message: {message}")
         try:
-            # overwrite by using active agent id
-            from_agent_id = self.active_agent.id
             from_agent = self.agents[from_agent_id]
             to_agent = self.agents[to_agent_id]
             if not to_agent:
@@ -28,16 +31,32 @@ class AgentManager:
                 logger.error(error_message)
                 return error_message
             history = copy.deepcopy(from_agent.get_messages())
-            messages = [*history]
+            self.new_active_agent = to_agent
+            tool_result_message = f"<system_context>{from_agent_id} sends message to {self.new_active_agent.id} successfully, {self.new_active_agent.id} is active agent.</system_context>"
+            # remove the transfer tool call and append message from calling agent
+            # in this way, we keep the conversation cohensive with less noise
+            max_messages = 15
+            start_idx = max(0, len(history) - (max_messages + 1))  # -11 to account for the -1 later
+            messages = history[start_idx:-1]
+            messages_content = ",".join([str(msg) for msg in messages])
+
+            messages_content = ",".join([str(msg) for msg in messages])
+            history = MessageParam(
+                role="assistant",
+                content=f"This is some context from conversation between agent {from_agent_id} and other agents: <background>{messages_content}</background> \n\nThe following message is from {from_agent_id} to {to_agent_id}",
+            )
+            from_agent_message = MessageParam(role="assistant", content=message, name=from_agent.config.name)
+            messages.append(from_agent_message)
+            messages = [history, from_agent_message]
             to_agent.memory.messages.clear()
             await to_agent.memory.saveList(messages)
-            self.active_agent = to_agent
+
             logger.info(
-                f"transfer_to_agent done, active agent is {self.active_agent.id}, messages: {len(self.active_agent.memory.messages)}, last message: {messages[-1]}"
+                f"transfer_to_agent done, new active agent will be {self.new_active_agent.id}, messages: {len(self.new_active_agent.memory.messages)}"
             )
-            return f"transfer from {from_agent_id} to {self.active_agent.id} successfully, current active agent is {self.active_agent.id} who now starts interacting with the user."
+            return tool_result_message
         except Exception as e:
-            error_msg = f"transfer_to_agent failed due to: {e}"
+            error_msg = f"chat_with_agent failed due to: {e}"
             logger.error(error_msg)
             return error_msg
 
@@ -76,18 +95,24 @@ class AgentManager:
 
         response = None
         turns_count = 0
+
+        author = Author(role="user", name="")
         while True:
+            if self.new_active_agent:
+                self.active_agent = self.new_active_agent
+                self.new_active_agent = None
             turns_count += 1
-            if turns_count >= run_metadata.max_turns:
-                logger.warning(f"Run reaches max turn: {run_metadata.max_turns}")
+            if run_metadata.enable_turn_debug:
+                response = input(f"Maximum turn {run_metadata.max_turns} reached. Continue? (y/n): ")
+                if response.lower() not in ["y", "yes"]:
+                    logger.warning("Stopped by user.")
+                    break
+
+            if not self.should_continue_run(turns_count, run_metadata):
                 break
-            messages = self.active_agent.get_message_params()  # convert message params
-            logger.debug(f"run_count: {turns_count}, {self.active_agent.id}, size: {len(messages)}")
-            history = [
-                msg.model_dump() if hasattr(msg, "model_dump") else msg.dict() if hasattr(msg, "dict") else msg
-                for msg in messages
-            ]
-            response: CompletionResponse = await self.active_agent.send_messages(history)
+
+            response: CompletionResponse = await self.active_agent.run(author)
+            author = None
 
             if isinstance(response, CompletionResponse):
                 if response.error:
@@ -104,11 +129,11 @@ class AgentManager:
                 if not tool_calls:
                     break
 
-                tool_result_wrapper = await self.active_agent.process_tools_with_timeout(tool_calls, 30)
-                if tool_result_wrapper.tool_result_message:
-                    await self.active_agent.memory.saveList([tool_result_wrapper.tool_result_message])
-                elif tool_result_wrapper.tool_messages:
-                    await self.active_agent.memory.saveList(tool_result_wrapper.tool_messages)
+                tool_result_wrapper = await self.active_agent.process_tools_with_timeout(
+                    tool_calls=tool_calls, timeout=30, author=response.author
+                )
+                if isinstance(tool_result_wrapper, ToolResponseWrapper):
+                    await self.active_agent.memory.save(tool_result_wrapper)
                 else:
                     raise Exception(f"Unexpected response: {tool_result_wrapper}")
 
@@ -116,6 +141,30 @@ class AgentManager:
                 raise Exception(f"Unexpected response: {response}")
 
         return response
+
+    def should_continue_run(self, turns_count: int, run_metadata: RunMetadata):
+        """
+        Determines if the game loop should continue based on turn count and user input.
+
+        Args:
+            turns_count: Current number of turns
+            run_metadata: Metadata containing max turns and debug settings
+
+        Returns:
+            bool: True if the loop should continue, False otherwise
+        """
+        if turns_count >= run_metadata.max_turns:
+            logger.warning(f"Run reaches max turn: {run_metadata.max_turns}")
+
+            if not run_metadata.enable_turn_debug:
+                return False
+
+            response = input(f"Maximum turn {run_metadata.max_turns} reached. Continue? (y/n): ")
+            if response.lower() not in ["y", "yes"]:
+                logger.warning("Stopped by user.")
+                return False
+
+        return True
 
     async def clean_up(self):
         self.agents.clear()
@@ -138,7 +187,7 @@ class AgentManager:
     def add_tool_to_agent(self, agent_id: str, tool: Union[Callable, Tool]) -> None:
         if agent_id in self.agents:
             self.agents[agent_id].config.tools.append(tool)
-            logger.info(f"Added tool {tool} to agent {agent_id}")
+            logger.debug(f"Added tool {tool} to agent {agent_id}")
 
     def list_agents(self, exclude: List[str] = []) -> List[dict[str, str]]:
         return [

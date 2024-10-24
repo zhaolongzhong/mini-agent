@@ -35,10 +35,12 @@ class CompletionResponse:
     def __init__(
         self,
         model: str,
+        author: Optional[Any],
         response: Optional[Any] = None,
         error: Optional[Any] = None,
         metadata: Optional[Any] = None,
     ):
+        self.author = author
         self.model = model
         self.response = response
         self.error = error

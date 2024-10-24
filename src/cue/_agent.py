@@ -12,6 +12,7 @@ from .llm.llm_client import LLMClient
 from .memory.memory import InMemoryStorage
 from .schemas import (
     AgentConfig,
+    Author,
     CompletionRequest,
     CompletionResponse,
     MessageParam,
@@ -38,7 +39,9 @@ class Agent:
         self.other_agents_info = ""
 
     def get_system_message(self) -> MessageParam:
-        instruction = f"{self.config.instruction} Your idenity is id: {self.config.id}, name: {self.config.name}"
+        instruction = (
+            f"{self.config.instruction} \n\n### IMPORTANT: Your name is {self.config.name} and id is {self.config.id}."
+        )
         if self.other_agents_info:
             instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info}"
         return MessageParam(role="system", name=self.config.name, content=instruction)
@@ -67,6 +70,8 @@ class Agent:
         description = ""
         if self.config.description:
             description = self.config.description
+        if not self.config.tools:
+            return
         tool_names = [tool.value for tool in self.config.tools]
         if not tool_names:
             return description
@@ -80,8 +85,20 @@ class Agent:
         else:
             return None
 
+    async def run(self, author: Optional[Author] = None):
+        messages = self.get_message_params()  # convert message params
+        logger.debug(f"{self.id}, size: {len(messages)}")
+        history = [
+            msg.model_dump() if hasattr(msg, "model_dump") else msg.dict() if hasattr(msg, "dict") else msg
+            for msg in messages
+        ]
+        return await self.send_messages(messages=history, author=author)
+
     async def send_messages(
-        self, messages: List[Union[BaseModel, Dict]], metadata: Optional[RunMetadata] = None
+        self,
+        messages: List[Union[BaseModel, Dict]],
+        metadata: Optional[RunMetadata] = None,
+        author: Optional[Author] = None,
     ) -> Union[CompletionResponse, ToolCallToolUseBlock]:
         if not self.metadata:
             self.metadata = metadata
@@ -95,6 +112,7 @@ class Agent:
             messages_dict.insert(0, self.get_system_message().model_dump(exclude_none=True))
 
         completion_request = CompletionRequest(
+            author=Author(name=self.config.name, role="assistant") if not author else author,
             model=self.config.model.id,
             messages=messages_dict,
             metadata=metadata,
@@ -107,7 +125,10 @@ class Agent:
         return response
 
     async def process_tools_with_timeout(
-        self, tool_calls: List[ToolCallToolUseBlock], timeout: int = 30
+        self,
+        tool_calls: List[ToolCallToolUseBlock],
+        timeout: int = 30,
+        author: Optional[Author] = None,
     ) -> ToolResponseWrapper:
         tool_responses = []
         tasks = []
@@ -124,14 +145,17 @@ class Agent:
             else:
                 raise ValueError(f"Unsupported tool call type: {type(tool_call)}")
 
-            if tool_name not in self.tool_manager.tools and tool_name not in ["call_agent", "transfer_to_agent"]:
+            chat_with_agent = "chat_with_agent"
+            if tool_name not in self.tool_manager.tools and tool_name not in ["call_agent", chat_with_agent]:
                 error_message = f"Tool '{tool_name}' not found. {self.tool_manager.tools.keys()}"
                 logger.error(f"{error_message}, tool_call: {tool_call}")
                 tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
                 continue
 
-            if tool_name == "transfer_to_agent":
-                tool_func = self.agent_manager.transfer_to_agent
+            if tool_name == chat_with_agent:
+                tool_func = self.agent_manager.chat_with_agent
+                if "from_agent_id" in kwargs:
+                    kwargs["from_agent_id"] = self.id
             else:
                 tool_func = self.tool_manager.tools[tool_name]
             task = asyncio.create_task(self.run_tool(tool_func, **kwargs))
@@ -151,9 +175,9 @@ class Agent:
         response = None
         if "claude" in self.config.model.id:
             tool_result_message = ToolResultMessage(role="user", content=tool_responses)
-            response = ToolResponseWrapper(tool_result_message=tool_result_message)
+            response = ToolResponseWrapper(tool_result_message=tool_result_message, author=author)
         else:
-            response = ToolResponseWrapper(tool_messages=tool_responses)
+            response = ToolResponseWrapper(tool_messages=tool_responses, author=author)
 
         return response
 

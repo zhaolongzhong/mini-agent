@@ -21,7 +21,7 @@ class AgentConfig(BaseModel):
     temperature: Optional[float] = 0.8
     max_tokens: Optional[int] = 1000
     stop_sequences: Optional[list[str]] = None
-    tools: Optional[list[Tool]] = None
+    tools: Optional[list[Tool]] = []
     conversation_id: Optional[str] = None
     max_actions: Optional[int] = 10
     storage_type: Optional[Any] = StorageType.IN_MEMORY

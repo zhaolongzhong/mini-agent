@@ -23,7 +23,7 @@ class TestAnthropicClient:
         message_from = client.message_from_template.format(agent_id="agent_a")
         expected_output = [
             {"role": "system", "content": "Your name is agent_b"},
-            {"role": "user", "content": f"{message_from}: Hello, world!"},
+            {"role": "user", "content": f"{message_from} Hello, world!"},
         ]
         result = client.process_messages(input_messages)
         assert result == expected_output
@@ -50,7 +50,7 @@ class TestAnthropicClient:
         expected_output = [
             {"role": "system", "content": "Your name is agent_b"},
             {"role": "user", "content": "What's your name?"},
-            {"role": "user", "content": f"{message_from}: My name is agent_a."},
+            {"role": "user", "content": f"{message_from} My name is agent_a."},
         ]
         result = client.process_messages(input_messages)
         assert result == expected_output

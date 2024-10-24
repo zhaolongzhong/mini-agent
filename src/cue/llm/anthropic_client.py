@@ -27,21 +27,22 @@ class AnthropicClient:
         self.client = anthropic.AsyncAnthropic(api_key=api_key)
         self.config = config
         self.model = config.model
-        self.message_from_template = """[message_from_{agent_id}]"""
-        logger.info(f"[AnthropicClient] initialized with model: {self.model} {self.config.id}")
+        self.message_from_template = """[{agent_id}]:"""
+        logger.debug(f"[AnthropicClient] initialized with model: {self.model} {self.config.id}")
 
     async def send_completion_request(self, request: CompletionRequest) -> CompletionResponse:
         response = None
         error = None
-        # The Messages API accepts a top-level `system` parameter, not \"system\" as an input message role.
-        system_message_content = " ".join([msg["content"] for msg in request.messages if msg["role"] == "system"])
-        system_message_content += "\n\nIf the role is user but the message content starts with something like [message_from_*], the message is from that agent."
-        messages = [msg for msg in request.messages if msg["role"] != "system"]
-        messages = self.process_messages(messages)
-        logger.debug(f"system_message_content: {system_message_content}")
-        logger.debug(f"tools_json: {request.tool_json}")
-        debug_print_messages(messages, tag=f"{self.config.id} send_completion_request clean messages")
+
         try:
+            # The Messages API accepts a top-level `system` parameter, not \"system\" as an input message role.
+            system_message_content = " ".join([msg["content"] for msg in request.messages if msg["role"] == "system"])
+            system_message_content += "\n\nIf the role is user but the message content starts with something like [message_from_*], the message is from that agent."
+            messages = [msg for msg in request.messages if msg["role"] != "system"]
+            messages = self.process_messages(messages)
+            logger.debug(f"system_message_content: {system_message_content}")
+            logger.debug(f"tools_json: {request.tool_json}")
+            debug_print_messages(messages, tag=f"{self.config.id} send_completion_request clean messages")
             response = await self.client.with_options(max_retries=2).messages.create(
                 model=request.model,
                 system=system_message_content,
@@ -59,7 +60,6 @@ class AnthropicClient:
             )
         except anthropic.APIStatusError as e:
             message = f"Another non-200-range status code was received. {e.status_code}, {e.response.text}"
-            debug_print_messages(request.tool_json, tag=f"{self.config.id} send_completion_request")
             debug_print_messages(messages, tag=f"{self.config.id} send_completion_request")
             error = ErrorResponse(
                 message=message,
@@ -67,7 +67,7 @@ class AnthropicClient:
             )
         if error:
             logger.error(error.model_dump())
-        return CompletionResponse(self.model, response, error=error)
+        return CompletionResponse(author=request.author, response=response, model=self.model, error=error)
 
     def format_message(self, message):
         """
@@ -76,7 +76,7 @@ class AnthropicClient:
         new_message = {"role": message["role"]}
         if "name" in message and message["name"] and "system" not in message["role"]:
             message_from = self.message_from_template.format(agent_id=message["name"])
-            new_message["content"] = f"{message_from}: {message['content']}"
+            new_message["content"] = f"{message_from} {message['content']}"
 
         else:
             new_message["content"] = message["content"]

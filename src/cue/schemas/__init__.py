@@ -1,4 +1,5 @@
 from .agent_config import AgentConfig
+from .author import Author
 from .completion_request import CompletionRequest
 from .completion_respone import CompletionResponse, ToolCallToolUseBlock
 from .conversation import Conversation
@@ -17,6 +18,7 @@ from .user import User, UserCreate
 __all__ = [
     "AgentConfig",
     "AssistantMessage",
+    "Author",
     "CompletionRequest",
     "CompletionResponse",
     "ToolCallToolUseBlock",

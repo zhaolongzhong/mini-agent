@@ -12,8 +12,7 @@ from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
 
 from ..llm.llm_model import ChatModel
-from ..schemas import AgentConfig, AssistantMessage, CompletionResponse, StorageType
-from ..schemas.anthropic import ToolResultMessage
+from ..schemas import AgentConfig, AssistantMessage, CompletionResponse, StorageType, ToolResponseWrapper
 from ..schemas.error import ErrorResponse
 from ..schemas.message import MessageParam
 from .memory_utils import load_from_memory
@@ -90,11 +89,8 @@ class InMemoryStorage(MemoryInterface):
                         logger.debug(f"Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
                 elif isinstance(msg, MessageParam):
                     result.append(msg)
-                elif isinstance(msg, ToolResultMessage):
-                    result.append(msg)
-                elif isinstance(msg, dict) and "role" in msg and "content" in msg:
-                    # AntropicMessageParam
-                    result.append(msg)
+                elif isinstance(msg, ToolResponseWrapper):
+                    result.append(msg.tool_result_message)
                 else:
                     logger.debug(f"Unexpected message type: {type(msg)}, {msg}, {model}")
             else:
@@ -107,9 +103,9 @@ class InMemoryStorage(MemoryInterface):
                         logger.debug(f"Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
                 elif isinstance(msg, MessageParam):
                     result.append(msg)
-                elif isinstance(msg, dict) and "role" in msg and "content" in msg:
-                    # ToolMessageParam
-                    result.append(msg)
+                elif isinstance(msg, ToolResponseWrapper):
+                    for item in msg.tool_messages:
+                        result.append(item)
                 else:
                     raise Exception(f"Unexpected message type: {type(msg)}, {msg}, {model}")
 

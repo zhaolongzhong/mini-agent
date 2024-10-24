@@ -64,7 +64,7 @@ class GeminiClient(LLMRequest, BaseClient):
         else:
             self.tool_json = None
 
-        logger.info(
+        logger.debug(
             f"[GeminiClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]} {self.config.id}"
         )
 

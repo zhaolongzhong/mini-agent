@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -33,18 +34,19 @@ class CLI:
 
         self.agent_manager = AgentManager()
         self.executor = ThreadPoolExecutor()
-        self.agent = None
+        configs, active_agent_id = get_agent_configs()
+        self.configs = configs
+        self.active_agent_id = active_agent_id
+        self._config_agents()
 
     def _config_agents(self) -> str:
-        configs, activate_agent_id = get_agent_configs()
-
         # Register all agents
-        self.agents = {agent_id: self.agent_manager.register_agent(config) for agent_id, config in configs.items()}
+        self.agents = {config.id: self.agent_manager.register_agent(config) for _, config in self.configs.items()}
 
         # Add transfer tool to all agents
         for agent_id in self.agents:
-            self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.transfer_to_agent)
-        return activate_agent_id
+            self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
+        return self.active_agent_id
 
     async def _get_user_input_async(self, prompt: str):
         loop = asyncio.get_event_loop()
@@ -53,8 +55,7 @@ class CLI:
     async def run(self):
         self.logger.info("Running the CLI. Type 'exit' or 'quit' to exit.")
         try:
-            active_agent_id = self._config_agents()
-            self.agent_manager.set_active_agent(active_agent_id)
+            self.agent_manager.set_active_agent(self.active_agent_id)
             run_metdata = RunMetadata()
             while True:
                 active_agent_id = self.agent_manager.active_agent.id
@@ -70,7 +71,7 @@ class CLI:
                     break
                 self.logger.debug(f"{user_input}")
 
-                run_metdata.user_messages.append(user_input)
+                run_metdata.user_messages.append(f"user_says_to_agent_b: {user_input}")
                 response = await self.agent_manager.run(active_agent_id, user_input, run_metdata)
                 if response:
                     agent_id = self.agent_manager.active_agent.id
@@ -133,9 +134,9 @@ def async_main():
 
     if args.config:
         cli_temp = CLI()
-        config = cli_temp.agent_config
-        for key, value in config.model_dump().items():
-            print(f"{key}: {value}")
+        for _id, config in cli_temp.configs.items():
+            print(json.dumps(config.model_dump(), indent=4, default=str))
+        print(f"active agent: {cli_temp.active_agent_id}")
         return
 
     if args.log_level:

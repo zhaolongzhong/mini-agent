@@ -32,8 +32,8 @@ class TestClientManager:
         )
         agent_a = agent_manager.register_agent(agent_a_config)
         agent_b = agent_manager.register_agent(agent_b_config)
-        agent_manager.add_tool_to_agent(agent_a.id, agent_manager.transfer_to_agent)
-        agent_manager.add_tool_to_agent(agent_b.id, agent_manager.transfer_to_agent)
+        agent_manager.add_tool_to_agent(agent_a.id, agent_manager.chat_with_agent)
+        agent_manager.add_tool_to_agent(agent_b.id, agent_manager.chat_with_agent)
 
         try:
             file_name = "fibo.py"
