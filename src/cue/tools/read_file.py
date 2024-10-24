@@ -12,6 +12,7 @@ class ReadTool(BaseTool):
     """
 
     name: ClassVar[Literal["read_file"]] = "read_file"
+    MAX_LENGTH: ClassVar[int] = 12000
 
     def __init__(self):
         self._function = self.read_file
@@ -48,14 +49,15 @@ class ReadTool(BaseTool):
             else:
                 with open(file_path, encoding=encoding) as f:
                     text = f.read()
+
             original_length = len(text)
-            max_lenth = 5000
-            if original_length > max_lenth:
-                visible_text = text[:max_lenth]
-                visibility_percentage = (max_lenth / original_length) * 100
-                visibility_info = f"\n\n[Truncated to {max_lenth} characters, visibility: {visibility_percentage:.2f}%]"
+            if original_length > self.MAX_LENGTH:
+                visible_text = text[: self.MAX_LENGTH]
+                visibility_percentage = (self.MAX_LENGTH / original_length) * 100
+                visibility_info = (
+                    f"\n\n[Truncated to {self.MAX_LENGTH} characters, visibility: {visibility_percentage:.2f}%]"
+                )
                 return visible_text + visibility_info
-            else:
-                return text
+            return text
         except Exception as error:
             return f"Error: {error}"
