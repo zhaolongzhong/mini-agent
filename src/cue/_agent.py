@@ -1,7 +1,8 @@
 import asyncio
+import copy
 import json
 import logging
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 from anthropic.types import ToolUseBlock
 from openai.types.chat import ChatCompletionMessageToolCall as ToolCall
@@ -12,6 +13,7 @@ from .llm.llm_client import LLMClient
 from .memory.memory import InMemoryStorage
 from .schemas import (
     AgentConfig,
+    AgentHandoffResult,
     Author,
     CompletionRequest,
     CompletionResponse,
@@ -21,7 +23,7 @@ from .schemas import (
     ToolResponseWrapper,
 )
 from .schemas.anthropic import ToolResultContent, ToolResultMessage
-from .tools import ToolManager
+from .tools import Tool, ToolManager
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,20 @@ class Agent:
             return description
         description += f" Agent {self.config.id} is able to use these tools: {', '.join(tool_names)}"
         return description
+
+    def add_tool_to_agent(self, tool: Union[Callable, Tool]) -> None:
+        self.config.tools.append(tool)
+        logger.debug(f"Added tool {tool} to agent {self.id}")
+
+    async def chat_with_agent(self, to_agent_id: str, message: str) -> AgentHandoffResult:
+        """Chat with another agent"""
+        messages = self.build_next_agent_context(to_agent_id, message)
+        return AgentHandoffResult(
+            from_agent_id=self.id,
+            to_agent_id=to_agent_id,
+            context=messages,
+            message=message,
+        )
 
     async def run(self, author: Optional[Author] = None):
         if not self.tool_json and self.config.tools:
@@ -132,16 +148,15 @@ class Agent:
                 raise ValueError(f"Unsupported tool call type: {type(tool_call)}")
 
             chat_with_agent = "chat_with_agent"
-            if tool_name not in self.tool_manager.tools and tool_name not in ["call_agent", chat_with_agent]:
+            if tool_name not in self.tool_manager.tools and tool_name not in chat_with_agent:
                 error_message = f"Tool '{tool_name}' not found. {self.tool_manager.tools.keys()}"
                 logger.error(f"{error_message}, tool_call: {tool_call}")
                 tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
                 continue
 
             if tool_name == chat_with_agent:
-                tool_func = self.agent_manager.chat_with_agent
-                if "from_agent_id" in kwargs:
-                    kwargs["from_agent_id"] = self.id
+                handoff_result = await self.chat_with_agent(**kwargs)
+                return ToolResponseWrapper(agent_handoff_result=handoff_result)
             else:
                 tool_func = self.tool_manager.tools[tool_name]
             task = asyncio.create_task(self.run_tool(tool_func, **kwargs))
@@ -185,3 +200,22 @@ class Agent:
             return result_param
         else:
             return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)
+
+    def build_next_agent_context(self, to_agent_id: str, message: str) -> List[Dict]:
+        history = copy.deepcopy(self.get_messages())
+        # remove the transfer tool call and append message from calling agent
+        # in this way, we keep the conversation cohensive with less noise
+        max_messages = 15
+        start_idx = max(0, len(history) - (max_messages + 1))  # -11 to account for the -1 later
+        messages = history[start_idx:-1]
+        messages_content = ",".join([str(msg) for msg in messages])
+
+        messages_content = ",".join([str(msg) for msg in messages])
+        history = MessageParam(
+            role="assistant",
+            content=f"This is some context from conversation between agent {self.id} and other agents: <background>{messages_content}</background> \n\nThe following message is from {self.id} to {to_agent_id}",
+        )
+        from_agent_message = MessageParam(role="assistant", content=message, name=self.config.name)
+        messages.append(from_agent_message)
+        messages = [history, from_agent_message]
+        return messages

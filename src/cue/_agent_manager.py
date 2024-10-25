@@ -1,14 +1,19 @@
-import copy
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
 from ._agent import Agent
-from .schemas import AgentConfig, Author, CompletionResponse, MessageParam, RunMetadata, ToolResponseWrapper
+from .schemas import (
+    AgentConfig,
+    AgentHandoffResult,
+    Author,
+    CompletionResponse,
+    MessageParam,
+    RunMetadata,
+    ToolResponseWrapper,
+)
 from .tools._tool import Tool
 
 logger = logging.getLogger(__name__)
-
-chat_with_agent = "chat_with_agent"
 
 
 class AgentManager:
@@ -16,47 +21,7 @@ class AgentManager:
         logger.info("AgentManager initialized")
         self.agents: Dict[str, Agent] = {}
         self.active_agent: Optional[Agent] = None
-        self.new_active_agent: Optional[Agent] = None
-
-    async def chat_with_agent(self, from_agent_id: str, to_agent_id: str, message: str) -> str:
-        """Chat with another agent"""
-        logger.debug(f"chat_with_agent from_agent_id: {from_agent_id}, to_agent_id: {to_agent_id}, message: {message}")
-        try:
-            from_agent = self.agents[from_agent_id]
-            to_agent = self.agents[to_agent_id]
-            if not to_agent:
-                error_message = f"There is no agent with id: {to_agent_id}"
-                logger.error(error_message)
-                return error_message
-            history = copy.deepcopy(from_agent.get_messages())
-            self.new_active_agent = to_agent
-            tool_result_message = f"<system_context>{from_agent_id} sends message to {self.new_active_agent.id} successfully, {self.new_active_agent.id} is active agent.</system_context>"
-            # remove the transfer tool call and append message from calling agent
-            # in this way, we keep the conversation cohensive with less noise
-            max_messages = 15
-            start_idx = max(0, len(history) - (max_messages + 1))  # -11 to account for the -1 later
-            messages = history[start_idx:-1]
-            messages_content = ",".join([str(msg) for msg in messages])
-
-            messages_content = ",".join([str(msg) for msg in messages])
-            history = MessageParam(
-                role="assistant",
-                content=f"This is some context from conversation between agent {from_agent_id} and other agents: <background>{messages_content}</background> \n\nThe following message is from {from_agent_id} to {to_agent_id}",
-            )
-            from_agent_message = MessageParam(role="assistant", content=message, name=from_agent.config.name)
-            messages.append(from_agent_message)
-            messages = [history, from_agent_message]
-            to_agent.memory.messages.clear()
-            await to_agent.memory.saveList(messages)
-
-            logger.info(
-                f"transfer_to_agent done, new active agent will be {self.new_active_agent.id}, messages: {len(self.new_active_agent.memory.messages)}"
-            )
-            return tool_result_message
-        except Exception as e:
-            error_msg = f"chat_with_agent failed due to: {e}"
-            logger.error(error_msg)
-            return error_msg
+        self.conversation_context = {"from_agent_id": None, "to_agent_id": None, "is_agent_conversation": False}
 
     async def run(
         self,
@@ -77,9 +42,6 @@ class AgentManager:
 
         author = Author(role="user", name="")
         while True:
-            if self.new_active_agent:
-                self.active_agent = self.new_active_agent
-                self.new_active_agent = None
             turns_count += 1
             if not self.should_continue_run(turns_count, run_metadata):
                 break
@@ -106,7 +68,13 @@ class AgentManager:
                     tool_calls=tool_calls, timeout=30, author=response.author
                 )
                 if isinstance(tool_result_wrapper, ToolResponseWrapper):
-                    await self.active_agent.memory.save(tool_result_wrapper)
+                    if tool_result_wrapper.agent_handoff_result:
+                        hand_off_result = tool_result_wrapper.agent_handoff_result
+                        await self._handle_hand_off_result(hand_off_result)
+                        # pick up new active agent in next loop
+                        continue
+                    else:
+                        await self.active_agent.memory.save(tool_result_wrapper)
                 else:
                     raise Exception(f"Unexpected response: {tool_result_wrapper}")
 
@@ -114,6 +82,22 @@ class AgentManager:
                 raise Exception(f"Unexpected response: {response}")
 
         return response
+
+    async def _handle_hand_off_result(self, hand_off_result: AgentHandoffResult) -> None:
+        """Process agent handoff by updating active agent and transferring context.
+
+        Args:
+            hand_off_result: Contains target agent ID and context to transfer
+
+        The method clears previous memory and transfers either single or list context
+        to the new active agent.
+        """
+        self.active_agent = self.agents[hand_off_result.to_agent_id]
+        self.active_agent.memory.messages.clear()
+        if isinstance(hand_off_result.context, List):
+            await self.active_agent.memory.saveList(hand_off_result.context)
+        else:
+            await self.active_agent.memory.save(hand_off_result.context)
 
     def should_continue_run(self, turns_count: int, run_metadata: RunMetadata):
         """

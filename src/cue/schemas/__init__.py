@@ -12,11 +12,12 @@ from .run_usage import RunUsage, RunUsageAndLimits
 from .storage_type import StorageType
 from .token import Token
 from .tool_call import AssistantMessage
-from .tool_response_wrapper import ToolResponseWrapper
+from .tool_response_wrapper import AgentHandoffResult, ToolResponseWrapper
 from .user import User, UserCreate
 
 __all__ = [
     "AgentConfig",
+    "AgentHandoffResult",
     "AssistantMessage",
     "Author",
     "CompletionRequest",

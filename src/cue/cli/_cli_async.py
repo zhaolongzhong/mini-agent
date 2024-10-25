@@ -46,8 +46,8 @@ class CLI:
 
         # Add transfer tool to all agents
         if len(self.agents) > 0:
-            for agent_id in self.agents:
-                self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
+            for agent in self.agents.values():
+                agent.add_tool_to_agent(agent.chat_with_agent)
         return self.active_agent_id
 
     async def _get_user_input_async(self, prompt: str):

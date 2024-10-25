@@ -51,7 +51,7 @@ class AsyncCueClient:
             self.agents[agent_id] = self.agent_manager.register_agent(config)
             if len(configs) > 1:
                 # only add it when there are multiple agents
-                self.agent_manager.add_tool_to_agent(agent_id, self.agent_manager.chat_with_agent)
+                self.agents[agent_id].add_tool_to_agent(self.agents[agent_id].chat_with_agent)
 
         if not self.agents:
             # Fallback to default configuration if no agents are configured
