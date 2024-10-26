@@ -21,3 +21,5 @@ class CompletionRequest(BaseModel):
         description="Whether to enable parallel function calling during tool use. Defaults to true.",
     )
     metadata: Optional[RunMetadata] = None
+    system_prompt_suffix: Optional[str] = ""
+    enable_prompt_caching: Optional[bool] = True

@@ -11,10 +11,10 @@ from openai.types.chat.completion_create_params import Function
 from pydantic import BaseModel
 
 from ..schemas import AgentConfig, CompletionRequest, CompletionResponse, ErrorResponse
-from ..utils.debug_utils import debug_print_messages
-from ..utils.id_generator import generate_id
+from ..utils import debug_print_messages, generate_id
 from .llm_request import LLMRequest
 from .openai_client_utils import JSON_FORMAT, O1_MODEL_SYSTEM_PROMPT_BASE
+from .system_prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,11 @@ class OpenAIClient(LLMRequest):
                 if json_dict:
                     response = self.convert_tool_call(response, json_dict)
             else:
+                system_prompt = (
+                    f"{SYSTEM_PROMPT}{' ' + request.system_prompt_suffix if request.system_prompt_suffix else ''}"
+                )
+                system_message = {"role": "system", "content": system_prompt}
+                messages.insert(0, system_message)
                 if self.tool_json:
                     response = await self.client.chat.completions.create(
                         messages=messages,
@@ -96,25 +101,26 @@ class OpenAIClient(LLMRequest):
             )
         if error:
             logger.error(error.model_dump())
-        return CompletionResponse(author=request.author, response=response, model=self.model, error=error)
+        return CompletionResponse(author=request.author, response=response, model=self.model.id, error=error)
 
-    def handle_o1_model(self, messages: List[Dict], tools: List[Dict]) -> List[Dict]:
+    def handle_o1_model(self, messages: List[Dict], request: CompletionRequest) -> List[Dict]:
         """
         For o1, filter out system message, combine merge them into a message with assistant role.
         """
         try:
+            tools = request.tool_json
             formatted_tools = "\n".join([json.dumps(tool) for tool in tools])
 
+            messages = [msg for msg in request.messages if msg["role"] != "system"]
             system_message_content = " ".join([msg["content"] for msg in messages if msg["role"] == "system"])
             system_message_content = system_message_content.strip()
-            additional_context = ""
-            if system_message_content:
-                additional_context = (
-                    f"Here is extra background context: <system_context>{system_message_content}</system_context>"
-                )
+
             system_prompt = O1_MODEL_SYSTEM_PROMPT_BASE.format(
-                json_format=JSON_FORMAT, available_functions=formatted_tools, additional_context=additional_context
+                json_format=JSON_FORMAT,
+                available_functions=formatted_tools,
+                additional_context=f"{request.system_prompt_suffix}{' ' + system_message_content if system_message_content else ''}",
             )
+            system_prompt = f"{SYSTEM_PROMPT} {system_prompt}"
             # logger.debug(f"o1_system_prompt: {system_prompt}")
 
             system_message = {

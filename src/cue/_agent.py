@@ -9,7 +9,7 @@ from openai.types.chat import ChatCompletionMessageToolCall as ToolCall
 from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
 
-from .llm.llm_client import LLMClient
+from .llm import LLMClient
 from .memory.memory import InMemoryStorage
 from .schemas import (
     AgentConfig,
@@ -24,6 +24,7 @@ from .schemas import (
 )
 from .schemas.anthropic import ToolResultContent, ToolResultMessage
 from .tools import Tool, ToolManager
+from .utils import record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -109,9 +110,6 @@ class Agent:
             msg.model_dump(exclude_none=True, exclude_unset=True) if isinstance(msg, BaseModel) else msg
             for msg in messages
         ]
-        # Add system message if it doesn't exist
-        if messages_dict[0]["role"] != "system":
-            messages_dict.insert(0, self.get_system_message().model_dump(exclude_none=True))
 
         completion_request = CompletionRequest(
             author=Author(name=self.config.name, role="assistant") if not author else author,
@@ -119,11 +117,10 @@ class Agent:
             messages=messages_dict,
             metadata=metadata,
             tool_json=self.tool_json,
+            system_prompt_suffix=self.get_system_message().content,
         )
         response = await self.client.send_completion_request(completion_request)
-        usage = response.get_usage()
-        if usage:
-            logger.debug(f"completion response usage: {usage.model_dump(exclude_none=True)}")
+        record_usage(response)
         return response
 
     async def process_tools_with_timeout(

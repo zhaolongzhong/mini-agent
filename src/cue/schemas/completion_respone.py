@@ -53,6 +53,15 @@ class CompletionResponse:
         self.error = error
         self.metadata = metadata
 
+    def get_id(self) -> str:
+        if isinstance(self.response, (AnthropicMessage, PromptCachingBetaMessage)):
+            return self.response.id
+        elif isinstance(self.response, ChatCompletion):
+            return self.response.id
+        raise InvalidResponseTypeError(
+            f"Expected AnthropicMessage or ChatCompletion, got {type(self.response).__name__}"
+        )
+
     def get_text(self) -> Union[str, list[dict]]:
         if self.response is None:
             return str(self.error)

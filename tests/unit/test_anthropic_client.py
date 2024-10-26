@@ -25,7 +25,7 @@ class TestAnthropicClient:
             {"role": "system", "content": "Your name is agent_b"},
             {"role": "user", "content": f"{message_from} Hello, world!"},
         ]
-        result = client.process_messages(input_messages)
+        result = client._process_messages(input_messages)
         assert result == expected_output
 
     def test_process_messages_without_name(self, client: AnthropicClient):
@@ -37,7 +37,7 @@ class TestAnthropicClient:
             {"role": "user", "content": "What's the weather like?"},
             {"role": "user", "content": "It's sunny today."},
         ]
-        result = client.process_messages(input_messages)
+        result = client._process_messages(input_messages)
         assert result == expected_output
 
     def test_process_mixed_messages(self, client: AnthropicClient):
@@ -52,7 +52,7 @@ class TestAnthropicClient:
             {"role": "user", "content": "What's your name?"},
             {"role": "user", "content": f"{message_from} My name is agent_a."},
         ]
-        result = client.process_messages(input_messages)
+        result = client._process_messages(input_messages)
         assert result == expected_output
 
 
