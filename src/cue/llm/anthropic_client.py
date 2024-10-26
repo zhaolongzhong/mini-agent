@@ -56,6 +56,7 @@ class AnthropicClient:
             print(f"msg_tokens: {msg_tokens}")
 
             if request.enable_prompt_caching:
+                logger.debug("_inject_prompt_caching")
                 self._inject_prompt_caching(messages)
 
             debug_print_messages(messages, tag=f"{self.config.id} send_completion_request clean messages")

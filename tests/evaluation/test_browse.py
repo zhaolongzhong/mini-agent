@@ -14,6 +14,7 @@ def agent_config(default_chat_model) -> AgentConfig:
     return AgentConfig(
         id="main",
         name="MainAgent",
+        is_primary=True,
         model=default_chat_model,
         tools=[Tool.Browse],
         is_test=True,

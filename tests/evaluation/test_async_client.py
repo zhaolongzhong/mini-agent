@@ -15,6 +15,7 @@ def agent_config(default_chat_model) -> AgentConfig:
     return AgentConfig(
         id="main",
         name="MainAgent",
+        is_primary=True,
         model=default_chat_model,
         tools=[],
         is_test=True,
@@ -49,6 +50,7 @@ class TestClientManager:
             "main": AgentConfig(
                 id="main",
                 name="main",
+                is_primary=True,
                 description="Lead coordinator that analyzes tasks, delegates to specialized agents (File Operator and Web Browser), manages information flow, and synthesizes results. Acts as the central hub for team collaboration.",
                 instruction="""Coordinate the AI team by analyzing requests, delegating tasks to specialists (File Operator and Web Browser), maintaining context, and synthesizing outputs. Provide clear instructions to agents, facilitate collaboration, and avoid using specialist tools directly.""",
                 model=default_chat_model,
@@ -74,13 +76,6 @@ class TestClientManager:
             response = await client.send_message("Hello there, who am I talking to? What is your id?")
             response_text = str(response).lower()
             assert "main" in response_text
-
-            # Switch active agent
-            new_agent_id = agent_ids[1]
-            assert new_agent_id == "file_operator"
-            client.set_active_agent(new_agent_id)
-            response = await client.send_message("Hello there, who am I talking to? What is your id?")
-            assert "file_operator" in str(response).lower()
 
         finally:
             await client.cleanup()

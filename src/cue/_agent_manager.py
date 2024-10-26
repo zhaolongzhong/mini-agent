@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Callable, Dict, List, Optional, Union
 
 from ._agent import Agent
@@ -7,6 +8,7 @@ from .schemas import (
     AgentHandoffResult,
     Author,
     CompletionResponse,
+    ConversationContext,
     MessageParam,
     RunMetadata,
     ToolResponseWrapper,
@@ -21,7 +23,7 @@ class AgentManager:
         logger.info("AgentManager initialized")
         self.agents: Dict[str, Agent] = {}
         self.active_agent: Optional[Agent] = None
-        self.conversation_context = {"from_agent_id": None, "to_agent_id": None, "is_agent_conversation": False}
+        self.primary_agent: Optional[Agent] = None
 
     async def run(
         self,
@@ -29,10 +31,21 @@ class AgentManager:
         message: str,
         run_metadata: RunMetadata = RunMetadata(),
     ) -> CompletionResponse:
-        agent = self.get_agent(agent_identifier)
-        if not agent:
-            raise ValueError(f"Agent with identifier '{agent_identifier}' not found. Register an agent first.")
+        self.primary_agent = self.get_agent(agent_identifier)
+        self.update_other_agents_info()
+        try:
+            logger.info(f"Starting run with agent {agent_identifier}")
+            start_time = time.time()
+            response = await self._execute_run(self.primary_agent, message, run_metadata)
+            duration = time.time() - start_time
+            logger.info(f"Run completed in {duration:.2f}s")
 
+            return response
+        except Exception as e:
+            logger.error(f"Error in run: {str(e)}", exc_info=True)
+            raise
+
+    async def _execute_run(self, agent, message, run_metadata):
         self.active_agent = agent
         user_message = MessageParam(role="user", content=message)
         await self.active_agent.memory.save(user_message)
@@ -49,7 +62,7 @@ class AgentManager:
             response: CompletionResponse = await self.active_agent.run(author)
             author = None
 
-            if isinstance(response, CompletionResponse):
+            if not isinstance(response, CompletionResponse):
                 if response.error:
                     logger.error(response.error.model_dump())
                     # Even if there's an error, store the interaction in memory
@@ -58,28 +71,35 @@ class AgentManager:
                     # - Avoiding repeated failed attempts
                     await self.active_agent.memory.save(response)
                     continue
-
-                await self.active_agent.memory.save(response)
-                tool_calls = response.get_tool_calls()
-                if not tool_calls:
-                    break
-
-                tool_result_wrapper = await self.active_agent.process_tools_with_timeout(
-                    tool_calls=tool_calls, timeout=30, author=response.author
-                )
-                if isinstance(tool_result_wrapper, ToolResponseWrapper):
-                    if tool_result_wrapper.agent_handoff_result:
-                        hand_off_result = tool_result_wrapper.agent_handoff_result
-                        await self._handle_hand_off_result(hand_off_result)
-                        # pick up new active agent in next loop
-                        continue
-                    else:
-                        await self.active_agent.memory.save(tool_result_wrapper)
                 else:
-                    raise Exception(f"Unexpected response: {tool_result_wrapper}")
+                    raise Exception(f"Unexpected response: {response}")
 
+            await self.active_agent.memory.save(response)
+            tool_calls = response.get_tool_calls()
+            if not tool_calls:
+                if self.active_agent.config.is_primary:
+                    return response
+                else:
+                    # auto switch to primary agent
+                    hand_off_result = await self.active_agent.chat_with_agent(
+                        self.primary_agent.id, response.get_text()
+                    )
+                    await self._handle_hand_off_result(hand_off_result)
+                    continue
+
+            tool_result_wrapper = await self.active_agent.process_tools_with_timeout(
+                tool_calls=tool_calls, timeout=30, author=response.author
+            )
+            if isinstance(tool_result_wrapper, ToolResponseWrapper):
+                if tool_result_wrapper.agent_handoff_result:
+                    hand_off_result = tool_result_wrapper.agent_handoff_result
+                    await self._handle_hand_off_result(hand_off_result)
+                    # pick up new active agent in next loop
+                    continue
+                else:
+                    await self.active_agent.memory.save(tool_result_wrapper)
             else:
-                raise Exception(f"Unexpected response: {response}")
+                raise Exception(f"Unexpected response: {tool_result_wrapper}")
 
         return response
 
@@ -93,6 +113,9 @@ class AgentManager:
         to the new active agent.
         """
         self.active_agent = self.agents[hand_off_result.to_agent_id]
+        self.active_agent.conversation_context = ConversationContext(
+            participants=[hand_off_result.from_agent_id, hand_off_result.to_agent_id]
+        )
         self.active_agent.memory.messages.clear()
         if isinstance(hand_off_result.context, List):
             await self.active_agent.memory.saveList(hand_off_result.context)
@@ -143,14 +166,26 @@ class AgentManager:
         logger.info(
             f"register_agent {agent.config.id} (name: {config.name}), available agents: {list(self.agents.keys())}"
         )
-        self.update_other_agents_info()
+        if config.is_primary:
+            self.primary_agent = agent
         return agent
 
     def update_other_agents_info(self):
+        if not self.primary_agent:
+            for agent in self.agents.values():
+                if agent.config.is_primary:
+                    self.primary_agent = agent
+
         for agent_id, agent in self.agents.items():
-            other_agents_info = self.list_agents(exclude=[agent_id])
-            agent.other_agents_info = other_agents_info
-            logger.debug(f"{agent_id} other_agents_info: {other_agents_info}")
+            if agent.config.is_primary:
+                agent.other_agents_info = self.list_agents(exclude=[agent_id])
+            else:
+                agent.other_agents_info = {
+                    "id": agent.id,
+                    "name": self.primary_agent.config.name,
+                    "description": self.primary_agent.description,
+                }
+            logger.debug(f"{agent_id} other_agents_info: {agent.other_agents_info}")
 
     def get_agent(self, identifier: str) -> Optional[Agent]:
         if identifier in self.agents:
@@ -160,7 +195,7 @@ class AgentManager:
             if agent.config.name == identifier:
                 return agent
 
-        return None
+        raise Exception(f"Agent '{identifier}' not found")
 
     def set_active_agent(self, agent_id: str):
         self.active_agent = self.get_agent(agent_id)

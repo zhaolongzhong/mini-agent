@@ -18,6 +18,7 @@ class TestClientManager:
         agent_a_config = AgentConfig(
             id="agent_a",
             name="agent_a",
+            is_primary=True,
             instruction="Your name is agent_a",
             model=default_chat_model,
             tools=[Tool.Read],
@@ -46,7 +47,7 @@ class TestClientManager:
 
             content = file_path.read_text()
             logger.debug(f"File Content: {content}")
-            assert agent_manager.active_agent.id == "agent_b", "Active agent should be agent_b"
+            assert agent_manager.active_agent.id == "agent_a", "Active agent should be agent_a"
 
             assert "def fibonacci" in content, "Fibonacci function not found in the created file."
         finally:

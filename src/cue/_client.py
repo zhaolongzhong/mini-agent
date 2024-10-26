@@ -76,20 +76,9 @@ class AsyncCueClient:
             return response.get_text()
         return str(response)
 
-    def set_active_agent(self, agent_id: str):
-        """Set the active agent by ID."""
-        if agent_id not in self.agents:
-            raise ValueError(f"Invalid agent ID: {agent_id}")
-        self.active_agent_id = agent_id
-        self.logger.info(f"Active agent set to: {agent_id}")
-
     def get_agent_ids(self) -> List[str]:
         """Get a list of all available agent IDs."""
         return list(self.agents.keys())
-
-    def get_active_agent_id(self) -> str:
-        """Get the current active agent ID."""
-        return self.agent_manager.active_agent.id
 
     async def cleanup(self):
         """Clean up resources used by the client."""

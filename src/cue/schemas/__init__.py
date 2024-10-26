@@ -3,6 +3,7 @@ from .author import Author
 from .completion_request import CompletionRequest
 from .completion_respone import CompletionResponse, ToolCallToolUseBlock
 from .conversation import Conversation
+from .conversation_context import ConversationContext
 from .error import ErrorResponse
 from .event_message import EventMessage, EventMessageType
 from .feature_flag import FeatureFlag
@@ -22,6 +23,7 @@ __all__ = [
     "Author",
     "CompletionRequest",
     "CompletionResponse",
+    "ConversationContext",
     "ToolCallToolUseBlock",
     "Conversation",
     "ErrorResponse",

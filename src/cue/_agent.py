@@ -17,6 +17,7 @@ from .schemas import (
     Author,
     CompletionRequest,
     CompletionResponse,
+    ConversationContext,
     MessageParam,
     RunMetadata,
     ToolCallToolUseBlock,
@@ -41,14 +42,20 @@ class Agent:
         self.description = self._generate_description()
         self.other_agents_info = ""
         self.tool_json = None
+        self.conversation_context: Optional[ConversationContext] = None  # current conversation context
 
     def get_system_message(self) -> MessageParam:
-        instruction = f"## IMPORTANT: Your name is {self.config.name} and id is {self.config.id}."
+        instruction = f"\n\n* Your id or name is {self.config.id}."
         if self.config.instruction:
-            instruction = f"{self.config.instruction} \n\n{instruction}"
+            instruction = f"\n\n* {self.config.instruction}{instruction}"
+        if self.config.is_primary:
+            instruction += "\n\n* You're primary agent, if you need to talk to other agent, you need to use `chat_with_agent` tool and specify the agent id you want to talk to, if you don't use `chat_with_agent`, you will reply to user or initial requester by default."
         if self.other_agents_info:
-            instruction += f"\n\nYou are aware of the following other agents:\n{self.other_agents_info} \n\nYou must use chat_with_agent when you talk to other agents, if you don't use it, the default is to user."
-        return MessageParam(role="system", name=self.config.name, content=instruction)
+            instruction += f"\n\n* You are aware of the following other agents:\n{self.other_agents_info}"
+        if not self.config.is_primary and self.conversation_context:
+            instruction += f"\n\n* Current participants in this conversation are:\n{','.join(self.conversation_context.participants)}"
+
+        return MessageParam(role="system", name=self.config.name, content=f"<IMPORTANT>{instruction}</IMPORTANT>")
 
     def get_messages(self) -> List:
         """Retrieve the original list of messages from the Pydantic model."""

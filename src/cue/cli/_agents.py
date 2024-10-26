@@ -9,6 +9,7 @@ default_model = ChatModel.GPT_4O_MINI
 main_agent = AgentConfig(
     id="main",
     name="main",
+    is_primary=True,
     description="Is main task executor and collaborate with other agents.",
     instruction="Analyze requests, collaborate with specialists when appropriate, maintain context, and synthesize outputs.",
     model=ChatModel.GPT_4O_MINI,
@@ -31,7 +32,7 @@ agent_claude = AgentConfig(
     name="agent_claude",
     description="Is very good at coding and also provide detail reasoning on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
-    model=ChatModel.CLAUDE_3_5_SONNET_20241022,
+    model=ChatModel.GPT_4O,
     tools=[Tool.Read, Tool.Write],
 )
 
@@ -40,7 +41,7 @@ system_operator = AgentConfig(
     name="system_operator",
     description="Is system operations specialist, be able to run python code or script, and execute bash command.",
     instruction="You are able to read file, write content to file, run python code or script, and execute bash command.",
-    model=ChatModel.GPT_4O_MINI,
+    model=ChatModel.GPT_4O,
     tools=[Tool.Read, Tool.Write, Tool.Python, Tool.Bash],
 )
 
