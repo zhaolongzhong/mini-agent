@@ -42,7 +42,7 @@ class TestClientManager:
         finally:
             await client.cleanup()
 
-    async def test_async_client_multi_agent(self, default_chat_model) -> None:
+    async def test_async_client_multi_agent(self, default_chat_model, tmp_path: pytest.TempPathFactory) -> None:
         """
         Test that the agent correctly handles basic input.
         """
@@ -51,18 +51,19 @@ class TestClientManager:
                 id="main",
                 name="main",
                 is_primary=True,
-                description="Lead coordinator that analyzes tasks, delegates to specialized agents (File Operator and Web Browser), manages information flow, and synthesizes results. Acts as the central hub for team collaboration.",
-                instruction="""Coordinate the AI team by analyzing requests, delegating tasks to specialists (File Operator and Web Browser), maintaining context, and synthesizing outputs. Provide clear instructions to agents, facilitate collaboration, and avoid using specialist tools directly.""",
+                description="Lead coordinator that analyzes tasks, delegates to specialized agents. Acts as the central hub for team collaboration.",
+                instruction="Coordinate the AI team by analyzing requests, delegating tasks to specialists (File Operator and Web Browser), maintaining context, and synthesizing outputs. Provide clear instructions to agents, facilitate collaboration, and avoid using specialist tools directly."
+                "",
                 model=default_chat_model,
-                tools=[Tool.Read],
+                tools=[],
             ),
             "file_operator": AgentConfig(
                 id="file_operator",
                 name="file_operator",
-                description="System operations specialist managing file operations, command execution, and local resources. Collaborates with Orchestrator and Web Browser for task coordination.",
-                instruction="""Execute system operations as directed by Orchestrator. Collaborate with Web Browser when tasks require both system operations and internet data. Provide operation feedback, alert on risks, maintain security, and handle errors gracefully.""",
+                description="System operations specialist managing file operations.",
+                instruction="Execute system operations as directed by main or coordinator agent.",
                 model=default_chat_model,
-                tools=[Tool.Read],
+                tools=[Tool.Edit],
             ),
         }
         client = AsyncCueClient()
@@ -70,12 +71,28 @@ class TestClientManager:
 
         try:
             agent_ids = client.get_agent_ids()
-            # Send message using active agent
             new_agent_id = agent_ids[0]
             assert new_agent_id == "main"
             response = await client.send_message("Hello there, who am I talking to? What is your id?")
             response_text = str(response).lower()
             assert "main" in response_text
+
+            # Test coordination
+            file_name = "fibo.py"
+            file_path = tmp_path / file_name
+            instruction = f"Under {tmp_path}, can you create a fibonacci function in {file_name}?"
+
+            response = await client.send_message(instruction)
+            logger.debug(f"Response: {response}")
+
+            assert response is not None, "Expected a non-None response from handle_input."
+            assert "fibo" in response.lower(), "Response does not mention 'fibo'."
+            assert file_path.exists(), f"Expected file '{file_path}' to be created."
+
+            content = file_path.read_text()
+            logger.debug(f"File Content: {content}")
+
+            assert "def fibonacci" in content, "Fibonacci function not found in the created file."
 
         finally:
             await client.cleanup()

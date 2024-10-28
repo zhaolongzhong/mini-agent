@@ -1,6 +1,6 @@
 import pytest
 
-from cue.tools.bash_tool import BashTool, ToolError
+from cue.tools import BashTool, ToolError
 
 
 @pytest.fixture

@@ -1,0 +1,44 @@
+{
+    "type": "function",
+    "function": {
+        "name": "edit",
+        "description": "Perform file operations like viewing, creating, and editing files in the filesystem.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The file operation to perform: 'view' (show file/dir contents), 'create' (needs file_text), 'str_replace' (needs old_str, new_str), 'insert' (needs insert_line, new_str), or 'undo_edit'."
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Absolute path to the target file or directory. Must start with '/'."
+                },
+                "file_text": {
+                    "type": "string",
+                    "description": "Content to write when creating a new file. Required when command is 'create'."
+                },
+                "view_range": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "description": "Two integers [start, end] specifying line numbers for viewing file content. Only valid for 'view' command on files."
+                },
+                "old_str": {
+                    "type": "string",
+                    "description": "String to be replaced in the file. Required when command is 'str_replace' and must appear exactly once in the file."
+                },
+                "new_str": {
+                    "type": "string",
+                    "description": "Replacement string. Required when command is either 'str_replace' or 'insert'."
+                },
+                "insert_line": {
+                    "type": "integer",
+                    "description": "Line number where text should be inserted. Required when command is 'insert'. Must be within valid range for the file."
+                }
+            },
+            "required": ["command", "path"]
+        }
+    }
+}

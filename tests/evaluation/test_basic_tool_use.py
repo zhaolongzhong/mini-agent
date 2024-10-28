@@ -17,7 +17,7 @@ def agent_config(default_chat_model) -> AgentConfig:
         name="MainAgent",
         is_primary=True,
         model=default_chat_model,
-        tools=[Tool.Read, Tool.Write, Tool.Bash],
+        tools=[Tool.Edit, Tool.Bash],
         is_test=True,
     )
 

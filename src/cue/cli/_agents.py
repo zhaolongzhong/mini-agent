@@ -15,7 +15,7 @@ main_agent = AgentConfig(
     model=ChatModel.GPT_4O_MINI,
     temperature=0.8,
     max_tokens=2000,
-    tools=[Tool.Read, Tool.Write],
+    tools=[Tool.Edit],
 )
 
 agent_o = AgentConfig(
@@ -24,7 +24,7 @@ agent_o = AgentConfig(
     description="Is very good at readoning, analyzing problems, be able to deep dive on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
     model=ChatModel.O1_MINI,
-    tools=[Tool.Read, Tool.Write],
+    tools=[Tool.Edit],
 )
 
 agent_claude = AgentConfig(
@@ -33,7 +33,7 @@ agent_claude = AgentConfig(
     description="Is very good at coding and also provide detail reasoning on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
     model=ChatModel.GPT_4O,
-    tools=[Tool.Read, Tool.Write],
+    tools=[Tool.Edit],
 )
 
 system_operator = AgentConfig(
@@ -42,7 +42,7 @@ system_operator = AgentConfig(
     description="Is system operations specialist, be able to run python code or script, and execute bash command.",
     instruction="You are able to read file, write content to file, run python code or script, and execute bash command.",
     model=ChatModel.GPT_4O,
-    tools=[Tool.Read, Tool.Write, Tool.Python, Tool.Bash],
+    tools=[Tool.Edit, Tool.Python, Tool.Bash],
 )
 
 browse_agent = AgentConfig(

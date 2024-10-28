@@ -6,6 +6,7 @@ from .base import BaseTool
 from .bash_tool import BashTool
 from .browse import BrowseTool
 from .drive import GoogleDriveTool
+from .edit import EditTool
 from .email import EmailTool
 from .read_file import ReadTool
 from .run_script import PythonRunner
@@ -20,6 +21,7 @@ class Tool(Enum):
     Read = ReadTool.name
     Write = WriteTool.name
     Bash = BashTool.name
+    Edit = EditTool.name
     Python = PythonRunner.name
     Browse = BrowseTool.name
     Email = EmailTool.name
@@ -32,6 +34,7 @@ class ToolManager:
             Tool.Read.value: ReadTool(),
             Tool.Write.value: WriteTool(),
             Tool.Bash.value: BashTool(),
+            Tool.Edit.value: EditTool(),
             Tool.Python.value: PythonRunner(),
             Tool.Browse.value: BrowseTool(),
             Tool.Email.value: EmailTool(),

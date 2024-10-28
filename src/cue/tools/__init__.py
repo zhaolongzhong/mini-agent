@@ -1,8 +1,9 @@
 from ._tool import Tool, ToolManager
-from .base import BaseTool
+from .base import BaseTool, CLIResult, ToolError, ToolFailure, ToolResult
 from .bash_tool import BashTool
 from .browse import BrowseTool
 from .drive import GoogleDriveTool
+from .edit import EditTool
 from .email import EmailTool
 from .read_file import ReadTool
 from .run_script import PythonRunner
@@ -12,7 +13,12 @@ __all__ = [
     "Tool",
     "ToolManager",
     "BaseTool",
+    "CLIResult",
+    "ToolFailure",
+    "ToolError",
+    "ToolResult",
     "BashTool",
+    "EditTool",
     "BrowseTool",
     "GoogleDriveTool",
     "EmailTool",
