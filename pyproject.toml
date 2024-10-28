@@ -40,6 +40,7 @@ dependencies = [
     "docker>=7.1",
     "tqdm>=4.66.5",
     "aiohttp==3.10.5",
+    "colorama>=0.4.6",
 ]
 
 [project.scripts]

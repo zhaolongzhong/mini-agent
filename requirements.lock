@@ -46,6 +46,8 @@ charset-normalizer==3.4.0
     # via requests
 click==8.1.7
     # via duckduckgo-search
+colorama==0.4.6
+    # via cue
 distro==1.9.0
     # via anthropic
     # via openai
@@ -98,7 +100,7 @@ idna==3.10
     # via httpx
     # via requests
     # via yarl
-jiter==0.6.1
+jiter==0.7.0
     # via anthropic
     # via openai
 lxml==4.9.4
@@ -181,7 +183,7 @@ sqlalchemy==2.0.30
     # via cue
 tiktoken==0.8.0
     # via cue
-tokenizers==0.20.1
+tokenizers==0.20.2
     # via anthropic
 tqdm==4.66.6
     # via cue
