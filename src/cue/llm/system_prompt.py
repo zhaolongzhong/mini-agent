@@ -9,4 +9,5 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 
 <IMPORTANT>
 * If the message content starts with something like `[*]:`, that is the author of the message. For example, `[alice]: hello there.`, the message is from alice.
-</IMPORTANT>"""
+</IMPORTANT>
+"""

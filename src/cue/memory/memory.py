@@ -1,8 +1,6 @@
 import json
 import logging
-import os
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from anthropic.types import Message as AnthropicMessage
@@ -12,11 +10,9 @@ from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
 
-from ..llm.llm_model import ChatModel
 from ..schemas import AgentConfig, AssistantMessage, CompletionResponse, StorageType, ToolResponseWrapper
 from ..schemas.error import ErrorResponse
 from ..schemas.message import MessageParam
-from .memory_utils import load_from_memory
 from .messages_operations import MessageOperations
 
 max_messages = 20
@@ -113,46 +109,6 @@ class InMemoryStorage(MemoryInterface):
         return result
 
 
-class FileStorage(MemoryInterface):
-    def __init__(self, name="memory.jsonl", model: ChatModel = None):
-        super().__init__()
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-        memory_dir = os.path.join(base_dir, "logs/memory")
-        os.makedirs(memory_dir, exist_ok=True)
-        self.memory_root_path = memory_dir
-        if "jsonl" not in name:
-            name += ".jsonl"
-        self.file_path = Path(f"{self.memory_root_path}/{name}")
-        # clear test files
-        for file in Path(self.memory_root_path).glob("*_test*"):
-            if file.is_file():
-                file.unlink()
-        self.file_path.touch(exist_ok=True)
-        messages = load_from_memory(self.file_path, model)
-        self.messages = messages
-
-    async def init_messages(self, limit=max_messages):
-        return self.messages
-
-    async def save(self, message: Dict):
-        self.messages.append(message)
-        with self.file_path.open("a", encoding="utf-8") as file:
-            file.write(json.dumps(message.model_dump()) + "\n")
-
-    async def saveList(self, messages: List[Dict]):
-        for message in messages:
-            await self.save(message)
-
-    async def get_message(self, id):
-        pass
-
-    async def set_message(self, id, message):
-        pass
-
-    def get_message_params(self, model: Optional[str] = None):
-        return self.messages[-max_messages:]
-
-
 class DatabaseStorage(MemoryInterface):
     def __init__(self):
         super().__init__()
@@ -229,12 +185,7 @@ def setup_memory_storage(storage_type: StorageType, config: AgentConfig, session
     Returns:
         MemoryInterface: An instance of the selected memory storage.
     """
-    if storage_type == StorageType.FILE:
-        model_id = config.model.model_id.split("/")[-1]  # Safely extract model ID
-        name = f"{config.id}_{model_id}_{session_id}"
-        memory = FileStorage(name=name, model=config.model)
-        logger.debug(f"Initialized FileStorage with name: {name}")
-    elif storage_type == StorageType.DATABASE:
+    if storage_type == StorageType.DATABASE:
         memory = DatabaseStorage()
         logger.debug("Initialized DatabaseStorage")
     elif storage_type == StorageType.IN_MEMORY:

@@ -3,8 +3,6 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from ..llm.llm_model import ChatModel
-from ..tools._tool import Tool
 from .feature_flag import FeatureFlag
 from .storage_type import StorageType
 
@@ -17,12 +15,12 @@ class AgentConfig(BaseModel):
     description: Optional[str] = None
     # System message defining agent's behavior, collaboration guidelines, and boundaries
     instruction: Optional[str] = None
-    model: Optional[ChatModel] = None
+    model: Optional[str] = None
     api_key: Optional[str] = None
     temperature: Optional[float] = 0.8
     max_tokens: Optional[int] = 1000
     stop_sequences: Optional[list[str]] = None
-    tools: Optional[list[Tool]] = []
+    tools: Optional[list[Any]] = []  # callable or tool enum
     conversation_id: Optional[str] = None
     max_actions: Optional[int] = 10
     storage_type: Optional[Any] = StorageType.IN_MEMORY

@@ -3,6 +3,7 @@ import logging
 from ..schemas import AgentConfig, CompletionRequest, CompletionResponse
 from .anthropic_client import AnthropicClient
 from .gemini_client import GeminiClient
+from .llm_model import ChatModel
 from .llm_request import LLMRequest
 from .openai_client import OpenAIClient
 
@@ -14,17 +15,18 @@ class LLMClient(LLMRequest):
         self.llm_client: LLMRequest = self._initialize_client(config)
 
     def _initialize_client(self, config: AgentConfig):
-        model = config.model
+        chat_model = ChatModel.from_model_id(config.model)
+        provider = chat_model.provider
         client_class_mapping = {
             "openai": OpenAIClient,
             "anthropic": AnthropicClient,
             "google": GeminiClient,
         }
 
-        client_class = client_class_mapping.get(model.provider)
+        client_class = client_class_mapping.get(provider)
         if not client_class:
-            logger.error(f"Client class for key prefix {model.provider} not found")
-            raise ValueError(f"Client class for key prefix {model.provider} not found")
+            logger.error(f"Client class for key prefix {provider} not found")
+            raise ValueError(f"Client class for key prefix {provider} not found")
 
         return client_class(config=config)
 

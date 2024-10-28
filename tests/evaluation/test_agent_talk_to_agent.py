@@ -12,24 +12,24 @@ logger = logging.getLogger(__name__)
 class TestClientManager:
     async def test_agent_talks_to_agent(self, default_chat_model, tmp_path: pytest.TempPathFactory) -> None:
         """
-        Test that a agent transfer task to another agent.
+        Test that a agent delegate a task to another agent.
         """
         agent_manager = AgentManager()
         agent_a_config = AgentConfig(
             id="agent_a",
-            name="agent_a",
             is_primary=True,
             instruction="Your name is agent_a",
             model=default_chat_model,
-            tools=[Tool.Read],
+            tools=[],
+            is_test=True,
         )
 
         agent_b_config = AgentConfig(
             id="agent_b",
-            name="agent_b",
             instruction="Your name is agent_b",
             model=default_chat_model,
-            tools=[Tool.Read, Tool.Write],
+            tools=[Tool.Edit],
+            is_test=True,
         )
         agent_a = agent_manager.register_agent(agent_a_config)
         agent_b = agent_manager.register_agent(agent_b_config)

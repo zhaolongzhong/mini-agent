@@ -4,7 +4,7 @@
 # last locked with the following flags:
 #   pre: false
 #   features: []
-#   all-features: true
+#   all-features: false
 #   with-sources: false
 #   generate-hashes: false
 
@@ -15,7 +15,6 @@ anthropic==0.37.0
     # via cue
 anyio==4.6.2.post1
     # via anthropic
-    # via groq
     # via httpx
     # via openai
 async-timeout==4.0.3
@@ -40,7 +39,6 @@ click==8.1.7
     # via duckduckgo-search
 distro==1.9.0
     # via anthropic
-    # via groq
     # via openai
 docker==7.1.0
     # via cue
@@ -54,7 +52,7 @@ filelock==3.16.1
     # via huggingface-hub
 fsspec==2024.10.0
     # via huggingface-hub
-google-api-core==2.21.0
+google-api-core==2.22.0
     # via google-api-python-client
 google-api-python-client==2.137.0
     # via cue
@@ -72,8 +70,6 @@ googleapis-common-protos==1.65.0
     # via google-api-core
 greenlet==3.1.1
     # via cue
-groq==0.9.0
-    # via cue
 h11==0.14.0
     # via httpcore
 httpcore==1.0.6
@@ -83,9 +79,8 @@ httplib2==0.22.0
     # via google-auth-httplib2
 httpx==0.27.2
     # via anthropic
-    # via groq
     # via openai
-huggingface-hub==0.26.0
+huggingface-hub==0.26.2
     # via tokenizers
 idna==3.10
     # via anyio
@@ -102,7 +97,7 @@ markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-mypy==1.12.0
+mypy==1.13.0
 mypy-extensions==1.0.0
     # via mypy
 nodeenv==1.9.1
@@ -116,9 +111,9 @@ packaging==24.1
     # via pytest
 pluggy==1.5.0
     # via pytest
-proto-plus==1.24.0
+proto-plus==1.25.0
     # via google-api-core
-protobuf==5.28.2
+protobuf==5.28.3
     # via google-api-core
     # via googleapis-common-protos
     # via proto-plus
@@ -134,7 +129,6 @@ pycryptodomex==3.21.0
 pydantic==2.7.0
     # via anthropic
     # via cue
-    # via groq
     # via openai
     # via pydantic-settings
 pydantic-core==2.18.1
@@ -149,11 +143,10 @@ pypdf==4.3.1
     # via cue
 pyreqwest-impersonate==0.5.3
     # via duckduckgo-search
-pyright==1.1.385
+pyright==1.1.386
 pytest==8.3.3
     # via pytest-asyncio
-pytest-asyncio==0.23.7
-    # via cue
+pytest-asyncio==0.24.0
 python-dotenv==1.0.0
     # via cue
     # via pydantic-settings
@@ -174,11 +167,10 @@ rich==13.7.1
     # via cue
 rsa==4.9
     # via google-auth
-ruff==0.7.0
+ruff==0.7.1
 sniffio==1.3.1
     # via anthropic
     # via anyio
-    # via groq
     # via httpx
     # via openai
 soupsieve==2.6
@@ -192,14 +184,13 @@ tokenizers==0.20.1
 tomli==2.0.2
     # via mypy
     # via pytest
-tqdm==4.66.5
+tqdm==4.66.6
     # via cue
     # via huggingface-hub
     # via openai
 typing-extensions==4.12.2
     # via anthropic
     # via anyio
-    # via groq
     # via huggingface-hub
     # via mypy
     # via openai

@@ -58,7 +58,7 @@ class ToolManager:
         """Iterate through the tools and gather their JSON configurations.
 
         Args:
-            model: ChatModel instance containing model information
+            model: Original model name from original provider
             tools: Optional list of Tool enum values or tool string identifiers
 
         Returns:

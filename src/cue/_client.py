@@ -21,7 +21,6 @@ class AsyncCueClient:
     def _create_default_config(self) -> AgentConfig:
         return AgentConfig(
             id="default_agent",
-            name="default_agent",
             model=ChatModel.GPT_4O_MINI,
             temperature=0.8,
             max_tokens=2000,
@@ -35,7 +34,8 @@ class AsyncCueClient:
 
     async def initialize(self, configs: Optional[List[AgentConfig]] = None):
         """Initialize the client with multiple agents."""
-        self.logger.info("Initializing AsyncCueClient with multiple agents")
+        suffix = "multiple agents" if len(configs) > 1 else "a single agent"
+        self.logger.info(f"Initializing AsyncCueClient with {suffix}")
 
         active_agent_id = None
         if not configs:

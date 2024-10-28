@@ -1,5 +1,7 @@
 # tests/conftest.py
+import asyncio
 import logging
+from typing import Iterator
 
 import pytest
 
@@ -11,9 +13,9 @@ test_config = {"default_model": ChatModel.GPT_4O_MINI}
 
 
 @pytest.fixture(scope="session")
-def default_chat_model() -> ChatModel:
+def default_chat_model() -> str:
     """Fixture to provide the default ChatModel for tests."""
-    return test_config["default_model"]
+    return test_config["default_model"].id
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -29,6 +31,13 @@ def configure_logging_fixture():
 
 
 # Function to change the default model (can be called from tests if needed)
-def set_default_model(model: ChatModel) -> None:
-    """Set the default ChatModel for tests."""
+def set_default_model(model: str) -> None:
+    """Set the default model for tests."""
     test_config["default_model"] = model
+
+
+@pytest.fixture(scope="session")
+def event_loop() -> Iterator[asyncio.AbstractEventLoop]:
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()

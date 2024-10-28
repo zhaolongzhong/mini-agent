@@ -60,7 +60,7 @@ class GeminiClient(LLMRequest, BaseClient):
         self.tools = config.tools
         self.tool_manager = ToolManager()
         if len(self.tools) > 0:
-            self.tool_json = self.tool_manager.get_tool_definitions(self.model.id, self.tools)
+            self.tool_json = self.tool_manager.get_tool_definitions(self.model, self.tools)
         else:
             self.tool_json = None
 
@@ -78,7 +78,7 @@ class GeminiClient(LLMRequest, BaseClient):
         try:
             if self.tool_json and len(self.tool_json) > 0:
                 response = await self.client.chat.completions.create(
-                    model=f"google/{self.model.model_id}",
+                    model=f"google/{self.model}",
                     messages=[
                         msg.model_dump(exclude={"tool_calls"})
                         if hasattr(msg, "tool_calls") and not msg.tool_calls
@@ -92,7 +92,7 @@ class GeminiClient(LLMRequest, BaseClient):
                 )
             else:
                 response = await self.client.chat.completions.create(
-                    model=f"google/{self.model.model_id}",
+                    model=f"google/{self.model}",
                     messages=[
                         msg.model_dump(exclude={"tool_calls"})
                         if hasattr(msg, "tool_calls") and not msg.tool_calls

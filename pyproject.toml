@@ -21,7 +21,6 @@ dependencies = [
     "anthropic==0.37.0",
     "openai==1.52.0",
     "tiktoken>=0.8.0",
-    "groq==0.9.0",
     "google-auth==2.31.0",
     "google-auth-oauthlib==1.2.1",
     "google-api-python-client==2.137.0",
@@ -35,7 +34,6 @@ dependencies = [
     "asyncpg==0.29.0",
     "rich==13.7.1",
     "blobfile==2.1.1",
-    "pytest-asyncio==0.23.7",
     "bs4==0.0.1",
     "duckduckgo-search==6.1.12",
     "pypdf==4.3.1",
@@ -53,7 +51,7 @@ dev-dependencies = [
     "mypy>=1.10.1",
     "ruff>=0.5.0",
     "pytest",
-    "pytest-asyncio",
+    "pytest-asyncio>=0.24.0",
 ]
 
 [tool.rye.scripts]

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -38,37 +39,50 @@ class AnthropicClient:
         try:
             # The Messages API accepts a top-level `system` parameter, not \"system\" as an input message role.
             system_message_content = request.system_prompt_suffix
-            system_message_content += "\n\nIf the role is user but the message content starts with something like `[*]:`, that is the author of the message."
             messages = [msg for msg in request.messages if msg["role"] != "system"]
-            system = {
+            system_message = {
                 "text": f"{SYSTEM_PROMPT}{' ' + system_message_content if system_message_content else ''}",
                 "type": "text",
                 "cache_control": {"type": "ephemeral"},
             }
             messages = self._process_messages(messages)
-            logger.debug(f"system_message_content: {system_message_content}" f"tools_json: {request.tool_json}")
-
-            system_tokens = count_token(str(system))
+            system_message_tokens = count_token(str(system_message))
             tool_tokens = count_token(str(request.tool_json))
-            msg_tokens = count_token(str(messages))
-            print(f"system_tokens: {system_tokens}")
-            print(f"tool_tokens: {tool_tokens}")
-            print(f"msg_tokens: {msg_tokens}")
+            message_tokens = count_token(str(messages))
+            input_tokens = {
+                "system_tokens": system_message_tokens,
+                "tool_tokens": tool_tokens,
+                "message_tokens": message_tokens,
+            }
 
             if request.enable_prompt_caching:
                 logger.debug("_inject_prompt_caching")
                 self._inject_prompt_caching(messages)
 
-            debug_print_messages(messages, tag=f"{self.config.id} send_completion_request clean messages")
-            response = await self.client.with_options(max_retries=2).beta.prompt_caching.messages.create(
-                model=request.model,
-                system=[system],
-                messages=messages,
-                max_tokens=request.max_tokens,
-                temperature=request.temperature,
-                tools=request.tool_json,
-                betas=["prompt-caching-2024-07-31"],
+            logger.debug(
+                f"input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
+                f"\ntools_json: {json.dumps(request.tool_json, indent=4)}"
             )
+            debug_print_messages(messages, tag=f"{self.config.id} send_completion_request clean messages")
+            if request.tool_json:
+                response = await self.client.with_options(max_retries=2).beta.prompt_caching.messages.create(
+                    model=request.model,
+                    system=[system_message],
+                    messages=messages,
+                    max_tokens=request.max_tokens,
+                    temperature=request.temperature,
+                    tools=request.tool_json,
+                    betas=["prompt-caching-2024-07-31"],
+                )
+            else:
+                response = await self.client.with_options(max_retries=2).beta.prompt_caching.messages.create(
+                    model=request.model,
+                    system=[system_message],
+                    messages=messages,
+                    max_tokens=request.max_tokens,
+                    temperature=request.temperature,
+                    betas=["prompt-caching-2024-07-31"],
+                )
         except anthropic.APIConnectionError as e:
             error = ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
         except anthropic.RateLimitError as e:
@@ -85,7 +99,7 @@ class AnthropicClient:
             )
         if error:
             logger.error(error.model_dump())
-        return CompletionResponse(author=request.author, response=response, model=self.model.id, error=error)
+        return CompletionResponse(author=request.author, response=response, model=self.model, error=error)
 
     def format_message(self, message):
         """

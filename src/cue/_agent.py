@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 class Agent:
     def __init__(self, config: AgentConfig, agent_manager: "AgentManager"):  # type: ignore # noqa: F821
-        self.id = config.id
+        self.id = config.id.strip().replace(" ", "_")
         self.config = config
         self.tool_manager = ToolManager()
         self.memory = InMemoryStorage()
@@ -45,17 +45,27 @@ class Agent:
         self.conversation_context: Optional[ConversationContext] = None  # current conversation context
 
     def get_system_message(self) -> MessageParam:
-        instruction = f"\n\n* Your id or name is {self.config.id}."
+        instruction = ""
         if self.config.instruction:
-            instruction = f"\n\n* {self.config.instruction}{instruction}"
+            instruction = f"\n* {self.config.instruction}{instruction}"
         if self.config.is_primary:
-            instruction += "\n\n* You're primary agent, if you need to talk to other agent, you need to use `chat_with_agent` tool and specify the agent id you want to talk to, if you don't use `chat_with_agent`, you will reply to user or initial requester by default."
-        if self.other_agents_info:
-            instruction += f"\n\n* You are aware of the following other agents:\n{self.other_agents_info}"
-        if not self.config.is_primary and self.conversation_context:
-            instruction += f"\n\n* Current participants in this conversation are:\n{','.join(self.conversation_context.participants)}"
+            instruction += f"""
+You are {self.id}, a primary agent in a multi-agent system. Please follow these core rules:
 
-        return MessageParam(role="system", name=self.config.name, content=f"<IMPORTANT>{instruction}</IMPORTANT>")
+1. To communicate with other agents:
+   - Use the `chat_with_agent` tool
+   - Specify the target agent's ID
+   - System automatically includes last 3 messages as context
+   - Provide additional context if the recent messages alone are insufficient
+
+2. All responses not using `chat_with_agent` will be sent directly to the user, so please format them accordingly
+"""
+        if self.other_agents_info:
+            instruction += f"\n* You are aware of the following other agents:\n{self.other_agents_info}"
+        if not self.config.is_primary and self.conversation_context:
+            instruction += f"\n* Current participants in this conversation are:\n{','.join(self.conversation_context.participants)}"
+
+        return MessageParam(role="system", name=self.id, content=f"<IMPORTANT>{instruction}</IMPORTANT>")
 
     def get_messages(self) -> List:
         """Retrieve the original list of messages from the Pydantic model."""
@@ -63,7 +73,7 @@ class Agent:
 
     def get_message_params(self) -> List[Dict]:
         """Retrieve a list of message parameter dictionaries for the completion API call."""
-        return self.memory.get_message_params(self.config.model.id)
+        return self.memory.get_message_params(self.config.model)
 
     def _generate_description(self) -> str:
         """Return the description about the agent."""
@@ -75,12 +85,12 @@ class Agent:
         tool_names = [tool.value for tool in self.config.tools]
         if not tool_names:
             return description
-        description += f" Agent {self.config.id} is able to use these tools: {', '.join(tool_names)}"
+        description += f" Agent {self.id} is able to use these tools: {', '.join(tool_names)}"
         return description
 
     def add_tool_to_agent(self, tool: Union[Callable, Tool]) -> None:
         self.config.tools.append(tool)
-        logger.debug(f"Added tool {tool} to agent {self.id}")
+        logger.debug(f"Added tool {tool} to agent {self.config.id}")
 
     async def chat_with_agent(self, to_agent_id: str, message: str) -> AgentHandoffResult:
         """Chat with another agent"""
@@ -95,7 +105,7 @@ class Agent:
     async def run(self, author: Optional[Author] = None):
         if not self.tool_json and self.config.tools:
             # chat_with_agent is added later so we cannot initialize in init
-            self.tool_json = self.tool_manager.get_tool_definitions(self.config.model.id, self.config.tools)
+            self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
         messages = self.get_message_params()  # convert message params
         logger.debug(f"{self.id}, size: {len(messages)}")
         history = [
@@ -119,8 +129,8 @@ class Agent:
         ]
 
         completion_request = CompletionRequest(
-            author=Author(name=self.config.name, role="assistant") if not author else author,
-            model=self.config.model.id,
+            author=Author(name=self.id, role="assistant") if not author else author,
+            model=self.config.model,
             messages=messages_dict,
             metadata=metadata,
             tool_json=self.tool_json,
@@ -178,7 +188,7 @@ class Agent:
                 tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
 
         response = None
-        if "claude" in self.config.model.id:
+        if "claude" in self.config.model:
             tool_result_message = ToolResultMessage(role="user", content=tool_responses)
             response = ToolResponseWrapper(tool_result_message=tool_result_message, author=author)
         else:
@@ -190,14 +200,14 @@ class Agent:
         return await tool_func(**kwargs)
 
     def create_success_response(self, tool_id: str, tool_name: str, content: str):
-        if "claude" in self.config.model.id:
+        if "claude" in self.config.model:
             # return ToolResultBlockParam(tool_use_id=tool_id, content=content, type="tool_result", is_error=False)
             return ToolResultContent(tool_use_id=tool_id, content=content, type="tool_result", is_error=False)
         else:
             return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=content)
 
     def create_error_response(self, tool_id: str, tool_name: str, error_message: str):
-        if "claude" in self.config.model.id:
+        if "claude" in self.config.model:
             result_param = ToolResultContent(
                 tool_use_id=tool_id, content=error_message, type="tool_result", is_error=True
             )
@@ -205,21 +215,21 @@ class Agent:
         else:
             return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)
 
-    def build_next_agent_context(self, to_agent_id: str, message: str) -> List[Dict]:
+    def build_next_agent_context(self, to_agent: str, last_message: str) -> List[Dict]:
         history = copy.deepcopy(self.get_messages())
         # remove the transfer tool call and append message from calling agent
         # in this way, we keep the conversation cohensive with less noise
-        max_messages = 15
-        start_idx = max(0, len(history) - (max_messages + 1))  # -11 to account for the -1 later
+        max_messages = 6
+        start_idx = max(0, len(history) - (max_messages + 1))
         messages = history[start_idx:-1]
         messages_content = ",".join([str(msg) for msg in messages])
 
         messages_content = ",".join([str(msg) for msg in messages])
         history = MessageParam(
             role="assistant",
-            content=f"This is some context from conversation between agent {self.id} and other agents: <background>{messages_content}</background> \n\nThe following message is from {self.id} to {to_agent_id}",
+            content=f"This is context from agent {self.id}: <background>{messages_content}</background> \n\nThe following message is from {self.id} to {to_agent}",
         )
-        from_agent_message = MessageParam(role="assistant", content=message, name=self.config.name)
+        from_agent_message = MessageParam(role="assistant", content=last_message, name=self.id)
         messages.append(from_agent_message)
         messages = [history, from_agent_message]
         return messages

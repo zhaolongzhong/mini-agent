@@ -48,7 +48,7 @@ class OpenAIClient(LLMRequest):
                 messages = self.handle_o1_model(messages, request.tool_json)
                 response = await self.client.chat.completions.create(
                     messages=messages,
-                    model=self.model.model_id,
+                    model=self.model,
                     max_completion_tokens=request.max_tokens,
                 )
                 content = response.choices[0].message.content
@@ -64,7 +64,7 @@ class OpenAIClient(LLMRequest):
                 if self.tool_json:
                     response = await self.client.chat.completions.create(
                         messages=messages,
-                        model=self.model.model_id,
+                        model=self.model,
                         max_completion_tokens=request.max_tokens,
                         temperature=request.temperature,
                         response_format=request.response_format,
@@ -74,7 +74,7 @@ class OpenAIClient(LLMRequest):
                 else:
                     response = await self.client.chat.completions.create(
                         messages=messages,
-                        model=self.model.model_id,
+                        model=self.model,
                         max_completion_tokens=request.max_tokens,
                         temperature=request.temperature,
                         response_format=request.response_format,
@@ -101,7 +101,7 @@ class OpenAIClient(LLMRequest):
             )
         if error:
             logger.error(error.model_dump())
-        return CompletionResponse(author=request.author, response=response, model=self.model.id, error=error)
+        return CompletionResponse(author=request.author, response=response, model=self.model, error=error)
 
     def handle_o1_model(self, messages: List[Dict], request: CompletionRequest) -> List[Dict]:
         """

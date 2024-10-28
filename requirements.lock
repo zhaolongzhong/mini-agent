@@ -4,7 +4,7 @@
 # last locked with the following flags:
 #   pre: false
 #   features: []
-#   all-features: true
+#   all-features: false
 #   with-sources: false
 #   generate-hashes: false
 
@@ -15,7 +15,6 @@ anthropic==0.37.0
     # via cue
 anyio==4.6.2.post1
     # via anthropic
-    # via groq
     # via httpx
     # via openai
 async-timeout==4.0.3
@@ -40,7 +39,6 @@ click==8.1.7
     # via duckduckgo-search
 distro==1.9.0
     # via anthropic
-    # via groq
     # via openai
 docker==7.1.0
     # via cue
@@ -48,13 +46,12 @@ duckduckgo-search==6.1.12
     # via cue
 exceptiongroup==1.2.2
     # via anyio
-    # via pytest
 filelock==3.16.1
     # via blobfile
     # via huggingface-hub
 fsspec==2024.10.0
     # via huggingface-hub
-google-api-core==2.21.0
+google-api-core==2.22.0
     # via google-api-python-client
 google-api-python-client==2.137.0
     # via cue
@@ -72,8 +69,6 @@ googleapis-common-protos==1.65.0
     # via google-api-core
 greenlet==3.1.1
     # via cue
-groq==0.9.0
-    # via cue
 h11==0.14.0
     # via httpcore
 httpcore==1.0.6
@@ -83,16 +78,13 @@ httplib2==0.22.0
     # via google-auth-httplib2
 httpx==0.27.2
     # via anthropic
-    # via groq
     # via openai
-huggingface-hub==0.26.0
+huggingface-hub==0.26.2
     # via tokenizers
 idna==3.10
     # via anyio
     # via httpx
     # via requests
-iniconfig==2.0.0
-    # via pytest
 jiter==0.6.1
     # via anthropic
     # via openai
@@ -108,12 +100,9 @@ openai==1.52.0
     # via cue
 packaging==24.1
     # via huggingface-hub
-    # via pytest
-pluggy==1.5.0
-    # via pytest
-proto-plus==1.24.0
+proto-plus==1.25.0
     # via google-api-core
-protobuf==5.28.2
+protobuf==5.28.3
     # via google-api-core
     # via googleapis-common-protos
     # via proto-plus
@@ -129,7 +118,6 @@ pycryptodomex==3.21.0
 pydantic==2.7.0
     # via anthropic
     # via cue
-    # via groq
     # via openai
     # via pydantic-settings
 pydantic-core==2.18.1
@@ -144,10 +132,6 @@ pypdf==4.3.1
     # via cue
 pyreqwest-impersonate==0.5.3
     # via duckduckgo-search
-pytest==8.3.3
-    # via pytest-asyncio
-pytest-asyncio==0.23.7
-    # via cue
 python-dotenv==1.0.0
     # via cue
     # via pydantic-settings
@@ -171,7 +155,6 @@ rsa==4.9
 sniffio==1.3.1
     # via anthropic
     # via anyio
-    # via groq
     # via httpx
     # via openai
 soupsieve==2.6
@@ -182,16 +165,13 @@ tiktoken==0.8.0
     # via cue
 tokenizers==0.20.1
     # via anthropic
-tomli==2.0.2
-    # via pytest
-tqdm==4.66.5
+tqdm==4.66.6
     # via cue
     # via huggingface-hub
     # via openai
 typing-extensions==4.12.2
     # via anthropic
     # via anyio
-    # via groq
     # via huggingface-hub
     # via openai
     # via pydantic

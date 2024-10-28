@@ -8,7 +8,6 @@ default_model = ChatModel.GPT_4O_MINI
 
 main_agent = AgentConfig(
     id="main",
-    name="main",
     is_primary=True,
     description="Is main task executor and collaborate with other agents.",
     instruction="Analyze requests, collaborate with specialists when appropriate, maintain context, and synthesize outputs.",
@@ -20,7 +19,6 @@ main_agent = AgentConfig(
 
 agent_o = AgentConfig(
     id="agent_o",
-    name="agent_o",
     description="Is very good at readoning, analyzing problems, be able to deep dive on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
     model=ChatModel.O1_MINI,
@@ -29,7 +27,6 @@ agent_o = AgentConfig(
 
 agent_claude = AgentConfig(
     id="agent_claude",
-    name="agent_claude",
     description="Is very good at coding and also provide detail reasoning on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
     model=ChatModel.GPT_4O,
@@ -38,7 +35,6 @@ agent_claude = AgentConfig(
 
 system_operator = AgentConfig(
     id="system_operator",
-    name="system_operator",
     description="Is system operations specialist, be able to run python code or script, and execute bash command.",
     instruction="You are able to read file, write content to file, run python code or script, and execute bash command.",
     model=ChatModel.GPT_4O,
@@ -47,7 +43,6 @@ system_operator = AgentConfig(
 
 browse_agent = AgentConfig(
     id="browse_agent",
-    name="browse_agent",
     description="Is able to search internet and browse web page or search news.",
     instruction="Search internet, extract relevant information, verify reliability, report limitations.",
     model=default_model,
@@ -56,7 +51,6 @@ browse_agent = AgentConfig(
 
 email_agent = AgentConfig(
     id="email_manager",
-    name="email_manager",
     description="Is able to read and sand emails and other email operations.",
     instruction="Manage email operations using available Gmail commands.",
     model=default_model,
@@ -65,7 +59,6 @@ email_agent = AgentConfig(
 
 drive_agent = AgentConfig(
     id="google_drive_manager",
-    name="google_drive_manager",
     description="Is able to access google drive, read file from drive or upload file to drive, or other operations.",
     instruction="Manage Google Drive operations using available commands.",
     model=default_model,

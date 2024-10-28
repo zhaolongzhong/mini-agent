@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from typing import Callable, Dict, List, Optional, Union
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 class AgentManager:
     def __init__(self):
         logger.info("AgentManager initialized")
-        self.agents: Dict[str, Agent] = {}
+        self._agents: Dict[str, Agent] = {}
         self.active_agent: Optional[Agent] = None
         self.primary_agent: Optional[Agent] = None
 
@@ -38,7 +39,7 @@ class AgentManager:
             start_time = time.time()
             response = await self._execute_run(self.primary_agent, message, run_metadata)
             duration = time.time() - start_time
-            logger.info(f"Run completed in {duration:.2f}s")
+            logger.info(f"Run completed in {duration:.2f}s, metadata:\n{run_metadata.model_dump_json(indent=4)}")
 
             return response
         except Exception as e:
@@ -112,7 +113,7 @@ class AgentManager:
         The method clears previous memory and transfers either single or list context
         to the new active agent.
         """
-        self.active_agent = self.agents[hand_off_result.to_agent_id]
+        self.active_agent = self._agents[hand_off_result.to_agent_id]
         self.active_agent.conversation_context = ConversationContext(
             participants=[hand_off_result.from_agent_id, hand_off_result.to_agent_id]
         )
@@ -141,6 +142,8 @@ class AgentManager:
                 logger.warning("Stopped by user.")
                 return False
         if turns_count >= run_metadata.max_turns:
+            if self.active_agent.config.is_test:
+                return False
             logger.warning(f"Run reaches max turn: {run_metadata.max_turns}")
             response = input(
                 f"Maximum turn {run_metadata.max_turns} reached. Continue? (y/n, press Enter to continue): "
@@ -152,19 +155,30 @@ class AgentManager:
         return True
 
     async def clean_up(self):
-        self.agents.clear()
-        self.active_agent = None
+        """Clean up all agents and their resources."""
+        cleanup_tasks = []
+        for agent_id in list(self._agents.keys()):
+            try:
+                if hasattr(self._agents[agent_id], "cleanup"):
+                    cleanup_tasks.append(asyncio.create_task(self._agents[agent_id].cleanup()))
+            except Exception as e:
+                logger.error(f"Error cleaning up agent {agent_id}: {e}")
+
+        if cleanup_tasks:
+            await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+
+        self._agents.clear()
         logger.info("All agents cleaned up and removed.")
 
     def register_agent(self, config: AgentConfig) -> Agent:
-        if config.id in self.agents:
+        if config.id in self._agents:
             logger.warning(f"Agent with id {config.id} already exists, returning existing agent.")
-            return self.agents[config.id]
+            return self._agents[config.id]
 
         agent = Agent(config=config, agent_manager=self)
-        self.agents[agent.config.id] = agent
+        self._agents[agent.config.id] = agent
         logger.info(
-            f"register_agent {agent.config.id} (name: {config.name}), available agents: {list(self.agents.keys())}"
+            f"register_agent {agent.config.id} (name: {config.id}), available agents: {list(self._agents.keys())}"
         )
         if config.is_primary:
             self.primary_agent = agent
@@ -172,27 +186,26 @@ class AgentManager:
 
     def update_other_agents_info(self):
         if not self.primary_agent:
-            for agent in self.agents.values():
+            for agent in self._agents.values():
                 if agent.config.is_primary:
                     self.primary_agent = agent
 
-        for agent_id, agent in self.agents.items():
+        for agent_id, agent in self._agents.items():
             if agent.config.is_primary:
                 agent.other_agents_info = self.list_agents(exclude=[agent_id])
             else:
                 agent.other_agents_info = {
                     "id": agent.id,
-                    "name": self.primary_agent.config.name,
                     "description": self.primary_agent.description,
                 }
             logger.debug(f"{agent_id} other_agents_info: {agent.other_agents_info}")
 
     def get_agent(self, identifier: str) -> Optional[Agent]:
-        if identifier in self.agents:
-            return self.agents[identifier]
+        if identifier in self._agents:
+            return self._agents[identifier]
 
-        for agent in self.agents.values():
-            if agent.config.name == identifier:
+        for agent in self._agents.values():
+            if agent.config.id == identifier:
                 return agent
 
         raise Exception(f"Agent '{identifier}' not found")
@@ -201,13 +214,13 @@ class AgentManager:
         self.active_agent = self.get_agent(agent_id)
 
     def add_tool_to_agent(self, agent_id: str, tool: Union[Callable, Tool]) -> None:
-        if agent_id in self.agents:
-            self.agents[agent_id].config.tools.append(tool)
+        if agent_id in self._agents:
+            self._agents[agent_id].config.tools.append(tool)
             logger.debug(f"Added tool {tool} to agent {agent_id}")
 
     def list_agents(self, exclude: List[str] = []) -> List[dict[str, str]]:
         return [
-            {"id": agent.id, "name": agent.config.name, "description": agent.description}
-            for agent in self.agents.values()
+            {"id_or_name": agent.id, "description": agent.description}
+            for agent in self._agents.values()
             if agent.id not in exclude
         ]

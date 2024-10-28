@@ -6,6 +6,7 @@ from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 
 from ..schemas import AgentConfig, ToolCallToolUseBlock
 from ..tools import ToolManager
+from .llm_model import ChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,9 @@ class BaseClient:
         self.model = config.model
         self.tools = config.tools
         self.tool_manager = ToolManager()
-        if config.model.tool_use_support and len(self.tools) > 0:
-            self.tool_json = self.tool_manager.get_tool_definitions(self.model.id, self.tools)
+        chat_model = ChatModel.from_model_id(config.model)
+        if chat_model.tool_use_support and len(self.tools) > 0:
+            self.tool_json = self.tool_manager.get_tool_definitions(self.model, self.tools)
         else:
             self.tool_json = None
 

@@ -58,7 +58,7 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
     task = task_family.get_tasks()[task_id]
 
     agent_config = AgentConfig(
-        name="cue_cli",
+        id="cue_cli",
         model=ChatModel.GPT_4O_MINI,
         temperature=0.8,
         max_tokens=2000,
@@ -93,7 +93,7 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
     score = task_family.score(task, str(submission))
     result = {
         "task_id": task["id"],
-        "model": model.model_id,
+        "model": model,
         "submission": submission,
         "score": score,
         "metadata": metadata.model_dump() if metadata else None,
