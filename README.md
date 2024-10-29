@@ -1,4 +1,4 @@
-# Cue (mini-agent)
+# Cue
 
 A lightweight multi-agent system.
 
@@ -100,13 +100,9 @@ If you want to print debug log, set the following environment first,
 export CUE_LOG="debug"
 ```
 
-## Additional Information
+## Diagram
 
-- **Dependencies**: Dependencies are managed using Rye, which simplifies package management and setup.
-- **Scripts**: The `setup.sh` script handles the installation of dependencies, while `run.sh` starts the CLI client in development mode.
-- **Environment**: Ensure you update the `.env` file with the necessary API keys before running the application.
-
-For more detailed documentation or troubleshooting, please refer to the project documentation.
+![Diagram](assets/diagram.png)
 
 ## Testing
 
