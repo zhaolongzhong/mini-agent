@@ -1,8 +1,8 @@
 from typing import Dict
 
-from ..llm.llm_model import ChatModel
 from ..schemas import AgentConfig
 from ..tools._tool import Tool
+from ..llm.llm_model import ChatModel
 
 default_model = ChatModel.GPT_4O_MINI.id
 

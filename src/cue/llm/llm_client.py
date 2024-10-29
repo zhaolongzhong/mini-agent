@@ -1,11 +1,11 @@
 import logging
 
 from ..schemas import AgentConfig, CompletionRequest, CompletionResponse
-from .anthropic_client import AnthropicClient
-from .gemini_client import GeminiClient
 from .llm_model import ChatModel
 from .llm_request import LLMRequest
+from .gemini_client import GeminiClient
 from .openai_client import OpenAIClient
+from .anthropic_client import AnthropicClient
 
 logger = logging.getLogger(__name__)
 

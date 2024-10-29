@@ -1,11 +1,11 @@
 import uuid
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
 
-from sqlalchemy import Column, DateTime, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Text, Column, DateTime, func
+from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from ..config import get_settings
 

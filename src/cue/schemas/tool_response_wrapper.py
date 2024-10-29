@@ -1,9 +1,9 @@
-from typing import List, Optional, Union
+from typing import List, Union, Optional
 
-from anthropic.types import MessageParam as AnthropicMessageParam
-from anthropic.types.beta import BetaMessageParam
-from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
+from anthropic.types import MessageParam as AnthropicMessageParam
+from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
+from anthropic.types.beta import BetaMessageParam
 
 from .author import Author
 

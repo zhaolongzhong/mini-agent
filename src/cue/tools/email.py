@@ -1,9 +1,9 @@
 import json
 import logging
-from typing import ClassVar, Literal
+from typing import Literal, ClassVar
 
 from .base import BaseTool, ToolResult
-from .utils.email_utils import get_email_details, read_email, send_email
+from .utils.email_utils import read_email, send_email, get_email_details
 
 logger: logging.Logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from cue import AgentConfig, AgentManager, RunMetadata, Tool
+from cue import Tool, AgentConfig, RunMetadata, AgentManager
 
 logger = logging.getLogger(__name__)
 

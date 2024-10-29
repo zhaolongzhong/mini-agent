@@ -1,19 +1,19 @@
-import argparse
-import asyncio
-import json
-import logging
 import os
-import subprocess
+import json
 import time
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+import asyncio
+import logging
+import argparse
+import subprocess
 from typing import Any
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import docker
 from tqdm.asyncio import tqdm
 
+from environment.utils import get_logger, setup_logger, generate_session_id
 from environment.task_run import TaskRun
-from environment.utils import generate_session_id, get_logger, setup_logger
 from evals.tool_use.assets.tool_use_task import ToolTaskFamily
 
 logger = get_logger(__name__)

@@ -1,8 +1,8 @@
 import json
-import logging
 import time
-from itertools import islice
+import logging
 from typing import Union
+from itertools import islice
 
 from duckduckgo_search import DDGS
 

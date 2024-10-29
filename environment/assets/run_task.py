@@ -15,9 +15,9 @@ Arguments:
     --output-folder   The directory where output files will be written.
 """
 
-import argparse
 import asyncio
 import logging
+import argparse
 from pathlib import Path
 
 logging.basicConfig(

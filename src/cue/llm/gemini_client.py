@@ -1,19 +1,19 @@
-import logging
 import os
-from pathlib import Path
+import logging
 from typing import Dict, List, Optional
+from pathlib import Path
 
+import openai
 import google.auth
 import google.auth.transport.requests
-import openai
 from google.oauth2 import service_account
 
-from ..memory import MemoryInterface
-from ..schemas import AgentConfig, ErrorResponse, RunMetadata
-from ..schemas.tool_call import AssistantMessage, convert_to_assistant_message
 from ..tools import ToolManager
+from ..memory import MemoryInterface
+from ..schemas import AgentConfig, RunMetadata, ErrorResponse
 from .base_client import BaseClient
 from .llm_request import LLMRequest
+from ..schemas.tool_call import AssistantMessage, convert_to_assistant_message
 
 logger = logging.getLogger(__name__)
 

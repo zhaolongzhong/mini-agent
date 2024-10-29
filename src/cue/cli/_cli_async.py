@@ -1,18 +1,18 @@
-import argparse
-import asyncio
-import json
-import logging
 import sys
+import json
+import asyncio
+import logging
+import argparse
 from concurrent.futures import ThreadPoolExecutor
 
-from rich.console import Console
 from rich.text import Text
 from rich.theme import Theme
+from rich.console import Console
 
-from .._agent_manager import AgentManager
-from ..cli._agents import get_agent_configs
-from ..schemas import CompletionResponse, RunMetadata
+from ..schemas import RunMetadata, CompletionResponse
 from ..utils.logs import setup_logging
+from ..cli._agents import get_agent_configs
+from .._agent_manager import AgentManager
 
 setup_logging()
 

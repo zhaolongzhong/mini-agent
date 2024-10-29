@@ -1,11 +1,11 @@
+import shutil
 import asyncio
 import logging
-import shutil
 import tempfile
 
 import pytest
 
-from cue import AgentConfig, AsyncCueClient, Tool
+from cue import Tool, AgentConfig, AsyncCueClient
 
 logger = logging.getLogger(__name__)
 

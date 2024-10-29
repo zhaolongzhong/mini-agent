@@ -1,19 +1,19 @@
+import time
 import asyncio
 import logging
-import time
-from typing import Callable, Dict, List, Optional, Union
+from typing import Dict, List, Union, Callable, Optional
 
 from openai.types.chat import ChatCompletionUserMessageParam
 
 from ._agent import Agent
 from .schemas import (
-    AgentConfig,
-    AgentHandoffResult,
     Author,
+    AgentConfig,
+    RunMetadata,
+    MessageParam,
+    AgentHandoffResult,
     CompletionResponse,
     ConversationContext,
-    MessageParam,
-    RunMetadata,
     ToolResponseWrapper,
 )
 from .tools._tool import Tool

@@ -1,9 +1,9 @@
-from collections import defaultdict
+from typing import Literal, ClassVar, Optional, get_args
 from pathlib import Path
-from typing import ClassVar, Literal, Optional, get_args
+from collections import defaultdict
 
-from .base import BaseTool, CLIResult, ToolError, ToolResult
 from .run import MAX_RESPONSE_LEN, TRUNCATED_MESSAGE, run
+from .base import BaseTool, CLIResult, ToolError, ToolResult
 
 Command = Literal[
     "view",

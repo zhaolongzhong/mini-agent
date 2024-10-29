@@ -1,7 +1,7 @@
 # src/cue/schemas/agent_config.py
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field, BaseModel
 
 from .feature_flag import FeatureFlag
 from .storage_type import StorageType

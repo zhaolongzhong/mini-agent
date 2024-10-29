@@ -1,16 +1,16 @@
 import io
-import logging
 import os
-import tarfile
 import time
-from datetime import datetime
-from pathlib import Path
+import logging
+import tarfile
 from typing import Any
+from pathlib import Path
+from datetime import datetime
 
 import docker
 
-from .docker_image_utils import build_image
 from .task_run import TaskRun
+from .docker_image_utils import build_image
 
 
 def remove_container(client: docker.DockerClient, name: str, logger: logging.Logger):

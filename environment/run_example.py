@@ -1,19 +1,19 @@
-import argparse
-import asyncio
 import json
-import logging
 import time
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+import asyncio
+import logging
+import argparse
 from typing import Any
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import docker
 from tqdm import tqdm
 
+from environment.utils import get_logger, setup_logging, generate_session_id
+from environment.task_run import TaskRun
 from environment.constants import RUN_DIR
 from environment.container import run_in_container
-from environment.task_run import TaskRun
-from environment.utils import generate_session_id, get_logger, setup_logging
 
 logger = get_logger(__name__)
 logger.setLevel(logging.DEBUG)

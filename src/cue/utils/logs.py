@@ -1,10 +1,10 @@
-import logging
 import os
+import logging
 from logging.handlers import TimedRotatingFileHandler
 
-from rich.console import Console
 from rich.style import Style
 from rich.theme import Theme
+from rich.console import Console
 
 _logger: logging.Logger = logging.getLogger("mini-agent")
 httpx_logger: logging.Logger = logging.getLogger("httpx")

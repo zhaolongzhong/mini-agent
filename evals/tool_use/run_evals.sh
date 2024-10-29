@@ -25,4 +25,4 @@ fi
 cd evals/tool_use
 
 # Run the evaluation script
-rye run python run_evals.py
+rye run python -m run_evals

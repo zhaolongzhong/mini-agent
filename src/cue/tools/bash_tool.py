@@ -1,8 +1,8 @@
 # https://github.com/anthropics/anthropic-quickstarts/blob/main/computer-use-demo/computer_use_demo/tools/bash.py
-import asyncio
 import os
+import asyncio
+from typing import Literal, ClassVar, Optional
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import ClassVar, Literal, Optional
 
 from .base import BaseTool, CLIResult, ToolError, ToolResult
 

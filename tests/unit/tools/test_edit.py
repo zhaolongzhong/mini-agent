@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cue.tools import CLIResult, EditTool, ToolError, ToolResult
+from cue.tools import EditTool, CLIResult, ToolError, ToolResult
 
 
 @pytest.mark.asyncio

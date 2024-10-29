@@ -3,7 +3,7 @@ from typing import List
 
 import pytest
 
-from cue import AgentConfig, AsyncCueClient, Tool
+from cue import Tool, AgentConfig, AsyncCueClient
 
 logger = logging.getLogger(__name__)
 

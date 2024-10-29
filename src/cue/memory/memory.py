@@ -3,11 +3,10 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from openai.types.chat import ChatCompletion
-from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
+from openai.types.chat import ChatCompletion, ChatCompletionToolMessageParam as ToolMessageParam
 
-from ..schemas import AgentConfig, AssistantMessage, CompletionResponse, StorageType, ToolResponseWrapper
+from ..schemas import AgentConfig, StorageType, AssistantMessage, CompletionResponse, ToolResponseWrapper
 from ..schemas.error import ErrorResponse
 from ..schemas.message import MessageParam
 from .messages_operations import MessageOperations

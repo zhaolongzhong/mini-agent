@@ -55,10 +55,12 @@ dev-dependencies = [
 ]
 
 [tool.rye.scripts]
-format = { chain = ["format:ruff", "fix:ruff"] }
-"format:black" = "black ."
+format = { chain = [
+  "format:ruff",
+  "fix:ruff",
+  "format:ruff",
+]}
 "format:ruff" = "ruff format ."
-"format:isort" = "isort ."
 
 lint = { chain = ["check:ruff"] }
 "check:ruff" = "ruff check ."
@@ -88,10 +90,10 @@ exclude = ["alembic"]
 
 [tool.ruff.lint]
 select = [
+    "I",  # isort
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
     "F",  # pyflakes
-    "I",  # isort
     "B",  # flake8-bugbear
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
@@ -108,6 +110,14 @@ ignore = [
     "UP035",  # Ignore use of Dict or List
     "UP038",  # Ignore (X, Y)
 ]
+
+
+[tool.ruff.lint.isort]
+length-sort = true
+length-sort-straight = true
+combine-as-imports = true
+extra-standard-library = ["typing_extensions"]
+known-first-party = ["cue", "tests", "environment", "evals"]
 
 [tool.ruff.format]
 docstring-code-format = true

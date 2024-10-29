@@ -1,6 +1,6 @@
 import asyncio
 
-from cue import AgentConfig, AsyncCueClient, ChatModel
+from cue import ChatModel, AgentConfig, AsyncCueClient
 
 
 async def main():

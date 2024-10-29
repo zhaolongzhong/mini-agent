@@ -1,12 +1,12 @@
 import json
 import logging
-from typing import Any, ClassVar, List, Literal, Union
+from typing import Any, List, Union, Literal, ClassVar
 
 import requests
 from bs4 import BeautifulSoup
 
 from .base import BaseTool, ToolResult
-from .utils.search import duckduckgo_search, search_news
+from .utils.search import search_news, duckduckgo_search
 
 logger: logging.Logger = logging.getLogger(__name__)
 

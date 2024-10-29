@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from cue.llm import AnthropicClient, ChatModel
+from cue.llm import ChatModel, AnthropicClient
 from cue.schemas import AgentConfig
 
 logger = logging.getLogger(__name__)

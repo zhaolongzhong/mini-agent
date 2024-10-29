@@ -1,18 +1,18 @@
-from typing import Any, Optional, Union, cast
+from typing import Any, Union, Optional, cast
 
+from pydantic import Field, BaseModel, ConfigDict
 from anthropic.types import (
     Message as AnthropicMessage,
+    ToolUseBlock,
 )
-from anthropic.types import ToolUseBlock
+from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall, ChatCompletionAssistantMessageParam
 from anthropic.types.beta import (
-    BetaMessageParam,
     BetaTextBlock,
+    BetaMessageParam,
     BetaTextBlockParam,
     BetaToolUseBlockParam,
 )
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
-from openai.types.chat import ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionMessageToolCall
-from pydantic import BaseModel, ConfigDict, Field
 
 from ..schemas.error import ErrorResponse
 

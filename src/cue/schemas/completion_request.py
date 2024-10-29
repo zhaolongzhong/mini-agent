@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field, BaseModel
 
 from .author import Author
 from .run_metadata import RunMetadata

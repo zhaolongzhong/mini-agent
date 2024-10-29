@@ -1,8 +1,8 @@
-import base64
-import json
 import os
+import json
+import base64
+from typing import Literal, ClassVar, Optional
 from dataclasses import dataclass
-from typing import ClassVar, Literal, Optional
 
 from cue.tools.utils.function_utils import get_definition_by_model
 

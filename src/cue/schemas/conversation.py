@@ -1,8 +1,8 @@
 import uuid
+from typing import Union, Optional
 from datetime import datetime
-from typing import Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field, BaseModel, ConfigDict
 
 from .task import Task
 

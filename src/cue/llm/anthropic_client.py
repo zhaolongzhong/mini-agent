@@ -1,11 +1,11 @@
+import os
 import json
 import logging
-import os
 
 import anthropic
 
-from ..schemas import AgentConfig, CompletionRequest, CompletionResponse, ErrorResponse
 from ..utils import count_token, debug_print_messages
+from ..schemas import AgentConfig, ErrorResponse, CompletionRequest, CompletionResponse
 from .system_prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)

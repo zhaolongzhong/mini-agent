@@ -1,22 +1,22 @@
-import json
-import logging
 import os
 import re
-from typing import Dict, List, Optional, Tuple
+import json
+import logging
+from typing import Dict, List, Tuple, Optional
 
 import openai
+from pydantic import BaseModel
 from openai.types.chat import ChatCompletionMessageToolCall
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.completion_create_params import Function
-from pydantic import BaseModel
 
 from cue.utils.token_utils import count_token
 
-from ..schemas import AgentConfig, CompletionRequest, CompletionResponse, ErrorResponse
-from ..utils import debug_print_messages, generate_id
+from ..utils import generate_id, debug_print_messages
+from ..schemas import AgentConfig, ErrorResponse, CompletionRequest, CompletionResponse
 from .llm_request import LLMRequest
-from .openai_client_utils import JSON_FORMAT, O1_MODEL_SYSTEM_PROMPT_BASE
 from .system_prompt import SYSTEM_PROMPT
+from .openai_client_utils import JSON_FORMAT, O1_MODEL_SYSTEM_PROMPT_BASE
 
 logger = logging.getLogger(__name__)
 

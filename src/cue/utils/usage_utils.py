@@ -1,14 +1,14 @@
-import json
 import os
-from datetime import datetime, timedelta
+import json
+from typing import Any, Dict, List, Optional
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
 
-from rich.console import Console
+from rich.text import Text
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
+from rich.console import Console
 
 from ..schemas.completion_respone import CompletionResponse
 

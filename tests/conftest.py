@@ -5,8 +5,8 @@ from typing import Iterator
 
 import pytest
 
-from cue.llm.llm_model import ChatModel
 from cue.utils.logs import setup_logging
+from cue.llm.llm_model import ChatModel
 
 # Global configuration dictionary
 test_config = {"default_model": ChatModel.GPT_4O_MINI}
