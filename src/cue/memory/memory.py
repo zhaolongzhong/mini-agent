@@ -3,9 +3,6 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from anthropic.types import Message as AnthropicMessage
-from anthropic.types import MessageParam as AntropicMessageParam
-from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
@@ -78,12 +75,7 @@ class InMemoryStorage(MemoryInterface):
         for msg in self.messages:
             if model and "claude" in model:
                 if isinstance(msg, CompletionResponse):
-                    if isinstance(msg.response, (AnthropicMessage, PromptCachingBetaMessage)):
-                        result.append(msg.response)
-                    elif isinstance(msg.error, ErrorResponse):
-                        result.append(AntropicMessageParam(role="assistant", content=msg.error.model_dump_json()))
-                    else:
-                        logger.debug(f"Unexpected subclass of CompletionResponse: {type(msg)}, {model}")
+                    result.append(msg.to_params())
                 elif isinstance(msg, MessageParam):
                     result.append(msg)
                 elif isinstance(msg, ToolResponseWrapper):
@@ -93,7 +85,7 @@ class InMemoryStorage(MemoryInterface):
             else:
                 if isinstance(msg, CompletionResponse):
                     if isinstance(msg.response, ChatCompletion):
-                        result.append(msg.response.choices[0].message)
+                        result.append(msg.to_params())
                     elif isinstance(msg.error, ErrorResponse):
                         result.append(AssistantMessage(role="assistant", content=msg.error.model_dump_json()))
                     else:
@@ -103,6 +95,11 @@ class InMemoryStorage(MemoryInterface):
                 elif isinstance(msg, ToolResponseWrapper):
                     for item in msg.tool_messages:
                         result.append(item)
+                elif isinstance(msg, dict):
+                    result.append(msg)
+                elif hasattr(msg, "role") and msg.role == "user":
+                    # ChatCompletionUserMessageParam
+                    result.append(msg)
                 else:
                     raise Exception(f"Unexpected message type: {type(msg)}, {msg}, {model}")
 
@@ -159,14 +156,14 @@ class DatabaseStorage(MemoryInterface):
                     message = MessageParam(**message_dict)
                     schema_messages.append(message)
                 else:
-                    print(f"Invalid message_dict. msg: {msg}")
+                    logger.debug(f"Invalid message_dict. msg: {msg}")
                     message_dict.update({"role": msg.role, "content": msg.content})
                     message = MessageParam(**message_dict)
                     schema_messages.append(message)
             except json.JSONDecodeError:
-                print(f"Failed to decode JSON for msg: {msg}")
+                logger.error(f"Failed to decode JSON for msg: {msg}")
             except Exception as e:
-                print(f"An error occurred: {e}")
+                logger.error(f"An error occurred: {e}")
         return schema_messages
 
 

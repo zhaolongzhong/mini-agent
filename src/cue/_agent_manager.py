@@ -3,6 +3,8 @@ import logging
 import time
 from typing import Callable, Dict, List, Optional, Union
 
+from openai.types.chat import ChatCompletionUserMessageParam
+
 from ._agent import Agent
 from .schemas import (
     AgentConfig,
@@ -99,6 +101,18 @@ class AgentManager:
                     continue
                 else:
                     await self.active_agent.memory.save(tool_result_wrapper)
+                    if tool_result_wrapper.base64_images:
+                        tool_result_content = {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{tool_result_wrapper.base64_images[0]}"},
+                        }
+
+                        contents = [
+                            {"type": "text", "text": "Please check previous query info related to this image"},
+                            tool_result_content,
+                        ]
+                        message_param = ChatCompletionUserMessageParam(role="user", content=contents)
+                        await self.active_agent.memory.save(message_param)
             else:
                 raise Exception(f"Unexpected response: {tool_result_wrapper}")
 

@@ -26,4 +26,8 @@ def debug_print_messages(messages: List[Dict[str, Any]], indent: int = 2, tag: O
                 logger.debug(f"{tag} Message {i}/{size}: {message}")
 
     except Exception as e:
-        logger.error(f"debug_print error: {e}")
+        # when it's image, Object of type SerializationIterator is not JSON serializable
+        if "SerializationIterator" not in str(e):
+            logger.error(f"debug_print error: {e}")
+        else:
+            logger.debug("debug_print skip print last message, it might be image")

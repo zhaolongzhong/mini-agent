@@ -10,6 +10,8 @@ from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.completion_create_params import Function
 from pydantic import BaseModel
 
+from cue.utils.token_utils import count_token
+
 from ..schemas import AgentConfig, CompletionRequest, CompletionResponse, ErrorResponse
 from ..utils import debug_print_messages, generate_id
 from .llm_request import LLMRequest
@@ -60,6 +62,18 @@ class OpenAIClient(LLMRequest):
                     f"{SYSTEM_PROMPT}{' ' + request.system_prompt_suffix if request.system_prompt_suffix else ''}"
                 )
                 system_message = {"role": "system", "content": system_prompt}
+                system_message_tokens = count_token(str(system_message))
+                tool_tokens = count_token(str(request.tool_json))
+                message_tokens = count_token(str(messages))
+                input_tokens = {
+                    "system_tokens": system_message_tokens,
+                    "tool_tokens": tool_tokens,
+                    "message_tokens": message_tokens,
+                }
+                logger.debug(
+                    f"input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
+                    f"\ntools_json: {json.dumps(request.tool_json, indent=4)}"
+                )
                 messages.insert(0, system_message)
                 if self.tool_json:
                     response = await self.client.chat.completions.create(

@@ -17,10 +17,10 @@ async def test_simple_script_execution(python_runner):
 print('Hello, World!')
 """
     result = await python_runner(script)
-    assert result.success
-    assert result.stdout.strip() == "Hello, World!"
-    assert result.stderr == ""
-    assert result.exit_code == 0
+    assert result.output is not None
+    assert result.output.strip() == "Hello, World!"
+    assert result.error is None
+    assert result.system == "0"
 
 
 @pytest.mark.asyncio
@@ -33,10 +33,10 @@ print(f'Pi is approximately {math.pi}')
 print(f'Random number: {random.randint(1, 100)}')
 """
     result = await python_runner(script)
-    assert result.success
-    assert "Pi is approximately 3.14" in result.stdout
-    assert result.stderr == ""
-    assert result.exit_code == 0
+    assert result.output is not None
+    assert "Pi is approximately 3.14" in result.output
+    assert result.error is None
+    assert result.system == "0"
 
 
 @pytest.mark.asyncio
@@ -47,9 +47,10 @@ import os
 os.system('echo "This should not work"')
 """
     result = await python_runner(script)
-    assert not result.success
-    assert "Import of module 'os' is not allowed" in result.stderr
-    assert result.exit_code == 1
+    assert result.output is None
+    assert result.error is not None
+    assert "Import of module 'os' is not allowed" in result.error
+    assert result.system == "1"
 
 
 @pytest.mark.asyncio
@@ -61,9 +62,10 @@ while True:
     time.sleep(1)
 """
     result = await python_runner(script)
-    assert not result.success
-    assert "Script execution timed out" in result.stderr
-    assert result.exit_code == 124
+    assert result.output is None
+    assert result.error is not None
+    assert "Script execution timed out" in result.error
+    assert result.system == "124"
 
 
 @pytest.mark.asyncio
@@ -75,10 +77,10 @@ async def test_script_from_file(python_runner):
 
         result = await python_runner(temp_file.name, is_file=True)
 
-    assert result.success
-    assert result.stdout.strip() == "Hello from file!"
-    assert result.stderr == ""
-    assert result.exit_code == 0
+    assert result.output is not None
+    assert result.output.strip() == "Hello from file!"
+    assert result.error is None
+    assert result.system == "0"
 
 
 @pytest.mark.asyncio
@@ -88,9 +90,10 @@ async def test_script_with_syntax_error(python_runner):
 print('Missing closing parenthesis'
 """
     result = await python_runner(script)
-    assert not result.success
-    assert "Invalid Python syntax" in result.stderr
-    assert result.exit_code == 1
+    assert result.output is None
+    assert result.error is not None
+    assert "Invalid Python syntax" in result.error
+    assert result.system == "1"
 
 
 @pytest.mark.asyncio
@@ -100,9 +103,10 @@ async def test_script_with_runtime_error(python_runner):
 x = 1 / 0
 """
     result = await python_runner(script)
-    assert not result.success
-    assert result.stderr != ""
-    assert result.exit_code == 1
+    assert result.output is None
+    assert result.error is not None
+    assert "ZeroDivisionError" in result.error
+    assert result.system == "1"
 
 
 @pytest.mark.asyncio
@@ -117,9 +121,10 @@ import random  # This should fail
 print(math.pi)
 """
     result = await restricted_runner(script)
-    assert not result.success
-    assert "Import of module 'random' is not allowed" in result.stderr
-    assert result.exit_code == 1
+    assert result.output is None
+    assert result.error is not None
+    assert "Import of module 'random' is not allowed" in result.error
+    assert result.system == "1"
 
 
 @pytest.mark.asyncio
@@ -133,6 +138,7 @@ async def test_file_size_limit(python_runner):
 
         result = await python_runner(temp_file.name, is_file=True)
 
-    assert not result.success
-    assert "exceeds maximum size" in result.stderr
-    assert result.exit_code == 1
+    assert result.output is None
+    assert result.error is not None
+    assert "exceeds maximum size" in result.error
+    assert result.system == "1"

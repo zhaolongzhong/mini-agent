@@ -43,7 +43,7 @@ def get_service():
     return build("drive", "v3", credentials=creds)
 
 
-def get_files_or_folders(query: str = "", page_size: int = 10):
+def get_files_or_folders(query: str = "", page_size: int = 10) -> list[any]:
     """Lists all folders in the user's Drive."""
     service = get_service()
 
@@ -62,7 +62,7 @@ def get_files_or_folders(query: str = "", page_size: int = 10):
     results = []
     if not items:
         message = "No files or folders found."
-        return message
+        return [message]
     else:
         for item in items:
             results.append(
@@ -74,7 +74,7 @@ def get_files_or_folders(query: str = "", page_size: int = 10):
     return results
 
 
-def get_by_folder_id(folder_id):
+def get_by_folder_id(folder_id) -> list[any]:
     """Lists all files in a specified folder."""
     service = get_service()
 
@@ -86,7 +86,7 @@ def get_by_folder_id(folder_id):
     if not items:
         message = f"No files found in folder ID {folder_id}."
         logger.error(message)
-        return message
+        return [message]
     else:
         for item in items:
             print(f"{item['name']} ({item['id']})")
@@ -99,7 +99,7 @@ def get_by_folder_id(folder_id):
     return results
 
 
-def download_file(file_id, file_name, directory="."):
+def download_file(file_id, file_name, directory=".") -> str:
     """Downloads a file from the user's Drive."""
     service = get_service()
 
@@ -115,7 +115,7 @@ def download_file(file_id, file_name, directory="."):
     return f"File {file_path} downloaded successfully."
 
 
-def create_folder(folder_name, parent_folder_id=None):
+def create_folder(folder_name, parent_folder_id=None) -> str:
     """Creates a folder in the user's Drive. If parent_folder_id is provided, the folder is created under the specified parent folder."""
     service = get_service()
 
@@ -127,7 +127,7 @@ def create_folder(folder_name, parent_folder_id=None):
     return f"Folder created successfully. Id: {folder.get('id')}"
 
 
-def upload_file_to_folder(file_name, folder_id):
+def upload_file_to_folder(file_name, folder_id) -> str:
     """Uploads a file to a specified folder in the user's Drive."""
     service = get_service()
 

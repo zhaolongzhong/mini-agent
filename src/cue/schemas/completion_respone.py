@@ -1,11 +1,17 @@
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 from anthropic.types import (
     Message as AnthropicMessage,
 )
 from anthropic.types import ToolUseBlock
+from anthropic.types.beta import (
+    BetaMessageParam,
+    BetaTextBlock,
+    BetaTextBlockParam,
+    BetaToolUseBlockParam,
+)
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
-from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
+from openai.types.chat import ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionMessageToolCall
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..schemas.error import ErrorResponse
@@ -112,3 +118,36 @@ class CompletionResponse:
         return (
             f"Text: {self.get_text()}, Tools: {self.get_tool_calls()}, Usage: {self.get_usage()} Response: {response}"
         )
+
+    def to_params(self):
+        response = self.response
+        error = self.error
+        if "claude" in self.model:
+            if isinstance(response, (AnthropicMessage, PromptCachingBetaMessage)):
+                return BetaMessageParam(role="assistant", content=self._response_to_anthropic_params(response))
+            elif isinstance(self.error, ErrorResponse):
+                return BetaMessageParam(role="assistant", content=error.model_dump_json())
+            else:
+                print(f"Unexpected subclass of CompletionResponse: {type(response)}, {self.model}")
+        else:
+            if isinstance(self.response, ChatCompletion):
+                return self._response_to_chat_completion_params(self.response)
+            elif isinstance(self.error, ErrorResponse):
+                return ChatCompletionAssistantMessageParam(role="assistant", content=error.model_dump_json())
+            else:
+                print(f"Unexpected subclass of CompletionResponse: {type(response)}, {self.model}")
+
+    def _response_to_anthropic_params(
+        self,
+        response: Union[AnthropicMessage, PromptCachingBetaMessage],
+    ) -> list[Union[BetaTextBlockParam, BetaToolUseBlockParam]]:
+        res: list[Union[BetaTextBlockParam, BetaToolUseBlockParam]] = []
+        for block in response.content:
+            if isinstance(block, BetaTextBlock):
+                res.append({"type": "text", "text": block.text})
+            else:
+                res.append(cast(BetaToolUseBlockParam, block.model_dump()))
+        return res
+
+    def _response_to_chat_completion_params(self, response: ChatCompletion):
+        return cast(ChatCompletionAssistantMessageParam, response.choices[0].message.model_dump())

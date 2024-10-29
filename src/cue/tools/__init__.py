@@ -6,6 +6,7 @@ from .drive import GoogleDriveTool
 from .edit import EditTool
 from .email import EmailTool
 from .read_file import ReadTool
+from .read_image import ReadImageTool
 from .run_script import PythonRunner
 from .write_to_file import WriteTool
 
@@ -25,4 +26,5 @@ __all__ = [
     "PythonRunner",
     "ReadTool",
     "WriteTool",
+    "ReadImageTool",
 ]

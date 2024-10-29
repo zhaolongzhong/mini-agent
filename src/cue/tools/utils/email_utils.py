@@ -2,7 +2,6 @@ import base64
 import logging
 import os.path
 from email.mime.text import MIMEText
-from typing import Union
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -57,7 +56,7 @@ def get_user_email(service):
     return user_info.get("email")
 
 
-def read_email(max_count: str = 10) -> Union[str, list[dict]]:
+def read_email(max_count: str = 10) -> list[dict]:
     """Shows basic usage of the Gmail API.
     Lists the subject lines of the last 10 emails in the user's inbox.
     """
@@ -68,7 +67,7 @@ def read_email(max_count: str = 10) -> Union[str, list[dict]]:
     results = []
     if not messages:
         logger.error("No messages found.")
-        return "No messages found."
+        return ["No messages found."]
     else:
         for message in messages:
             msg = service.users().messages().get(userId="me", id=message["id"]).execute()
@@ -120,7 +119,7 @@ def get_email_details(message_id) -> dict:
     return email_data
 
 
-def create_message(to, subject, message_text):
+def _create_message(to, subject, message_text):
     message = MIMEText(message_text)
     message["to"] = to
     message["subject"] = subject
@@ -131,7 +130,7 @@ def create_message(to, subject, message_text):
 def send_message(service, user_id, message) -> str:
     try:
         message = service.users().messages().send(userId=user_id, body=message).execute()
-        return "success, message id: {}".format(message["id"])
+        return "Sent to {} successfully, message id: {}".format(user_id, message["id"])
     except Exception as error:
         logger.error(f"An error occurred: {error}")
         return f"An error occurred: {error}"
@@ -142,7 +141,7 @@ def send_email(to_email: str, subject: str, content: str) -> str:
     Sends an email.
     """
     service = get_service()
-    message = create_message(to_email, subject, content)
+    message = _create_message(to_email, subject, content)
     return send_message(service, "me", message)
 
 

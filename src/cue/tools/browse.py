@@ -1,10 +1,11 @@
+import json
 import logging
 from typing import Any, ClassVar, List, Literal, Union
 
 import requests
 from bs4 import BeautifulSoup
 
-from .base import BaseTool
+from .base import BaseTool, ToolResult
 from .utils.search import duckduckgo_search, search_news
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -16,26 +17,27 @@ commands = {
 }
 
 
-def search(args: list[str]) -> Union[str, list[any]]:
+def search(args: list[str]) -> ToolResult:
     combined_query = " ".join(args)
     try:
         text = duckduckgo_search(combined_query)
         # text = google_search(combined_query)
+        return ToolResult(output=text)
     except Exception as e:
         logger.error(f"Error fetching with web_search for {combined_query}: {e}")
         text = f"Error fetching the page. {e}"
-    return text
+        return ToolResult(error=text)
 
 
-def news(args: list[str]) -> Union[str, list[any]]:
+def news(args: list[str]) -> ToolResult:
     combined_query = " ".join(args)
     results = search_news(combined_query)
     if not results:
-        return "No news found. Try search."
-    return results
+        results = ["No news found. Try search."]
+    return ToolResult(output=" ".join(results))
 
 
-def open_url(url: str) -> str:
+def open_url(url: str) -> ToolResult:
     """Fetches and returns the text content of a specified web page.
 
     This function sends a request to the given URL and extracts the text content
@@ -56,7 +58,7 @@ def open_url(url: str) -> str:
             # pylint: disable=broad-exception-raised
             # raise Exception(f"Error fetching {url}: HTTP {response.status_code}")
             logger.error(f"Error fetching {url}: HTTP {response.status_code}")
-            return f"Error fetching the page. HTTP {response.status_code}"
+            return ToolResult(error=f"Error fetching the page. HTTP {response.status_code}")
 
         # Use BeautifulSoup to parse the HTML content
         soup = BeautifulSoup(response.text, "html.parser")
@@ -70,7 +72,7 @@ def open_url(url: str) -> str:
         # Check for JavaScript requirement
         if "You need to enable JavaScript to run this app." in text:
             logger.warning("Unable to parse page due to JavaScript being required")
-            return "Unable to parse page due to JavaScript being required"
+            return ToolResult(error="Unable to parse page due to JavaScript being required")
         text = remove_newlines(text)
 
         # Calculate visibility percentage
@@ -92,11 +94,11 @@ def open_url(url: str) -> str:
             "pub_date": publish_date if publish_date else "",
             "text": text,
         }
-        return result
+        return ToolResult(output=json.dumps(result))
 
     except Exception as e:
         logger.error("An error occurred: %s", e)
-        return "Cannot open page."
+        return ToolResult(error=f"Cannot open page: {e}.")
 
 
 def find_publish_date(soup):

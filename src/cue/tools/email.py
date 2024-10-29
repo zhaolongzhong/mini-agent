@@ -1,7 +1,8 @@
+import json
 import logging
-from typing import ClassVar, Literal, Union
+from typing import ClassVar, Literal
 
-from .base import BaseTool
+from .base import BaseTool, ToolResult
 from .utils.email_utils import get_email_details, read_email, send_email
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -21,10 +22,10 @@ class EmailTool(BaseTool):
     def __init__(self):
         super().__init__()
 
-    async def __call__(self, command: str, args: list[str]) -> Union[str, list[any]]:
+    async def __call__(self, command: str, args: list[str]) -> ToolResult:
         return await self.email(command, args)
 
-    async def email(self, command: str, args: list[str]) -> Union[str, list[any]]:
+    async def email(self, command: str, args: list[str]) -> ToolResult:
         """Manage emails, including reading inbox, reading email details, and sending emails.
 
         Args:
@@ -35,7 +36,7 @@ class EmailTool(BaseTool):
             args (list[str]): Command arguments.
 
         Returns:
-            Union[str, list[any]]: Email operation result or error message.
+            ToolResult: Email operation result or error message.
 
         """
         logger.debug(f"email: {command}, {args}")
@@ -44,17 +45,19 @@ class EmailTool(BaseTool):
                 max_count = int(args[0])
             else:
                 max_count = 10
-            return read_email(max_count)
+            emails_dict = read_email(max_count)  # return a list of email dict
+            return ToolResult(output=", ".join(emails_dict))
         elif command == commands["read_detail"]:
             if len(args) == 0:
                 return "Email ID required for reading details."
             email_id = args[0]
-            return get_email_details(email_id)
+            email_detail = get_email_details(email_id)
+            return ToolResult(output=json.dumps(email_detail))
         elif command == commands["send"]:
             if len(args) < 3:
                 return "recipient, subject, and message text are required for sending an email."
             recipient, subject, message_text = args[0], args[1], args[2]
-            send_email(recipient, subject, message_text)
-            return f"Email sent to {recipient}"
+            res = send_email(recipient, subject, message_text)
+            return ToolResult(output=res)
         else:
-            return "Command not found."
+            return ToolResult(error="Command not found.")

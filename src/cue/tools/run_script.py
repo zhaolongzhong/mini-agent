@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, Dict, Literal, Optional, Union
 
-from .base import BaseTool
+from .base import BaseTool, ToolResult
 
 
 @dataclass
@@ -48,9 +48,10 @@ class PythonRunner(BaseTool):
         self.allowed_paths = allowed_paths or set()
         self.timeout = timeout or self.DEFAULT_TIMEOUT
 
-    async def __call__(self, script: Union[str, Path], is_file: bool = False, **kwargs):
+    async def __call__(self, script: Union[str, Path], is_file: bool = False, **kwargs) -> ToolResult:
         """Execute a Python script from content or file."""
-        return await self.run_script(script, is_file)
+        res = await self.run_script(script, is_file)
+        return self.convert_script_to_tool_result(res)
 
     def _validate_script_file(self, file_path: Union[str, Path]) -> Optional[str]:
         """Validate a script file before execution."""
@@ -207,3 +208,32 @@ with open("{script_path}") as f:
                     os.unlink(script_path)
                 except OSError:
                     pass
+
+    def convert_script_to_tool_result(self, script_result: ScriptResult) -> ToolResult:
+        """
+        Convert a ScriptResult instance to a ToolResult instance.
+
+        The conversion logic:
+        - If success is True, stdout goes to output
+        - If success is False, stderr goes to error
+        - If exception exists, it's added to error (with stderr if present)
+        - System field gets exit_code if present
+        - base64_image is always None as ScriptResult doesn't have equivalent
+        """
+        error = None
+        if not script_result.success:
+            error_parts = []
+            if script_result.stderr:
+                error_parts.append(script_result.stderr)
+            if script_result.exception:
+                error_parts.append(f"Exception: {script_result.exception}")
+            error = "\n".join(error_parts) if error_parts else None
+
+        system = str(script_result.exit_code) if script_result.exit_code is not None else None
+
+        return ToolResult(
+            output=script_result.stdout if script_result.success else None,
+            error=error,
+            system=system,
+            base64_image=None,
+        )

@@ -1,9 +1,6 @@
-import pytest
-
-from .hello_world import TaskFamily
+from evals.hello_world.hello_world import TaskFamily
 
 
-@pytest.fixture
 def task_family():
     return TaskFamily()
 

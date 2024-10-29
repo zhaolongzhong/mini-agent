@@ -9,6 +9,7 @@ from .drive import GoogleDriveTool
 from .edit import EditTool
 from .email import EmailTool
 from .read_file import ReadTool
+from .read_image import ReadImageTool
 from .run_script import PythonRunner
 from .utils.function_to_json import function_to_json
 from .utils.function_utils import get_definition_by_model
@@ -26,6 +27,7 @@ class Tool(Enum):
     Browse = BrowseTool.name
     Email = EmailTool.name
     Drive = GoogleDriveTool.name
+    Image = ReadImageTool.name
 
 
 class ToolManager:
@@ -39,6 +41,8 @@ class ToolManager:
             Tool.Browse.value: BrowseTool(),
             Tool.Email.value: EmailTool(),
             Tool.Drive.value: GoogleDriveTool(),
+            Tool.Drive.value: GoogleDriveTool(),
+            Tool.Image.value: ReadImageTool(),
         }
         self._definition_cache: Dict[str, dict] = {}
 

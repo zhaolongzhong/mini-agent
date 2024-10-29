@@ -5,6 +5,7 @@ import logging
 from typing import Callable, Dict, List, Optional, Union
 
 from anthropic.types import ToolUseBlock
+from anthropic.types.beta import BetaImageBlockParam, BetaMessageParam, BetaTextBlockParam, BetaToolResultBlockParam
 from openai.types.chat import ChatCompletionMessageToolCall as ToolCall
 from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
 from pydantic import BaseModel
@@ -23,8 +24,7 @@ from .schemas import (
     ToolCallToolUseBlock,
     ToolResponseWrapper,
 )
-from .schemas.anthropic import ToolResultContent, ToolResultMessage
-from .tools import Tool, ToolManager
+from .tools import Tool, ToolManager, ToolResult
 from .utils import record_usage
 
 logger = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
         timeout: int = 30,
         author: Optional[Author] = None,
     ) -> ToolResponseWrapper:
-        tool_responses = []
+        tool_results = []
         tasks = []
 
         for tool_call in tool_calls:
@@ -165,50 +165,91 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
             if tool_name not in self.tool_manager.tools and tool_name not in chat_with_agent:
                 error_message = f"Tool '{tool_name}' not found. {self.tool_manager.tools.keys()}"
                 logger.error(f"{error_message}, tool_call: {tool_call}")
-                tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
+                tool_results.append(self.create_error_response(tool_id, tool_name, error_message))
                 continue
 
             if tool_name == chat_with_agent:
                 handoff_result = await self.chat_with_agent(**kwargs)
                 return ToolResponseWrapper(agent_handoff_result=handoff_result)
-            else:
-                tool_func = self.tool_manager.tools[tool_name]
+
+            tool_func = self.tool_manager.tools[tool_name]
             task = asyncio.create_task(self.run_tool(tool_func, **kwargs))
             tasks.append((task, tool_id, tool_name))
 
+        base64_images = []
         for task, tool_id, tool_name in tasks:
             try:
-                tool_response = await asyncio.wait_for(task, timeout=timeout)
-                tool_responses.append(self.create_success_response(tool_id, tool_name, str(tool_response)))
+                tool_result = await asyncio.wait_for(task, timeout=timeout)
+                base64_image = tool_result.base64_image
+                if base64_image:
+                    base64_images.append(base64_image)
+                tool_results.append(self.create_success_response(tool_id, tool_result, tool_name))
             except asyncio.TimeoutError:
                 error_message = f"Timeout while calling tool <{tool_name}> after {timeout}s."
-                tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
+                tool_results.append(self.create_error_response(tool_id, error_message, tool_name))
             except Exception as e:
                 error_message = f"Error while calling tool <{tool_name}>: {e}"
-                tool_responses.append(self.create_error_response(tool_id, tool_name, error_message))
+                tool_results.append(self.create_error_response(tool_id, error_message, tool_name))
 
         response = None
         if "claude" in self.config.model:
-            tool_result_message = ToolResultMessage(role="user", content=tool_responses)
+            tool_result_message = BetaMessageParam(role="user", content=tool_results)
             response = ToolResponseWrapper(tool_result_message=tool_result_message, author=author)
         else:
-            response = ToolResponseWrapper(tool_messages=tool_responses, author=author)
+            response = ToolResponseWrapper(tool_messages=tool_results, author=author, base64_images=base64_images)
 
         return response
 
     async def run_tool(self, tool_func, **kwargs):
         return await tool_func(**kwargs)
 
-    def create_success_response(self, tool_id: str, tool_name: str, content: str):
+    def create_success_response(self, tool_id: str, result: ToolResult, tool_name: Optional[str] = None):
         if "claude" in self.config.model:
-            # return ToolResultBlockParam(tool_use_id=tool_id, content=content, type="tool_result", is_error=False)
-            return ToolResultContent(tool_use_id=tool_id, content=content, type="tool_result", is_error=False)
+            tool_result_content: list[BetaTextBlockParam | BetaImageBlockParam] | str = []
+            is_error = False
+            if result.error:
+                is_error = True
+                tool_result_content = _maybe_prepend_system_tool_result(result, result.error)
+            else:
+                if result.output:
+                    tool_result_content.append(
+                        {
+                            "type": "text",
+                            "text": _maybe_prepend_system_tool_result(result, result.output),
+                        }
+                    )
+                if result.base64_image:
+                    tool_result_content.append(
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": result.base64_image,
+                            },
+                        }
+                    )
+
+            return BetaToolResultBlockParam(
+                tool_use_id=tool_id, content=tool_result_content, type="tool_result", is_error=is_error
+            )
         else:
-            return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=content)
+            tool_result_content = ""
+            if result.error:
+                is_error = True
+                tool_result_content = _maybe_prepend_system_tool_result(result, result.error)
+            else:
+                if result.output:
+                    tool_result_content = _maybe_prepend_system_tool_result(result, result.output)
+                # if result.base64_image:
+                #     # handle in loop
+                #     pass
+
+            return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=tool_result_content)
 
     def create_error_response(self, tool_id: str, tool_name: str, error_message: str):
         if "claude" in self.config.model:
-            result_param = ToolResultContent(
+            result_param = BetaToolResultBlockParam(
                 tool_use_id=tool_id, content=error_message, type="tool_result", is_error=True
             )
             return result_param
@@ -233,3 +274,9 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
         messages.append(from_agent_message)
         messages = [history, from_agent_message]
         return messages
+
+
+def _maybe_prepend_system_tool_result(result: ToolResult, result_text: str):
+    if result.system:
+        result_text = f"<system>{result.system}</system>\n{result_text}"
+    return result_text

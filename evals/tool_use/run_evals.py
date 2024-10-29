@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Any
 
 import docker
-from assets.tool_use_task import ToolTaskFamily
 from tqdm.asyncio import tqdm
 
 from environment.container import run_in_container
 from environment.task_run import TaskRun
 from environment.utils import generate_session_id, get_logger, setup_logger
+from evals.tool_use.assets.tool_use_task import ToolTaskFamily
 
 logger = get_logger(__name__)
 logger.setLevel(level=logging.DEBUG)

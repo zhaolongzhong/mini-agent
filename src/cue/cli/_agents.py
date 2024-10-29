@@ -4,14 +4,14 @@ from ..llm.llm_model import ChatModel
 from ..schemas import AgentConfig
 from ..tools._tool import Tool
 
-default_model = ChatModel.GPT_4O_MINI
+default_model = ChatModel.GPT_4O_MINI.id
 
 main_agent = AgentConfig(
     id="main",
     is_primary=True,
     description="Is main task executor and collaborate with other agents.",
     instruction="Analyze requests, collaborate with specialists when appropriate, maintain context, and synthesize outputs.",
-    model=ChatModel.GPT_4O_MINI,
+    model=ChatModel.GPT_4O_MINI.id,
     temperature=0.8,
     max_tokens=2000,
     tools=[Tool.Edit],
@@ -21,7 +21,7 @@ agent_o = AgentConfig(
     id="agent_o",
     description="Is very good at readoning, analyzing problems, be able to deep dive on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
-    model=ChatModel.O1_MINI,
+    model=ChatModel.O1_MINI.id,
     tools=[Tool.Edit],
 )
 
@@ -29,7 +29,7 @@ agent_claude = AgentConfig(
     id="agent_claude",
     description="Is very good at coding and also provide detail reasoning on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
-    model=ChatModel.GPT_4O,
+    model=ChatModel.GPT_4O.id,
     tools=[Tool.Edit],
 )
 
@@ -37,7 +37,7 @@ system_operator = AgentConfig(
     id="system_operator",
     description="Is system operations specialist, be able to run python code or script, and execute bash command.",
     instruction="You are able to read file, write content to file, run python code or script, and execute bash command.",
-    model=ChatModel.GPT_4O,
+    model=ChatModel.GPT_4O.id,
     tools=[Tool.Edit, Tool.Python, Tool.Bash],
 )
 
@@ -76,7 +76,7 @@ def get_agent_configs() -> tuple[Dict[str, AgentConfig], str]:
         "main": main_agent,
         # "agent_o": agent_o,
         # "agent_claude": agent_claude,
-        "system_operator": system_operator,
+        # "system_operator": system_operator,
         # "browse_agent": browse_agent,
         # "email_manager": email_agent,
         # "google_drive_manager": drive_agent,

@@ -1,7 +1,7 @@
 import logging
-from typing import ClassVar, Literal, Union
+from typing import ClassVar, Literal
 
-from .base import BaseTool
+from .base import BaseTool, ToolResult
 from .utils.drive_utils import (
     create_folder,
     download_file,
@@ -29,10 +29,10 @@ class GoogleDriveTool(BaseTool):
     def __init__(self):
         super().__init__()
 
-    async def __call__(self, command: str, args: list[str]) -> Union[str, list[any]]:
+    async def __call__(self, command: str, args: list[str]) -> ToolResult:
         return await self.drive(command, args)
 
-    async def drive(self, command: str, args: list[str]) -> Union[str, list[any]]:
+    async def drive(self, command: str, args: list[str]) -> ToolResult:
         """Handle Google Drive operations like listing, downloading, and managing files/folders.
 
         Args:
@@ -45,7 +45,7 @@ class GoogleDriveTool(BaseTool):
             args (list[str]): Command arguments as described above.
 
         Returns:
-            Union[str, list[any]]: Operation result or error message.
+            ToolResult: Operation result or error message.
 
         """
         logger.debug(f"drive: {command}, {args}")
@@ -56,30 +56,39 @@ class GoogleDriveTool(BaseTool):
                     page_size = int(args[1])
                 else:
                     page_size = 10
-                return get_files_or_folders(query, page_size)
+                results = get_files_or_folders(query, page_size)
             else:
-                return get_files_or_folders()
+                results = get_files_or_folders()
+                return ToolResult(output=", ".join(results))
         elif command == commands["get_by_folder_id"]:
             if len(args) == 0:
-                return "Folder ID required for getting files."
+                return ToolResult(error="Folder ID required for getting files.")
             folder_id = args[0]
-            return get_by_folder_id(folder_id)
+            results = get_by_folder_id(folder_id)
+            return ToolResult(output=", ".join(results))
         elif command == commands["download_file"]:
             if len(args) < 2:
-                return "File ID and file name are required for downloading a file."
+                return ToolResult(error="File ID and file name are required for downloading a file.")
             file_id, file_name = args[0], args[1]
             directory = args[2] if len(args) > 2 else "."
-            return download_file(file_id, file_name, directory)
+            result = download_file(file_id, file_name, directory)
+            return ToolResult(output=result)
         elif command == commands["create_folder"]:
             if len(args) == 0:
-                return "Folder name is required for creating a folder and parent_folder_id is optional."
+                return ToolResult(
+                    error="Folder name is required for creating a folder and parent_folder_id is optional."
+                )
             folder_name = args[0]
             parent_folder_id = args[1] if len(args) > 1 else None
-            return create_folder(folder_name, parent_folder_id)
+            result = create_folder(folder_name, parent_folder_id)
+            return ToolResult(output=result)
         elif command == commands["upload_file_to_folder"]:
             if len(args) < 2:
-                return "File name and folder ID are required for uploading a file."
+                return ToolResult(error="File name and folder ID are required for uploading a file.")
             file_name, folder_id = args[0], args[1]
-            return upload_file_to_folder(file_name, folder_id)
+            result = upload_file_to_folder(file_name, folder_id)
+            return ToolResult(output=result)
         else:
-            return "Invalid command. Please ensure the function signature is 'handle_drive_command(command, args)' with a valid command and corresponding arguments."
+            return ToolResult(
+                error="Invalid command. Please ensure the function signature is 'handle_drive_command(command, args)' with a valid command and corresponding arguments."
+            )

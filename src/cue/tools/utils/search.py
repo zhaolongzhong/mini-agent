@@ -74,7 +74,7 @@ def safe_google_results(results: Union[str, list]) -> str:
     return safe_message
 
 
-def search_news(query):
+def search_news(query) -> list[str]:
     results = DDGS().news(keywords=query, region="wt-wt", safesearch="off", timelimit="m", max_results=20)
     processed_results = []
     for result in results:
