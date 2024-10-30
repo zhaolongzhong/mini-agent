@@ -10,9 +10,7 @@ from openai.types.chat import ChatCompletionMessageToolCall
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.completion_create_params import Function
 
-from cue.utils.token_utils import count_token
-
-from ..utils import generate_id, debug_print_messages
+from ..utils import DebugUtils, TokenCounter, generate_id
 from ..schemas import AgentConfig, ErrorResponse, CompletionRequest, CompletionResponse
 from .llm_request import LLMRequest
 from .system_prompt import SYSTEM_PROMPT
@@ -44,10 +42,11 @@ class OpenAIClient(LLMRequest):
                 msg.model_dump(exclude_none=True, exclude_unset=True) if isinstance(msg, BaseModel) else msg
                 for msg in request.messages
             ]
-            debug_print_messages(messages, tag=f"{self.config.id} send_completion_request")
+            DebugUtils.debug_print_messages(messages, tag=f"{self.config.id} send_completion_request")
             is_o1 = "o1" in request.model
             if is_o1:
                 messages = self.handle_o1_model(messages, request.tool_json)
+                DebugUtils.take_snapshot(messages, suffix=f"{request.model}_pre_request")
                 response = await self.client.chat.completions.create(
                     messages=messages,
                     model=self.model,
@@ -62,9 +61,9 @@ class OpenAIClient(LLMRequest):
                     f"{SYSTEM_PROMPT}{' ' + request.system_prompt_suffix if request.system_prompt_suffix else ''}"
                 )
                 system_message = {"role": "system", "content": system_prompt}
-                system_message_tokens = count_token(str(system_message))
-                tool_tokens = count_token(str(request.tool_json))
-                message_tokens = count_token(str(messages))
+                system_message_tokens = TokenCounter.count_token(str(system_message))
+                tool_tokens = TokenCounter.count_token(str(request.tool_json))
+                message_tokens = TokenCounter.count_token(str(messages))
                 input_tokens = {
                     "system_tokens": system_message_tokens,
                     "tool_tokens": tool_tokens,
@@ -75,6 +74,7 @@ class OpenAIClient(LLMRequest):
                     f"\ntools_json: {json.dumps(request.tool_json, indent=4)}"
                 )
                 messages.insert(0, system_message)
+                DebugUtils.take_snapshot(messages=messages, suffix=f"{request.model}_pre_request")
                 if self.tool_json:
                     response = await self.client.chat.completions.create(
                         messages=messages,
@@ -104,7 +104,7 @@ class OpenAIClient(LLMRequest):
             )
         except openai.APIStatusError as e:
             message = f"Another non-200-range status code was received. {e.response}, {e.response.text}"
-            debug_print_messages(messages, tag=f"{self.config.id} send_completion_request")
+            DebugUtils.debug_print_messages(messages=messages, tag=f"{self.config.id} send_completion_request")
             error = ErrorResponse(
                 message=message,
                 code=str(e.status_code),

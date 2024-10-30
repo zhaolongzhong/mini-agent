@@ -3,10 +3,13 @@ import json
 import logging
 
 import anthropic
+from anthropic.types import ToolUseBlock
+from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 
-from ..utils import count_token, debug_print_messages
+from ..utils import DebugUtils, TokenCounter
 from ..schemas import AgentConfig, ErrorResponse, CompletionRequest, CompletionResponse
 from .system_prompt import SYSTEM_PROMPT
+from ..utils.id_generator import generate_id
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +49,9 @@ class AnthropicClient:
                 "cache_control": {"type": "ephemeral"},
             }
             messages = self._process_messages(messages)
-            system_message_tokens = count_token(str(system_message))
-            tool_tokens = count_token(str(request.tool_json))
-            message_tokens = count_token(str(messages))
+            system_message_tokens = TokenCounter.count_token(str(system_message))
+            tool_tokens = TokenCounter.count_token(str(request.tool_json))
+            message_tokens = TokenCounter.count_token(str(messages))
             input_tokens = {
                 "system_tokens": system_message_tokens,
                 "tool_tokens": tool_tokens,
@@ -63,7 +66,10 @@ class AnthropicClient:
                 f"input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
                 f"\ntools_json: {json.dumps(request.tool_json, indent=4)}"
             )
-            debug_print_messages(messages, tag=f"{self.config.id} send_completion_request clean messages")
+            DebugUtils.debug_print_messages(
+                messages=messages, tag=f"{self.config.id} send_completion_request clean messages"
+            )
+            DebugUtils.take_snapshot(messages=messages, suffix=f"{request.model}_pre_request")
             if request.tool_json:
                 response = await self.client.with_options(max_retries=2).beta.prompt_caching.messages.create(
                     model=request.model,
@@ -92,14 +98,16 @@ class AnthropicClient:
             )
         except anthropic.APIStatusError as e:
             message = f"Another non-200-range status code was received. {e.status_code}, {e.response.text}"
-            debug_print_messages(messages, tag=f"{self.config.id} send_completion_request")
+            DebugUtils.debug_print_messages(messages=messages, tag=f"{self.config.id} send_completion_request")
             error = ErrorResponse(
                 message=message,
                 code=str(e.status_code),
             )
         if error:
             logger.error(error.model_dump())
-        return CompletionResponse(author=request.author, response=response, model=self.model, error=error)
+        return CompletionResponse(
+            author=request.author, response=self.replace_tool_call_ids(response), model=self.model, error=error
+        )
 
     def format_message(self, message):
         """
@@ -148,3 +156,22 @@ class AnthropicClient:
                     # First message encountered after breakpoints = 0
                     content[-1].pop("cache_control", None)  # Remove existing cache_control
                     break  # Stop processing older messages
+
+    def replace_tool_call_ids(self, response_data: PromptCachingBetaMessage) -> None:
+        """
+        Replace tool call IDs in the response to:
+        1) Ensure uniqueness by generating new IDs from the server if duplicates exist.
+        2) Shorten IDs to save tokens (length optimization may be adjusted).
+        """
+        if not response_data or not response_data.content:
+            return
+
+        for content in response_data.content:
+            if not isinstance(content, ToolUseBlock):
+                continue
+            content.id = self.generate_tool_id()
+        return response_data
+
+    def generate_tool_id(self) -> str:
+        tool_call_id = generate_id(prefix="toolu_", length=4)
+        return tool_call_id

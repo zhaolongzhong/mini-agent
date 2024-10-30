@@ -1,9 +1,6 @@
 from typing import List, Union, Optional
 
 from pydantic import BaseModel
-from anthropic.types import MessageParam as AnthropicMessageParam
-from openai.types.chat import ChatCompletionToolMessageParam as ToolMessageParam
-from anthropic.types.beta import BetaMessageParam
 
 from .author import Author
 
@@ -17,7 +14,7 @@ class AgentHandoffResult(BaseModel):
 
 class ToolResponseWrapper(BaseModel):
     author: Optional[Author] = None
-    tool_messages: Optional[List[ToolMessageParam]] = None
-    tool_result_message: Optional[Union[AnthropicMessageParam, BetaMessageParam]] = None
+    tool_messages: Optional[List[dict]] = None
+    tool_result_message: Optional[dict] = None
     agent_handoff_result: Optional[AgentHandoffResult] = None
     base64_images: list = None

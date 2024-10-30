@@ -3,8 +3,6 @@ import asyncio
 import logging
 from typing import Dict, List, Union, Callable, Optional
 
-from openai.types.chat import ChatCompletionUserMessageParam
-
 from ._agent import Agent
 from .schemas import (
     Author,
@@ -51,7 +49,7 @@ class AgentManager:
     async def _execute_run(self, agent, message, run_metadata):
         self.active_agent = agent
         user_message = MessageParam(role="user", content=message)
-        await self.active_agent.memory.save(user_message)
+        self.active_agent.add_message(user_message)
 
         response = None
         turns_count = 0
@@ -72,12 +70,12 @@ class AgentManager:
                     # This preserves the tool call/response pair for:
                     # - Maintaining conversation context
                     # - Avoiding repeated failed attempts
-                    await self.active_agent.memory.save(response)
+                    self.active_agent.add_message(response)
                     continue
                 else:
                     raise Exception(f"Unexpected response: {response}")
 
-            await self.active_agent.memory.save(response)
+            self.active_agent.add_message(response)
             tool_calls = response.get_tool_calls()
             if not tool_calls:
                 if self.active_agent.config.is_primary:
@@ -100,7 +98,7 @@ class AgentManager:
                     # pick up new active agent in next loop
                     continue
                 else:
-                    await self.active_agent.memory.save(tool_result_wrapper)
+                    self.active_agent.add_message(tool_result_wrapper)
                     if tool_result_wrapper.base64_images:
                         tool_result_content = {
                             "type": "image_url",
@@ -111,8 +109,9 @@ class AgentManager:
                             {"type": "text", "text": "Please check previous query info related to this image"},
                             tool_result_content,
                         ]
-                        message_param = ChatCompletionUserMessageParam(role="user", content=contents)
-                        await self.active_agent.memory.save(message_param)
+                        # ChatCompletionUserMessageParam
+                        message_param = {"role": "user", "content": contents}
+                        self.active_agent.add_message(message_param)
             else:
                 raise Exception(f"Unexpected response: {tool_result_wrapper}")
 
@@ -131,11 +130,11 @@ class AgentManager:
         self.active_agent.conversation_context = ConversationContext(
             participants=[hand_off_result.from_agent_id, hand_off_result.to_agent_id]
         )
-        self.active_agent.memory.messages.clear()
         if isinstance(hand_off_result.context, List):
-            await self.active_agent.memory.saveList(hand_off_result.context)
+            for msg in hand_off_result.context:
+                self.active_agent.add_message(msg)  # TODO: should we combine them as single message in the first place
         else:
-            await self.active_agent.memory.save(hand_off_result.context)
+            self.active_agent.add_message(hand_off_result.context)
 
     def should_continue_run(self, turns_count: int, run_metadata: RunMetadata):
         """
