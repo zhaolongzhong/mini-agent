@@ -4,7 +4,6 @@ from typing import Any, Optional
 from pydantic import Field, BaseModel
 
 from .feature_flag import FeatureFlag
-from .storage_type import StorageType
 
 
 class AgentConfig(BaseModel):
@@ -23,6 +22,6 @@ class AgentConfig(BaseModel):
     tools: Optional[list[Any]] = []  # callable or tool enum
     conversation_id: Optional[str] = None
     max_actions: Optional[int] = 10
-    storage_type: Optional[Any] = StorageType.IN_MEMORY
+    enable_external_memory: bool = False
     feature_flag: FeatureFlag = Field(default_factory=FeatureFlag)
     is_test: bool = False

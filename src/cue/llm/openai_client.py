@@ -45,7 +45,7 @@ class OpenAIClient(LLMRequest):
             DebugUtils.debug_print_messages(messages, tag=f"{self.config.id} send_completion_request")
             is_o1 = "o1" in request.model
             if is_o1:
-                messages = self.handle_o1_model(messages, request.tool_json)
+                messages = self.handle_o1_model(messages, request)
                 DebugUtils.take_snapshot(messages, suffix=f"{request.model}_pre_request")
                 response = await self.client.chat.completions.create(
                     messages=messages,
@@ -234,5 +234,13 @@ class OpenAIClient(LLMRequest):
                     tool_call.id = self.generate_tool_id()
 
     def generate_tool_id(self) -> str:
+        """Generate a short tool call ID for session-scoped uniqueness.
+
+        Uses 4-char random suffix since unique IDs only needed within
+        a single session's context window
+
+        Returns:
+            String like: 'call_a1b2'
+        """
         tool_call_id = generate_id(prefix="call_", length=4)
         return tool_call_id

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from tool_use_task import ToolTaskFamily
 
-from cue import Tool, Agent, ChatModel, AgentConfig, FeatureFlag, StorageType, AgentManager, CompletionResponse
+from cue import Tool, Agent, ChatModel, AgentConfig, FeatureFlag, AgentManager, CompletionResponse
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
         max_tokens=2000,
         conversation_id="",
         feature_flag=FeatureFlag(is_cli=True, is_eval=False),
-        storage_type=StorageType.IN_MEMORY,
+        enable_external_memory=False,
         tools=[Tool.Read, Tool.ShellTool, Tool.Write],
         is_test=True,
     )

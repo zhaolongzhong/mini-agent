@@ -4,6 +4,7 @@ from ._tool import Tool, ToolManager
 from .drive import GoogleDriveTool
 from .email import EmailTool
 from .browse import BrowseTool
+from .memory import MemoryTool
 from .bash_tool import BashTool
 from .read_file import ReadTool
 from .read_image import ReadImageTool
@@ -27,4 +28,5 @@ __all__ = [
     "ReadTool",
     "WriteTool",
     "ReadImageTool",
+    "MemoryTool",
 ]

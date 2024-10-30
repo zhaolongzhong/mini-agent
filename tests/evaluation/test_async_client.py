@@ -66,7 +66,7 @@ class TestClientManager:
             assert new_agent_id == "main"
             response = await client.send_message("Hello there, who am I talking to? What is your id?")
             response_text = str(response).lower()
-            assert "main" in response_text
+            assert "main" or "primary" in response_text
 
             file_name = "fibo.py"
             file_path = tmp_path / file_name

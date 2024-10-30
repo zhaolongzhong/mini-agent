@@ -142,12 +142,14 @@ class DynamicContextManager:
             # Check if the oldest message is part of a tool call sequence
             if len(self.messages) >= 2 and has_tool_calls(self.messages[0]):
                 # Remove both the tool response and the message with tool_calls
-                logger.info("Removing tool response and associated tool call message")
+                logger.info(f"Tokens {total_tokens}/{self.max_tokens}, pruning tool call & response")
                 self.messages.pop(0)  # Remove tool call
                 # Keep removing tool result messages until we find a non-tool result
                 while len(self.messages) > 0 and is_tool_result(self.messages[0]):
                     removed_message = self.messages.pop(0)
-                    logger.info(f"Removed tool result message: {removed_message}")
+                    logger.info(
+                        f"Tokens {total_tokens}/{self.max_tokens}, pruning tool call & response: {removed_message}"
+                    )
             else:
                 # Remove just the oldest message
                 removed_message = self.messages.pop(0)

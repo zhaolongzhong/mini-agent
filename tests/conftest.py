@@ -1,7 +1,4 @@
-# tests/conftest.py
-import asyncio
 import logging
-from typing import Iterator
 
 import pytest
 
@@ -36,8 +33,9 @@ def set_default_model(model: str) -> None:
     test_config["default_model"] = model
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Iterator[asyncio.AbstractEventLoop]:
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# @pytest.fixture(scope="session")
+# def event_loop() -> Iterator[asyncio.AbstractEventLoop]:
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     yield loop
+#     loop.close()

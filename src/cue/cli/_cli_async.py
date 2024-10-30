@@ -14,6 +14,7 @@ from ..utils.logs import setup_logging
 from ..cli._agents import get_agent_configs
 from ._cli_command import CliCommand, parse_command
 from .._agent_manager import AgentManager
+from ..utils.id_generator import generate_run_id
 
 setup_logging()
 
@@ -58,8 +59,13 @@ class CLI:
     async def run(self):
         self.logger.info("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
         try:
-            self.agent_manager.set_active_agent(self.active_agent_id)
-            run_metadata = RunMetadata(enable_turn_debug=self.enable_debug_turn)
+            await self.agent_manager.initialize(self.active_agent_id)
+            activate_agent = self.agent_manager.get_agent(self.active_agent_id)
+            run_metadata = RunMetadata(
+                run_id=generate_run_id(),
+                enable_turn_debug=self.enable_debug_turn,
+                enable_external_memory=activate_agent.config.enable_external_memory,
+            )
 
             while True:
                 active_agent_id = self.agent_manager.active_agent.id

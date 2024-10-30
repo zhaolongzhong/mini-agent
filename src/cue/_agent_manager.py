@@ -14,7 +14,8 @@ from .schemas import (
     ConversationContext,
     ToolResponseWrapper,
 )
-from .tools._tool import Tool
+from .tools._tool import Tool, ToolManager
+from .memory.memory_service_client import MemoryServiceClient
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,8 @@ class AgentManager:
         self._agents: Dict[str, Agent] = {}
         self.active_agent: Optional[Agent] = None
         self.primary_agent: Optional[Agent] = None
+        self.memory_service: Optional[MemoryServiceClient] = None
+        self.tool_manager: Optional[ToolManager] = None
 
     async def run(
         self,
@@ -33,7 +36,13 @@ class AgentManager:
         run_metadata: RunMetadata = RunMetadata(),
     ) -> CompletionResponse:
         self.primary_agent = self.get_agent(agent_identifier)
+        # Update other agents info once we set primary agent
         self.update_other_agents_info()
+        if run_metadata.enable_external_memory and not self.memory_service:
+            self.memory_service = MemoryServiceClient()
+            await self.memory_service.create_default_assistant()
+        if not self.tool_manager:
+            self.tool_manager = ToolManager(self.memory_service)
         try:
             logger.info(f"Starting run with agent {agent_identifier}")
             start_time = time.time()
@@ -46,7 +55,7 @@ class AgentManager:
             logger.error(f"Error in run: {str(e)}", exc_info=True)
             raise
 
-    async def _execute_run(self, agent, message, run_metadata):
+    async def _execute_run(self, agent: Agent, message: str, run_metadata: RunMetadata):
         self.active_agent = agent
         user_message = MessageParam(role="user", content=message)
         self.active_agent.add_message(user_message)
@@ -167,8 +176,13 @@ class AgentManager:
 
         return True
 
+    async def initialize(self, active_agent_id: str):
+        self.active_agent = self.get_agent(active_agent_id)
+
     async def clean_up(self):
-        """Clean up all agents and their resources."""
+        if self.memory_service:
+            await self.memory_service.disconnect()
+
         cleanup_tasks = []
         for agent_id in list(self._agents.keys()):
             try:
@@ -208,7 +222,7 @@ class AgentManager:
                 agent.other_agents_info = self.list_agents(exclude=[agent_id])
             else:
                 agent.other_agents_info = {
-                    "id": agent.id,
+                    "id": self.primary_agent.id,
                     "description": self.primary_agent.description,
                 }
             logger.debug(f"{agent_id} other_agents_info: {agent.other_agents_info}")
@@ -222,9 +236,6 @@ class AgentManager:
                 return agent
 
         raise Exception(f"Agent '{identifier}' not found")
-
-    def set_active_agent(self, agent_id: str):
-        self.active_agent = self.get_agent(agent_id)
 
     def add_tool_to_agent(self, agent_id: str, tool: Union[Callable, Tool]) -> None:
         if agent_id in self._agents:

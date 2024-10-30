@@ -7,6 +7,7 @@ from .edit import EditTool
 from .drive import GoogleDriveTool
 from .email import EmailTool
 from .browse import BrowseTool
+from .memory import MemoryTool
 from .bash_tool import BashTool
 from .read_file import ReadTool
 from .read_image import ReadImageTool
@@ -14,6 +15,7 @@ from .run_script import PythonRunner
 from .write_to_file import WriteTool
 from .utils.function_utils import get_definition_by_model
 from .utils.function_to_json import function_to_json
+from ..memory.memory_service_client import MemoryServiceClient
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +30,11 @@ class Tool(Enum):
     Email = EmailTool.name
     Drive = GoogleDriveTool.name
     Image = ReadImageTool.name
+    Memory = MemoryTool.name
 
 
 class ToolManager:
-    def __init__(self):
+    def __init__(self, memory_service: Optional[MemoryServiceClient] = None):
         self.tools: Dict[str, BaseTool] = {
             Tool.Read.value: ReadTool(),
             Tool.Write.value: WriteTool(),
@@ -43,6 +46,7 @@ class ToolManager:
             Tool.Drive.value: GoogleDriveTool(),
             Tool.Drive.value: GoogleDriveTool(),
             Tool.Image.value: ReadImageTool(),
+            Tool.Memory.value: MemoryTool(memory_service),
         }
         self._definition_cache: Dict[str, dict] = {}
 

@@ -12,8 +12,9 @@ from concurrent.futures import ThreadPoolExecutor
 import docker
 from tqdm.asyncio import tqdm
 
-from environment.utils import get_logger, setup_logger, generate_session_id
+from environment.logs import get_logger, setup_logger
 from environment.task_run import TaskRun
+from environment.id_generator import generate_run_id
 from evals.tool_use.assets.tool_use_task import ToolTaskFamily
 
 logger = get_logger(__name__)
@@ -94,7 +95,7 @@ async def task_wrapper(
 
 async def main(args):
     MAX_CONCURRENT_TASKS = 10
-    run_id = generate_session_id()
+    run_id = generate_run_id()
     run_assets_path = get_run_assets_path()
     task_family = ToolTaskFamily()
     # for task in task_family.get_tasks().values():

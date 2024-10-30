@@ -12,11 +12,9 @@ from openai.types.chat import (
 )
 from anthropic.types.beta import BetaTextBlockParam, BetaImageBlockParam, BetaToolResultBlockParam
 
-from cue.utils.debug_utils import DebugUtils
-
 from .llm import LLMClient
-from .tools import Tool, ToolResult, ToolManager
-from .utils import record_usage
+from .tools import Tool, MemoryTool, ToolResult, ToolManager
+from .utils import DebugUtils, record_usage
 from .schemas import (
     Author,
     AgentConfig,
@@ -29,7 +27,8 @@ from .schemas import (
     ToolResponseWrapper,
     ToolCallToolUseBlock,
 )
-from .memory.memory import InMemoryStorage
+from .memory.memory_manager import DynamicMemoryManager
+from .system_message_builder import SystemMessageBuilder
 from .context.context_manager import DynamicContextManager
 
 logger = logging.getLogger(__name__)
@@ -39,9 +38,9 @@ class Agent:
     def __init__(self, config: AgentConfig, agent_manager: "AgentManager"):  # type: ignore # noqa: F821
         self.id = config.id.strip().replace(" ", "_")
         self.config = config
-        self.tool_manager = ToolManager()
-        self.memory = InMemoryStorage()
-        self.context = DynamicContextManager()
+        self.tool_manager: Optional[ToolManager] = None
+        self.memory_manager = DynamicMemoryManager(max_tokens=1000)
+        self.context = DynamicContextManager(max_tokens=12000 if self.config.is_primary else 4096)
         self.client: LLMClient = LLMClient(self.config)
         self.metadata: Optional[RunMetadata] = None
         self.agent_manager = agent_manager
@@ -49,33 +48,36 @@ class Agent:
         self.other_agents_info = ""
         self.tool_json = None
         self.conversation_context: Optional[ConversationContext] = None  # current conversation context
+        self.system_message_builder = SystemMessageBuilder(self.id, self.config)
 
     def get_system_message(self) -> MessageParam:
-        instruction = ""
-        if self.config.instruction:
-            instruction = f"\n* {self.config.instruction}{instruction}"
-        if self.config.is_primary:
-            instruction += f"""
-You are {self.id}, a primary agent in a multi-agent system. Please follow these core rules:
-
-1. To communicate with other agents:
-   - Use the `chat_with_agent` tool
-   - Specify the target agent's ID
-   - System automatically includes last 3 messages as context
-   - Provide additional context if the recent messages alone are insufficient
-
-2. All responses not using `chat_with_agent` will be sent directly to the user, so please format them accordingly
-"""
-        if self.other_agents_info:
-            instruction += f"\n* You are aware of the following other agents:\n{self.other_agents_info}"
-        if not self.config.is_primary and self.conversation_context:
-            instruction += f"\n* Current participants in this conversation are:\n{','.join(self.conversation_context.participants)}"
-
-        return MessageParam(role="system", name=self.id, content=f"<IMPORTANT>{instruction}</IMPORTANT>")
+        self.system_message_builder.set_conversation_context(self.conversation_context)
+        self.system_message_builder.set_other_agents_info(self.other_agents_info)
+        return self.system_message_builder.build()
 
     def _get_message_params(self) -> List[Dict]:
         """Retrieve a list of message parameter dictionaries for the completion API call."""
         return self.context.messages
+
+    async def _get_recent_memories(self) -> Optional[dict]:
+        """Should be called whenever there is a memory update"""
+        if not self.config.enable_external_memory:
+            return None
+        try:
+            memory_tool: MemoryTool = self.tool_manager.tools[Tool.Memory.value]
+            memories = await memory_tool.get_recent_memories(limit=5)
+            if memories:
+                memories.reverse()  # # oldest -> newest order, oldest first, FIFO when limit reached
+                for memory in memories:
+                    if memory.strip():
+                        self.memory_manager.add_memory(memory)
+
+                # Get formatted memories respecting token limits
+                return self.memory_manager.get_formatted_memories()
+
+        except Exception as e:
+            logger.error(f"Ran into {e} while trying to get recent memories.")
+            return None
 
     def _generate_description(self) -> str:
         """Return the description about the agent."""
@@ -112,6 +114,8 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
         return DebugUtils.take_snapshot(self.context.messages)
 
     async def run(self, author: Optional[Author] = None):
+        if not self.tool_manager:
+            self.tool_manager = self.agent_manager.tool_manager
         if not self.tool_json and self.config.tools:
             # chat_with_agent is added later so we cannot initialize in init
             self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
@@ -121,6 +125,10 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
             msg.model_dump() if hasattr(msg, "model_dump") else msg.dict() if hasattr(msg, "dict") else msg
             for msg in messages
         ]
+        memories_param = await self._get_recent_memories()
+        if memories_param:
+            history.insert(0, memories_param)
+            logger.debug(f"Recent memories: {json.dumps(memories_param, indent=4)}")
         return await self.send_messages(messages=history, author=author)
 
     async def send_messages(
@@ -175,13 +183,18 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
             if tool_name not in self.tool_manager.tools and tool_name not in chat_with_agent:
                 error_message = f"Tool '{tool_name}' not found. {self.tool_manager.tools.keys()}"
                 logger.error(f"{error_message}, tool_call: {tool_call}")
-                tool_results.append(self.create_error_response(tool_id, tool_name, error_message))
+                tool_results.append(
+                    self.create_error_response(
+                        tool_id,
+                        error_message,
+                        tool_name,
+                    )
+                )
                 continue
 
             if tool_name == chat_with_agent:
                 # ensure this tool and tool result pair
                 handoff_result = await self.chat_with_agent(**kwargs)
-                handoff_result.tool_id = tool_id
                 if "model" in self.config.model:
                     tool_result_ = {
                         "tool_use_id": tool_id,
@@ -291,7 +304,7 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
             }
             return tool_message_param
 
-    def create_error_response(self, tool_id: str, tool_name: str, error_message: str):
+    def create_error_response(self, tool_id: str, error_message: str, tool_name: str):
         if "claude" in self.config.model:
             result_param = BetaToolResultBlockParam(
                 tool_use_id=tool_id, content=error_message, type="tool_result", is_error=True

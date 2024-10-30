@@ -10,10 +10,11 @@ from concurrent.futures import ThreadPoolExecutor
 import docker
 from tqdm import tqdm
 
-from environment.utils import get_logger, setup_logging, generate_session_id
+from environment.logs import get_logger, setup_logging
 from environment.task_run import TaskRun
 from environment.constants import RUN_DIR
 from environment.container import run_in_container
+from environment.id_generator import generate_run_id
 
 logger = get_logger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -80,7 +81,7 @@ async def run_tasks(tasks: list[TaskRun], max_concurrent: int) -> dict[str, Any]
 
 async def main(args: argparse.Namespace) -> None:
     MAX_CONCURRENT_TASKS = args.max_concurrent
-    run_id = generate_session_id()
+    run_id = generate_run_id()
     run_assets_path = get_run_assets_path()
     base_image = "evals_example"
 

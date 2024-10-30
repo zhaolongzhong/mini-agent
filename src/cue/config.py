@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    API_URL: str = ""  # Default to localhost
     POSTGRES_HOST: Optional[str] = "127.0.0.1"
     POSTGRES_USER: Optional[str] = "postgres"
     POSTGRES_PASSWORD: Optional[str] = "password"

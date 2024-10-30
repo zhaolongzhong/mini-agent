@@ -51,7 +51,7 @@ usage() {
   echo "  $0 -e          # Run evaluation tests"
   echo "  $0 -t tests/evaluation/test_async_client.py::TestClientManager::test_async_client  # Run a single test, e.g. ./scripts/test.sh -t tests/evaluation/test_basic_tool_use.py"
   echo "  $0 -u -e       # Run unit and evaluation tests"
-  echo "  $0 -u -p '-v -x'  # Run unit tests with verbose output and exit on first failure"
+  echo "  $0 -u -p '-s -v -x'  # Run unit tests with debug log, verbose output and exit on first failure"
   exit 1
 }
 

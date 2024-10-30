@@ -1,0 +1,34 @@
+{
+    "type": "function",
+    "function": {
+        "name": "memory",
+        "description": "Perform memory operations like viewing, creating, recalling, updating, and deleting memory.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The memory operation to perform: 'view', 'recall', 'create', 'update', or 'delete'.",
+                    "enum": ["view", "recall", "create", "update", "delete"]
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Search query string used for recall command, id cannot be used here."
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return for view and recall commands"
+                },
+                "memory_id": {
+                    "type": "string",
+                    "description": "Memory ID(s) used for view, update and deletion operations. For view and deletion, provide multiple IDs as comma-separated string. For view, if there is no id provided, it will get recent memories."
+                },
+                "new_str": {
+                    "type": "string",
+                    "description": "New content string used for create and update commands"
+                }
+            },
+            "required": ["command"]
+        }
+    }
+}

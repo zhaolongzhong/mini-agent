@@ -3,7 +3,7 @@ from pathlib import Path
 
 import docker
 
-from .utils import close_logger, setup_logger
+from .logs import close_logger, setup_logger
 
 ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 

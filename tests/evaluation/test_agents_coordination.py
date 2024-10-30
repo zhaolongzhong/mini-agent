@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 @pytest.mark.asyncio
 @pytest.mark.evaluation
 class TestClientManager:
-    async def test_agent_talks_to_agent(self, default_chat_model, tmp_path: pytest.TempPathFactory) -> None:
+    async def test_agent_coordination(self, default_chat_model, tmp_path: pytest.TempPathFactory) -> None:
         """
         Test that a agent delegate a task to another agent.
         """
