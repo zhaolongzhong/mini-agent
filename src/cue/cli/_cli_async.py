@@ -12,6 +12,7 @@ from rich.console import Console
 from ..schemas import RunMetadata, CompletionResponse
 from ..utils.logs import setup_logging
 from ..cli._agents import get_agent_configs
+from ._cli_command import CliCommand, parse_command
 from .._agent_manager import AgentManager
 
 setup_logging()
@@ -55,26 +56,58 @@ class CLI:
         return await loop.run_in_executor(self.executor, lambda: self.console.input(prompt))
 
     async def run(self):
-        self.logger.info("Running the CLI. Type 'exit' or 'quit' to exit.")
+        self.logger.info("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
         try:
             self.agent_manager.set_active_agent(self.active_agent_id)
-            run_metdata = RunMetadata(enable_turn_debug=self.enable_debug_turn)
+            run_metadata = RunMetadata(enable_turn_debug=self.enable_debug_turn)
+
             while True:
                 active_agent_id = self.agent_manager.active_agent.id
                 user_prompt = Text("[User]: ", style="user")
                 user_input = await self._get_user_input_async(user_prompt)
-                if len(user_input) < 3:
+
+                # Parse command
+                command, message = parse_command(user_input)
+
+                # Handle empty or too short messages
+                if not command and (not message or len(message) < 3):
                     error_message = Text("[Cue ]: ", style="cue")
                     error_message.append("Message must be at least 3 characters long.", style="error")
                     self.console.print(error_message)
                     continue
-                if user_input.lower() in ["exit", "quit"]:
+
+                # Handle commands
+                if command == CliCommand.HELP:
+                    from ._cli_command import print_help
+
+                    print_help(self.console, message)
+                    continue
+                if command == CliCommand.EXIT:
                     self.logger.info("Exit command received. Shutting down.")
                     break
-                self.logger.debug(f"{user_input}")
 
-                run_metdata.user_messages.append(f"user_says_to_agent_b: {user_input}")
-                response = await self.agent_manager.run(active_agent_id, user_input, run_metdata)
+                if command == CliCommand.SNAPSHOT:
+                    try:
+                        snapshot_path = self.agent_manager.active_agent.snapshot()
+                        success_msg = Text("[System]: ", style="system")
+                        success_msg.append(f"Snapshot saved to {snapshot_path}", style="success")
+                        self.console.print(success_msg)
+
+                        # If there was additional message content, process it
+                        if message and len(message) >= 3:
+                            user_input = message
+                        else:
+                            continue
+                    except Exception as e:
+                        error_msg = Text("[System]: ", style="system")
+                        error_msg.append(f"Failed to save snapshot: {str(e)}", style="error")
+                        self.console.print(error_msg)
+                        continue
+
+                self.logger.debug(f"{user_input}")
+                run_metadata.user_messages.append(f"{user_input}")
+
+                response = await self.agent_manager.run(active_agent_id, user_input, run_metadata)
                 if response:
                     agent_id = self.agent_manager.active_agent.id
                     if isinstance(response, CompletionResponse):
@@ -85,6 +118,7 @@ class CLI:
                     message.append(f"[{agent_id}]: ", style="cue")
                     message.append(str(response), style="cue")
                     self.console.print(message)
+
         except Exception as e:
             self.logger.exception(f"An error occurred: {e}")
             raise

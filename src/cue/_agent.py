@@ -10,7 +10,9 @@ from openai.types.chat import (
     ChatCompletionMessageToolCall as ToolCall,
     ChatCompletionToolMessageParam as ToolMessageParam,
 )
-from anthropic.types.beta import BetaMessageParam, BetaTextBlockParam, BetaImageBlockParam, BetaToolResultBlockParam
+from anthropic.types.beta import BetaTextBlockParam, BetaImageBlockParam, BetaToolResultBlockParam
+
+from cue.utils.debug_utils import DebugUtils
 
 from .llm import LLMClient
 from .tools import Tool, ToolResult, ToolManager
@@ -28,6 +30,7 @@ from .schemas import (
     ToolCallToolUseBlock,
 )
 from .memory.memory import InMemoryStorage
+from .context.context_manager import DynamicContextManager
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,7 @@ class Agent:
         self.config = config
         self.tool_manager = ToolManager()
         self.memory = InMemoryStorage()
+        self.context = DynamicContextManager()
         self.client: LLMClient = LLMClient(self.config)
         self.metadata: Optional[RunMetadata] = None
         self.agent_manager = agent_manager
@@ -69,13 +73,9 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
 
         return MessageParam(role="system", name=self.id, content=f"<IMPORTANT>{instruction}</IMPORTANT>")
 
-    def get_messages(self) -> List:
-        """Retrieve the original list of messages from the Pydantic model."""
-        return self.memory.messages
-
-    def get_message_params(self) -> List[Dict]:
+    def _get_message_params(self) -> List[Dict]:
         """Retrieve a list of message parameter dictionaries for the completion API call."""
-        return self.memory.get_message_params(self.config.model)
+        return self.context.messages
 
     def _generate_description(self) -> str:
         """Return the description about the agent."""
@@ -104,11 +104,18 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
             message=message,
         )
 
+    def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
+        self.context.add_message(message)
+
+    def snapshot(self) -> str:
+        """Take a snapshot of current message list and save to a file"""
+        return DebugUtils.take_snapshot(self.context.messages)
+
     async def run(self, author: Optional[Author] = None):
         if not self.tool_json and self.config.tools:
             # chat_with_agent is added later so we cannot initialize in init
             self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
-        messages = self.get_message_params()  # convert message params
+        messages = self._get_message_params()  # convert message params
         logger.debug(f"{self.id}, size: {len(messages)}")
         history = [
             msg.model_dump() if hasattr(msg, "model_dump") else msg.dict() if hasattr(msg, "dict") else msg
@@ -140,6 +147,7 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
         )
         response = await self.client.send_completion_request(completion_request)
         record_usage(response)
+        logger.debug(f"Response: {response}")
         return response
 
     async def process_tools_with_timeout(
@@ -171,7 +179,29 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
                 continue
 
             if tool_name == chat_with_agent:
+                # ensure this tool and tool result pair
                 handoff_result = await self.chat_with_agent(**kwargs)
+                handoff_result.tool_id = tool_id
+                if "model" in self.config.model:
+                    tool_result_ = {
+                        "tool_use_id": tool_id,
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Called chat_with_agent successfully",
+                            }
+                        ],
+                        "type": "tool_result",
+                        "is_error": False,
+                    }
+                else:
+                    tool_result_ = {
+                        "tool_call_id": tool_id,
+                        "name": chat_with_agent,
+                        "role": "tool",
+                        "content": "Called chat_with_agent successfully",
+                    }
+                self.add_message(tool_result_)
                 return ToolResponseWrapper(agent_handoff_result=handoff_result)
 
             tool_func = self.tool_manager.tools[tool_name]
@@ -182,6 +212,7 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
         for task, tool_id, tool_name in tasks:
             try:
                 tool_result = await asyncio.wait_for(task, timeout=timeout)
+                print(f"inx tool_result: {tool_result}")
                 base64_image = tool_result.base64_image
                 if base64_image:
                     base64_images.append(base64_image)
@@ -195,7 +226,7 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
 
         response = None
         if "claude" in self.config.model:
-            tool_result_message = BetaMessageParam(role="user", content=tool_results)
+            tool_result_message = {"role": "user", "content": tool_results}
             response = ToolResponseWrapper(tool_result_message=tool_result_message, author=author)
         else:
             response = ToolResponseWrapper(tool_messages=tool_results, author=author, base64_images=base64_images)
@@ -232,9 +263,14 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
                         }
                     )
 
-            return BetaToolResultBlockParam(
-                tool_use_id=tool_id, content=tool_result_content, type="tool_result", is_error=is_error
-            )
+            # BetaToolResultBlockParam
+            tool_result_block_param = {
+                "tool_use_id": tool_id,
+                "content": tool_result_content,
+                "type": "tool_result",
+                "is_error": is_error,
+            }
+            return tool_result_block_param
         else:
             tool_result_content = ""
             if result.error:
@@ -247,7 +283,14 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
                 #     # handle in loop
                 #     pass
 
-            return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=tool_result_content)
+            # ChatCompletionToolMessageParam
+            tool_message_param = {
+                "tool_call_id": tool_id,
+                "name": tool_name,
+                "role": "tool",
+                "content": tool_result_content,
+            }
+            return tool_message_param
 
     def create_error_response(self, tool_id: str, tool_name: str, error_message: str):
         if "claude" in self.config.model:
@@ -259,7 +302,7 @@ You are {self.id}, a primary agent in a multi-agent system. Please follow these 
             return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)
 
     def build_next_agent_context(self, to_agent: str, last_message: str) -> List[Dict]:
-        history = copy.deepcopy(self.get_messages())
+        history = copy.deepcopy(self._get_message_params())
         # remove the transfer tool call and append message from calling agent
         # in this way, we keep the conversation cohensive with less noise
         max_messages = 6

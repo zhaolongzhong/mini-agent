@@ -37,7 +37,7 @@ def news(args: list[str]) -> ToolResult:
     return ToolResult(output=" ".join(results))
 
 
-def open_url(url: str) -> ToolResult:
+def open_url(url: str) -> str:
     """Fetches and returns the text content of a specified web page.
 
     This function sends a request to the given URL and extracts the text content
@@ -58,7 +58,7 @@ def open_url(url: str) -> ToolResult:
             # pylint: disable=broad-exception-raised
             # raise Exception(f"Error fetching {url}: HTTP {response.status_code}")
             logger.error(f"Error fetching {url}: HTTP {response.status_code}")
-            return ToolResult(error=f"Error fetching the page. HTTP {response.status_code}")
+            return f"Error fetching the page<{url}>. HTTP {response.status_code}"
 
         # Use BeautifulSoup to parse the HTML content
         soup = BeautifulSoup(response.text, "html.parser")
@@ -72,7 +72,7 @@ def open_url(url: str) -> ToolResult:
         # Check for JavaScript requirement
         if "You need to enable JavaScript to run this app." in text:
             logger.warning("Unable to parse page due to JavaScript being required")
-            return ToolResult(error="Unable to parse page due to JavaScript being required")
+            return f"Unable to parse page<{url}> due to JavaScript being required"
         text = remove_newlines(text)
 
         # Calculate visibility percentage
@@ -94,11 +94,11 @@ def open_url(url: str) -> ToolResult:
             "pub_date": publish_date if publish_date else "",
             "text": text,
         }
-        return ToolResult(output=json.dumps(result))
+        return json.dumps(result)
 
     except Exception as e:
         logger.error("An error occurred: %s", e)
-        return ToolResult(error=f"Cannot open page: {e}.")
+        return f"Cannot open page<{url}>: {e}."
 
 
 def find_publish_date(soup):
@@ -185,7 +185,8 @@ class BrowseTool(BaseTool):
         if command == commands["search"]:
             return search(args)  # return a list search results with title, url, and snippet
         elif command == commands["open_url"]:  # return web page contents
-            return [open_url(url) for url in args]
+            results = [open_url(url) for url in args]
+            return ToolResult(output=", ".join(results))
         elif command == commands["news"]:
             return news(args)  # return a list news
         else:
