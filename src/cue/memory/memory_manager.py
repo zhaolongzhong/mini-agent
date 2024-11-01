@@ -56,7 +56,7 @@ class DynamicMemoryManager:
         while self._get_total_tokens() > self.max_tokens and len(self.memories) > 1:
             removed_memory = self.memories.pop()  # Always remove oldest (from start)
             logger.info(
-                f"Tokens {self._get_total_tokens()}/{self.max_tokens}, removed oldest memory to maintain token limit: {removed_memory[:100]}..."
+                f"Tokens {self._get_total_tokens()}/{self.max_tokens}, size:{len(self.memories)}, removed oldest memory to maintain token limit: {removed_memory[:100]}..."
             )
 
         return True

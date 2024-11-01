@@ -14,7 +14,7 @@ class CRUDAssistantMemory(CRUDBaseAsync[AssistantMemory, AssistantMemoryCreate, 
         obj_in_data = obj_in.model_dump(exclude_none=True, exclude_unset=True)
         db_obj = self.model(
             **obj_in_data,
-            id=generate_id(prefix="mem_"),
+            id=generate_id(prefix="mem_", length=6),
         )
 
         db.add(db_obj)

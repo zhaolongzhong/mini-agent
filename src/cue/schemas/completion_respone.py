@@ -3,6 +3,7 @@ from typing import Any, Union, Optional, cast
 from pydantic import Field, BaseModel, ConfigDict
 from anthropic.types import (
     Message as AnthropicMessage,
+    TextBlock,
     ToolUseBlock,
 )
 from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall, ChatCompletionAssistantMessageParam
@@ -73,7 +74,7 @@ class CompletionResponse:
             return str(self.error)
 
         if isinstance(self.response, (AnthropicMessage, PromptCachingBetaMessage)):
-            return self.response.content[0].text
+            return "\n".join(content.text for content in self.response.content if isinstance(content, TextBlock))
         elif isinstance(self.response, ChatCompletion):
             return self.response.choices[0].message.content
         raise InvalidResponseTypeError(
