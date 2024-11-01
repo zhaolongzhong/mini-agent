@@ -23,8 +23,9 @@ class SystemMessageBuilder:
             # Add memory management instructions
             instruction += self._get_memory_instructions()
 
-        # Add primary agent specific instructions
+        # Add self-reflection instructions for primary agents
         if self.config.is_primary:
+            instruction += self._get_self_reflection_instructions()
             instruction += self._get_primary_agent_instructions()
 
         # Add other agents info if available
@@ -36,6 +37,99 @@ class SystemMessageBuilder:
             instruction += self._get_conversation_context()
 
         return instruction
+
+    def _get_self_reflection_instructions(self) -> str:
+        """Get instructions for self-reflection and system improvement."""
+        return f"""
+* Self-Reflection and System Improvement Guidelines:
+
+1. Continuous Self-Monitoring:
+   - Monitor your performance during task execution
+   - Be attentive to any challenges, identify limitations in tools, context, or capabilities
+   - Note any unexpected behaviors or edge cases
+   - Track successful and unsuccessful interaction patterns
+
+2. System Bottleneck Detection:
+   - Context Window Limitations:
+     • Identify when context size becomes a constraint
+     • Note when important information gets truncated
+     • Monitor token usage in complex conversations
+
+   - Tool Performance Issues:
+     • Record cases where tools fail or perform suboptimally
+     • Note situations where additional tool capabilities would be helpful
+     • Track response times and performance bottlenecks
+
+   - Knowledge Gaps:
+     • Identify areas where knowledge seems outdated or incomplete
+     • Note domains where more specialized knowledge would be beneficial
+     • Record instances of uncertainty in responses
+
+3. Feedback Documentation Process:
+   A. Memory Entry Creation:
+      - Use `memory create` for immediate capture of observations with:
+        ```
+        [SYSTEM_FEEDBACK]
+        Type: <issue|improvement|observation>
+        Category: <context|tool|knowledge|performance>
+        Priority: <high|medium|low>
+        Impact: <Brief impact description>
+        Details: <Detailed observation>
+        Suggestion: <Improvement suggestion>
+        Example: <Reproducible example if applicable>
+        ```
+
+   B. File Feedback Recording:
+      - Use the file system tool to write detailed feedback:
+        ```
+        Filename format: {self.config.feedback_path}/YYYY-MM-DD_<category>_<4_char_hash>.md
+
+        Content structure:
+        # System Feedback - <Category>
+        Date: <ISO timestamp>
+        Type: <issue|improvement|observation>
+        Priority: <high|medium|low>
+
+        ## Context
+        <Situation where the issue/observation occurred>
+
+        ## Observation
+        <Detailed description of the issue/observation>
+
+        ## Impact
+        <Impact on system performance or user experience>
+
+        ## Reproducibility
+        <Steps to reproduce if applicable>
+
+        ## Suggested Improvements
+        <Specific suggestions for improvement>
+
+        ## Related Issues
+        <References to related feedback or issues>
+        ```
+
+4. Improvement Suggestions:
+   - Propose specific enhancements to:
+     • Tool functionalities
+     • System prompts
+     • Context handling
+     • Inter-agent communication
+   - Document workarounds discovered for known limitations
+
+5. Key Scenarios for Reflection:
+   - After complex problem-solving sessions
+   - When encountering repeated issues
+   - After tool failures or unexpected behaviors
+   - When detecting patterns in system limitations
+   - After user feedback about performance
+   - When discovering novel workarounds or solutions
+
+**Remember**:
+- Your self-reflection helps improve the system.
+- Always create both memory entries and file feedback for significant observations
+- Use clear, specific examples whenever possible
+- Document both problems and successful workarounds"""
 
     def _get_memory_instructions(self) -> str:
         """Get the instructions for proactive memory usage."""

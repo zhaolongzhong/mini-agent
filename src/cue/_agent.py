@@ -1,8 +1,10 @@
+import os
 import copy
 import json
 import asyncio
 import logging
 from typing import Dict, List, Union, Callable, Optional
+from pathlib import Path
 
 from pydantic import BaseModel
 from anthropic.types import ToolUseBlock
@@ -49,6 +51,7 @@ class Agent:
         self.tool_json = None
         self.conversation_context: Optional[ConversationContext] = None  # current conversation context
         self.system_message_builder = SystemMessageBuilder(self.id, self.config)
+        self.setup_feedback()
 
     def get_system_message(self) -> MessageParam:
         self.system_message_builder.set_conversation_context(self.conversation_context)
@@ -112,6 +115,15 @@ class Agent:
     def snapshot(self) -> str:
         """Take a snapshot of current message list and save to a file"""
         return DebugUtils.take_snapshot(self.context.messages)
+
+    def setup_feedback(self) -> str:
+        """Setup system feedback"""
+        if not self.config.feedback_path:
+            self.config.feedback_path = Path(
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "../../logs/feedbacks"))
+            )
+            self.config.feedback_path.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"System feedback: {self.config.feedback_path}")
 
     async def run(self, author: Optional[Author] = None):
         if not self.tool_manager:

@@ -1,5 +1,5 @@
-# src/cue/schemas/agent_config.py
 from typing import Any, Optional
+from pathlib import Path
 
 from pydantic import Field, BaseModel
 
@@ -10,6 +10,7 @@ class AgentConfig(BaseModel):
     id: Optional[str] = "default_id"
     name: Optional[str] = "default_name"
     is_primary: Optional[bool] = False
+    feedback_path: Optional[Path] = None
     # Detailed description of agent's role, capabilities, and collaboration patterns
     description: Optional[str] = None
     # System message defining agent's behavior, collaboration guidelines, and boundaries
