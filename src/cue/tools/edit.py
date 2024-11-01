@@ -18,8 +18,8 @@ SNIPPET_LINES: int = 4
 class EditTool(BaseTool):
     """
     An filesystem editor tool that allows the agent to view, create, and edit files.
-    The tool parameters are defined by Anthropic and are not editable.
     https://github.com/anthropics/anthropic-quickstarts/blob/8f734fd08c425c6ec91ddd613af04ff87d70c5a0/computer-use-demo/computer_use_demo/tools/edit.py#L23
+    https://www.anthropic.com/research/swe-bench-sonnet
     """
 
     name: ClassVar[Literal["edit"]] = "edit"
