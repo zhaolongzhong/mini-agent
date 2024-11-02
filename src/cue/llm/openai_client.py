@@ -70,7 +70,7 @@ class OpenAIClient(LLMRequest):
                     "message_tokens": message_tokens,
                 }
                 logger.debug(
-                    f"input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
+                    f"{self.config.id} input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
                     f"\ntools_json: {json.dumps(request.tool_json, indent=4)}"
                 )
                 messages.insert(0, system_message)

@@ -16,6 +16,7 @@ class ToolResult:
     error: Optional[str] = None
     base64_image: Optional[str] = None
     system: Optional[str] = None
+    agent_transfer: Optional[Any] = None
 
 
 class BaseTool(metaclass=ABCMeta):

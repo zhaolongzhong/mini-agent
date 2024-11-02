@@ -1,7 +1,7 @@
 import time
 import asyncio
 import logging
-from typing import Dict, List, Union, Callable, Optional
+from typing import Dict, List, Optional
 
 from ._agent import Agent
 from .schemas import (
@@ -14,7 +14,7 @@ from .schemas import (
     ConversationContext,
     ToolResponseWrapper,
 )
-from .tools._tool import Tool, ToolManager
+from .tools._tool import ToolManager
 from .memory.memory_service_client import MemoryServiceClient
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class AgentManager:
     ) -> CompletionResponse:
         self.primary_agent = self.get_agent(agent_identifier)
         # Update other agents info once we set primary agent
-        self.update_other_agents_info()
+        self._update_other_agents_info()
         if run_metadata.enable_external_memory and not self.memory_service:
             self.memory_service = MemoryServiceClient()
             await self.memory_service.create_default_assistant()
@@ -84,17 +84,14 @@ class AgentManager:
                 else:
                     raise Exception(f"Unexpected response: {response}")
 
-            self.active_agent.add_message(response)
             tool_calls = response.get_tool_calls()
             if not tool_calls:
+                self.active_agent.add_message(response)
                 if self.active_agent.config.is_primary:
                     return response
                 else:
                     # auto switch to primary agent
-                    context = self.active_agent.build_context_for_next_agent()
-                    transfer = AgentTransfer(
-                        to_agent_id=self.primary_agent.id, message=response.get_text(), context=context
-                    )
+                    transfer = AgentTransfer(to_agent_id=self.primary_agent.id, message=response.get_text())
                     await self._handle_transfer(transfer)
                     continue
 
@@ -102,13 +99,15 @@ class AgentManager:
                 tool_calls=tool_calls, timeout=30, author=response.author
             )
             if isinstance(tool_result, ToolResponseWrapper):
+                # Add tool use and tool result pair
+                self.active_agent.add_message(response)
+                self.active_agent.add_message(tool_result)
                 if tool_result.agent_transfer:
                     transfer = tool_result.agent_transfer
                     await self._handle_transfer(transfer)
                     # pick up new active agent in next loop
                     continue
                 else:
-                    self.active_agent.add_message(tool_result)
                     if tool_result.base64_images:
                         tool_result_content = {
                             "type": "image_url",
@@ -136,23 +135,28 @@ class AgentManager:
         The method clears previous memory and transfers either single or list context
         to the new active agent.
         """
+        messages = []
         from_agent_id = self.active_agent.id
-        if not agent_transfer.context:
-            agent_transfer.context = self.active_agent.build_context_for_next_agent()
+        agent_transfer.context = self.active_agent.build_context_for_next_agent(
+            max_messages=agent_transfer.max_messages
+        )
+
+        if agent_transfer.context:
+            context_message = MessageParam(
+                role="assistant",
+                content=f"Here is context from {from_agent_id} <background>{agent_transfer.context}</background>",
+            )
+            messages.append(context_message)
+
+        transfer_message = MessageParam(role="assistant", content=agent_transfer.message, name=from_agent_id)
+        messages.append(transfer_message)
 
         self.active_agent = self._agents[agent_transfer.to_agent_id]
+        for msg in messages:
+            self.active_agent.add_message(msg)
         self.active_agent.conversation_context = ConversationContext(
             participants=[from_agent_id, agent_transfer.to_agent_id]
         )
-        history = MessageParam(
-            role="assistant",
-            content=f"{from_agent_id}: here is context <background>{agent_transfer.context}</background>",
-        )
-        transfer_message = MessageParam(role="assistant", content=agent_transfer.message, name=from_agent_id)
-
-        messages = [history, transfer_message]
-        for msg in messages:
-            self.active_agent.add_message(msg)
 
     def should_continue_run(self, turns_count: int, run_metadata: RunMetadata):
         """
@@ -220,7 +224,7 @@ class AgentManager:
             self.primary_agent = agent
         return agent
 
-    def update_other_agents_info(self):
+    def _update_other_agents_info(self):
         if not self.primary_agent:
             for agent in self._agents.values():
                 if agent.config.is_primary:
@@ -245,11 +249,6 @@ class AgentManager:
                 return agent
 
         raise Exception(f"Agent '{identifier}' not found")
-
-    def add_tool_to_agent(self, agent_id: str, tool: Union[Callable, Tool]) -> None:
-        if agent_id in self._agents:
-            self._agents[agent_id].config.tools.append(tool)
-            logger.debug(f"Added tool {tool} to agent {agent_id}")
 
     def list_agents(self, exclude: List[str] = []) -> List[dict[str, str]]:
         return [

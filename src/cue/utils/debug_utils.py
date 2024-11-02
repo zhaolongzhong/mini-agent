@@ -36,7 +36,6 @@ class DebugUtils:
                 logger.error(f"debug_print error: {e}")
             else:
                 logger.debug("debug_print skip print last message, it might be image")
-        logger.debug("debug_print skip print last message, it might be image")
 
     @staticmethod
     def _serialize_message(msg: Union[Dict, BaseModel]) -> Dict[str, Any]:

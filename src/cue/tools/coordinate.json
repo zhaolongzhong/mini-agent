@@ -17,11 +17,14 @@
                 },
                 "message": {
                     "type": "string",
-                    "description": "Required parameter of `transfer` command,. The message sent to the to agent"
+                    "description": "Message to be sent to the target agent. Must provide meaningful context if max_messages is 0"
+                },
+                "max_messages": {
+                    "type": "integer",
+                    "description": "Number of previous messages to transfer (0-12). Default: 6. Set to 0 to use message field only without message history. When set to 0, ensure the message param contains sufficient context for the target agent to understand the request. Those messages exclude last (this) transfer tool use and result."
                 }
-    
             },
-            "required": ["to_agent_id", "message"]
+            "required": ["command", "to_agent_id", "message"]
         }
     }
 }

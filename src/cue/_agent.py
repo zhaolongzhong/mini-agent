@@ -1,5 +1,4 @@
 import os
-import copy
 import json
 import asyncio
 import logging
@@ -22,7 +21,6 @@ from .schemas import (
     AgentConfig,
     RunMetadata,
     MessageParam,
-    AgentTransfer,
     CompletionRequest,
     CompletionResponse,
     ConversationContext,
@@ -120,7 +118,7 @@ class Agent:
     async def run(self, author: Optional[Author] = None):
         self._init_tools()
         messages = self._get_message_params()  # convert message params
-        logger.debug(f"{self.id}, size: {len(messages)}")
+        logger.debug(f"{self.id} run message param size: {len(messages)}")
         history = [
             msg.model_dump() if hasattr(msg, "model_dump") else msg.dict() if hasattr(msg, "dict") else msg
             for msg in messages
@@ -197,15 +195,20 @@ class Agent:
             tasks.append((task, tool_id, tool_name))
 
         base64_images = []
+        agent_transfer = None
         for task, tool_id, tool_name in tasks:
             try:
-                tool_result = await asyncio.wait_for(task, timeout=timeout)
-                if isinstance(tool_result, AgentTransfer):
-                    return ToolResponseWrapper(agent_transfer=tool_result)
+                tool_result: ToolResult = await asyncio.wait_for(task, timeout=timeout)
                 base64_image = tool_result.base64_image
                 if base64_image:
                     base64_images.append(base64_image)
+
                 tool_results.append(self.create_success_response(tool_id, tool_result, tool_name))
+
+                agent_transfer = tool_result.agent_transfer
+                if agent_transfer:
+                    # if we have transfer tool use, ignore other tools
+                    break
             except asyncio.TimeoutError:
                 error_message = f"Timeout while calling tool <{tool_name}> after {timeout}s."
                 tool_results.append(self.create_error_response(tool_id, error_message, tool_name))
@@ -216,9 +219,18 @@ class Agent:
         response = None
         if "claude" in self.config.model:
             tool_result_message = {"role": "user", "content": tool_results}
-            response = ToolResponseWrapper(tool_result_message=tool_result_message, author=author)
+            response = ToolResponseWrapper(
+                tool_result_message=tool_result_message,
+                author=author,
+                agent_transfer=agent_transfer,
+            )
         else:
-            response = ToolResponseWrapper(tool_messages=tool_results, author=author, base64_images=base64_images)
+            response = ToolResponseWrapper(
+                tool_messages=tool_results,
+                author=author,
+                base64_images=base64_images,
+                agent_transfer=agent_transfer,
+            )
 
         return response
 
@@ -290,16 +302,32 @@ class Agent:
         else:
             return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)
 
-    def build_context_for_next_agent(self) -> str:
-        history = copy.deepcopy(self._get_message_params())
-        # remove the transfer tool call and append message from calling agent
-        # in this way, we keep the conversation cohensive with less noise
-        max_messages = 6
-        start_idx = max(0, len(history) - (max_messages + 1))
-        messages = history[start_idx:-1]
-        messages_content = ",".join([str(msg) for msg in messages])
+    def build_context_for_next_agent(self, max_messages: int = 6) -> str:
+        """
+        Build context to be passed to the next agent, excluding the current transfer command and its result.
 
-        messages_content = ",".join([str(msg) for msg in messages])
+        Args:
+            max_messages: Number of previous messages to include (0-12).
+                        If 0, returns empty string as no history should be included.
+
+        Returns:
+            str: Formatted message history, excluding current transfer command and result
+        """
+        if max_messages == 0:
+            return ""
+
+        history = self._get_message_params()
+
+        # Since the last two messages are the transfer command and its result,
+        # we exclude them and then take up to max_messages from the remaining history
+        history_without_transfer = history[:-2] if len(history) >= 2 else []
+
+        # Calculate how many messages to take
+        start_idx = max(0, len(history_without_transfer) - max_messages)
+        messages = history_without_transfer[start_idx:]
+
+        messages_content = ",".join(str(msg) for msg in messages)
+
         return messages_content
 
 

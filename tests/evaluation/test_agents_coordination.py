@@ -38,7 +38,7 @@ class TestClientManager:
             file_name = "fibo.py"
             file_path = tmp_path / file_name
             instruction = f"Can you create a fibonacci function named fibonacci at {file_path}?"
-            response = await agent_manager.run(agent_a.id, instruction, run_metadata=RunMetadata(max_turns=8))
+            response = await agent_manager.run(agent_a.id, instruction, run_metadata=RunMetadata(max_turns=10))
             logger.debug(f"Response: {response}")
             assert response is not None, "Expected a non-None response."
             assert file_path.exists(), f"Expected file '{file_path}' to be created."

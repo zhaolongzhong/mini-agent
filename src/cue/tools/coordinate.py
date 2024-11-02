@@ -1,8 +1,8 @@
-from typing import Literal, ClassVar
+from typing import Literal, ClassVar, Optional
 from pathlib import Path
 
-from .base import BaseTool, ToolError
-from ..schemas.tool_response_wrapper import AgentTransfer
+from .base import BaseTool, ToolError, ToolResult
+from ..schemas.tool_response_wrapper import DEFAULT_MAX_MESSAGES, MAX_ALLOWED_MESSAGES, AgentTransfer
 
 Command = Literal["transfer"]
 
@@ -41,12 +41,14 @@ class CoordinateTool(BaseTool):
         command: Command,
         to_agent_id: str,
         message: str,
+        max_messages: Optional[int] = DEFAULT_MAX_MESSAGES,
         **kwargs,
     ):
         if command == "transfer":
             return self.transfer(
                 to_agent_id=to_agent_id,
                 message=message,
+                max_messages=max_messages,
                 **kwargs,
             )
         else:
@@ -57,9 +59,17 @@ class CoordinateTool(BaseTool):
         *,
         to_agent_id: str,
         message: str,
+        max_messages: Optional[int] = 6,
         **kwargs,
     ) -> AgentTransfer:
-        return AgentTransfer(
-            to_agent_id=to_agent_id,
-            message=message,
+        max_messages = DEFAULT_MAX_MESSAGES if max_messages is None else min(max(0, max_messages), MAX_ALLOWED_MESSAGES)
+        transfer_info = AgentTransfer(to_agent_id=to_agent_id, message=message, max_messages=max_messages)
+        mode_desc = (
+            "using message only"
+            if max_messages == 0
+            else f"with up to {max_messages} previous messages (excluding this transfer command)"
+        )
+        return ToolResult(
+            output=f"Transfer request created successfully ({mode_desc}). Details: {transfer_info.model_dump_json(indent=2)}",
+            agent_transfer=transfer_info,
         )

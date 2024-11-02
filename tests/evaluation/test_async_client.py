@@ -46,14 +46,14 @@ class TestClientManager:
                 description="Lead coordinator that analyzes tasks, delegates to specialized agents.",
                 instruction="Coordinate the AI team by analyzing requests, delegating tasks to specialists.",
                 model=default_chat_model,
-                tools=[],
+                tools=[Tool.Coordinate],
             ),
             "file_operator": AgentConfig(
                 id="file_operator",
                 description="System operations specialist managing file operations.",
                 instruction="Execute system operations as directed by main or coordinator agent.",
                 model=default_chat_model,
-                tools=[Tool.Edit],
+                tools=[Tool.Coordinate, Tool.Edit],
             ),
         }
 

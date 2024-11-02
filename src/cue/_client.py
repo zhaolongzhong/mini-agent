@@ -48,9 +48,6 @@ class AsyncCueClient:
         for config in configs:
             agent_id = config.id
             self.agents[agent_id] = self.agent_manager.register_agent(config)
-            if len(configs) > 1:
-                # only add it when there are multiple agents
-                self.agents[agent_id].add_tool_to_agent(self.agents[agent_id].create_agent_handoff)
 
         if not self.agents:
             # Fallback to default configuration if no agents are configured
