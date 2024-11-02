@@ -155,12 +155,6 @@ class SystemMessageBuilder:
 - When detecting patterns, document them for future reference
 - Before long breaks in conversation, save session summary
 
-4. Memory Search Best Practices:
-- Use specific keywords for targeted recall
-- Include temporal markers when relevant (e.g., "last week", "recent")
-- Combine multiple search terms for better results
-- Review both exact and semantically similar matches
-
 Remember: Being proactive with memory management helps maintain conversation continuity and improves the quality of assistance across sessions."""
 
     def _get_primary_agent_instructions(self) -> str:
@@ -169,12 +163,12 @@ Remember: Being proactive with memory management helps maintain conversation con
 You are {self.agent_id}, a primary agent in a multi-agent system. Please follow these core rules:
 
 1. To communicate with other agents:
-   - Use the `chat_with_agent` tool
+   - Use the `coordinate` tool
    - Specify the target agent's ID
    - System automatically includes last 3 messages as context
    - Provide additional context if the recent messages alone are insufficient
 
-2. All responses not using `chat_with_agent` will be sent directly to the user, so please format them accordingly
+2. All responses not using `coordinate` will be sent directly to the user, so please format them accordingly
 """
 
     def _get_conversation_context(self) -> str:
