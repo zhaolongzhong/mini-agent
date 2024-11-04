@@ -8,9 +8,8 @@ cd "$(dirname "$0")/.."
 check_rye_installed() {
     if ! command -v rye &> /dev/null; then
         echo "Rye is not installed. Installing Rye..."
-        curl -sSf https://rye-up.com/install | sh
-        # Ensure the shell environment is updated to include Rye
-        export PATH="$HOME/.rye/bin:$PATH"
+        curl -sSf https://rye.astral.sh/get | bash
+        echo 'source "$HOME/.rye/env"' >> ~/.bash_profile
     else
         echo "Rye is already installed."
     fi
