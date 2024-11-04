@@ -44,7 +44,7 @@ def _basic_config() -> None:
 
 
 def _setup_development_config() -> None:
-    env = os.environ.get("CUE_LOG", "info")
+    env = os.environ.get("CUE_LOG", "debug")
     environment = os.getenv("ENVIRONMENT", "development")
 
     # use dedicated logger for development
