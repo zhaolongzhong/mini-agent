@@ -139,11 +139,12 @@ class OpenAIClient(LLMRequest):
 
             system_message = {
                 "role": "assistant",
-                "content": system_prompt,
+                "content": f"<system_context>{system_prompt}</system_context>",
             }
             # convert tools call and tool message to normal message
             final_messages = [msg for msg in messages if msg["role"] != "system"]
             final_messages.insert(0, system_message)
+            logger.debug(f"{request.model} system message: {system_prompt}")
             return final_messages
         except Exception as e:
             logger.error(f"Error handling o1 model: {e}")
