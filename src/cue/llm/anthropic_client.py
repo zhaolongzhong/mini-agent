@@ -41,22 +41,29 @@ class AnthropicClient:
         error = None
 
         try:
-            # The Messages API accepts a top-level `system` parameter, not \"system\" as an input message role.
-            system_message_content = request.system_prompt_suffix
-            messages = [msg for msg in request.messages if msg["role"] != "system"]
-            system_message = {
-                "text": f"{SYSTEM_PROMPT}{' ' + system_message_content if system_message_content else ''}",
+            base_system_message = {
+                "text": f"{SYSTEM_PROMPT}{' ' + request.system_prompt_suffix if request.system_prompt_suffix else ''}",
                 "type": "text",
+            }
+
+            system_message = {
+                **base_system_message,
                 "cache_control": {"type": "ephemeral"},
             }
+            # The Messages API accepts a top-level `system` parameter, not \"system\" as an input message role.
+            messages = [msg for msg in request.messages if msg["role"] != "system"]
             messages = self._process_messages(messages)
+
             system_message_tokens = TokenCounter.count_token(str(system_message))
             tool_tokens = TokenCounter.count_token(str(request.tool_json))
             message_tokens = TokenCounter.count_token(str(messages))
+            estimate_input_tokens = await self.count_tokens(request, base_system_message, messages)
             input_tokens = {
                 "system_tokens": system_message_tokens,
                 "tool_tokens": tool_tokens,
                 "message_tokens": message_tokens,
+                "input_tokens": system_message_tokens + tool_tokens + message_tokens,
+                "estimate_input_tokens": estimate_input_tokens,
             }
 
             if request.enable_prompt_caching:
@@ -81,6 +88,7 @@ class AnthropicClient:
                     tools=request.tool_json,
                     betas=["prompt-caching-2024-07-31"],
                 )
+
             else:
                 response = await self.client.with_options(max_retries=2).beta.prompt_caching.messages.create(
                     model=request.model,
@@ -178,3 +186,19 @@ class AnthropicClient:
     def generate_tool_id(self) -> str:
         tool_call_id = generate_id(prefix="toolu_", length=4)
         return tool_call_id
+
+    async def count_tokens(self, request: CompletionRequest, system_message: str, messages: list[dict]) -> int:
+        try:
+            # https://docs.anthropic.com/en/docs/build-with-claude/token-counting
+            result = await self.client.beta.messages.count_tokens(
+                betas=["token-counting-2024-11-01"],
+                model=request.model,
+                system=[system_message],
+                tools=request.tool_json,
+                messages=messages,
+            )
+            logger.debug(f"count_tokens - estimate input tokens: {result.model_dump_json()}")
+            return result.input_tokens
+        except Exception as e:
+            logger.error(f"Ran into error when counting tokens: {e}")
+            return 0

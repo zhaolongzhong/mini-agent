@@ -6,6 +6,7 @@ class ChatModel(Enum):
     # Claude https://docs.anthropic.com/en/docs/about-claude/models#model-names
     CLAUDE_3_OPUS_20240229 = ("claude-3-opus-20240229", True, "anthropic")
     CLAUDE_3_5_SONNET_20241022 = ("claude-3-5-sonnet-20241022", True, "anthropic")
+    CLAUDE_3_5_HAIKU_20241022 = ("claude-3-5-haiku-20241022", True, "anthropic")
 
     # Gemini https://ai.google.dev/gemini-api/docs/models/gemini#model-variations
     # https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library#supported_models

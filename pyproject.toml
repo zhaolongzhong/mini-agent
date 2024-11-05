@@ -18,8 +18,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "anthropic==0.37.0",
-    "openai==1.52.0",
+    "anthropic==0.39.0",
+    "openai==1.54.1",
     "tiktoken>=0.8.0",
     "google-auth==2.31.0",
     "google-auth-oauthlib==1.2.1",
