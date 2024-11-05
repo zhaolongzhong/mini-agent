@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 
@@ -75,7 +75,14 @@ async def test_create_command():
     edit_tool = EditTool()
 
     # Test creating a new file with content
-    with patch("pathlib.Path.exists", return_value=False), patch("pathlib.Path.write_text") as mock_write_text:
+    with (
+        patch("pathlib.Path.exists", return_value=False),
+        patch("pathlib.Path.write_text") as mock_write_text,
+        patch("pathlib.Path.parent", new_callable=PropertyMock) as mock_parent,
+    ):
+        # Setup mock parent path
+        mock_parent_path = Mock(spec=Path)
+        mock_parent.return_value = mock_parent_path
         result = await edit_tool(command="create", path="/test/newfile.txt", file_text="New file content")
         assert isinstance(result, ToolResult)
         assert result.output
