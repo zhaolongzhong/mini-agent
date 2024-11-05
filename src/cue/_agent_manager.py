@@ -135,6 +135,13 @@ class AgentManager:
         The method clears previous memory and transfers either single or list context
         to the new active agent.
         """
+        if agent_transfer.to_agent_id not in self._agents:
+            available_agents = ", ".join(self._agents.keys())
+            error_msg = f"Target agent '{agent_transfer.to_agent_id}' not found. Available agents: {available_agents}"
+            self.active_agent.add_message(MessageParam(role="user", content=error_msg))
+            logger.error(error_msg)
+            return
+
         messages = []
         from_agent_id = self.active_agent.id
         agent_transfer.context = self.active_agent.build_context_for_next_agent(

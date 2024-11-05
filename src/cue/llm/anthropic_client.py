@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from typing import Optional
 
 import anthropic
 from anthropic.types import ToolUseBlock
@@ -157,14 +158,16 @@ class AnthropicClient:
                     content[-1].pop("cache_control", None)  # Remove existing cache_control
                     break  # Stop processing older messages
 
-    def replace_tool_call_ids(self, response_data: PromptCachingBetaMessage) -> None:
+    def replace_tool_call_ids(
+        self, response_data: Optional[PromptCachingBetaMessage]
+    ) -> Optional[PromptCachingBetaMessage]:
         """
         Replace tool call IDs in the response to:
         1) Ensure uniqueness by generating new IDs from the server if duplicates exist.
         2) Shorten IDs to save tokens (length optimization may be adjusted).
         """
-        if not response_data or not response_data.content:
-            return
+        if response_data is None or response_data.content is None:
+            return None
 
         for content in response_data.content:
             if not isinstance(content, ToolUseBlock):
