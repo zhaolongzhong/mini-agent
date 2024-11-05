@@ -16,6 +16,7 @@ from anthropic.types.beta import BetaTextBlockParam, BetaImageBlockParam, BetaTo
 from .llm import LLMClient
 from .tools import Tool, MemoryTool, ToolResult, ToolManager
 from .utils import DebugUtils, record_usage
+from .context import DynamicContextManager, ProjectContextManager
 from .schemas import (
     Author,
     AgentConfig,
@@ -29,17 +30,17 @@ from .schemas import (
 )
 from .memory.memory_manager import DynamicMemoryManager
 from .system_message_builder import SystemMessageBuilder
-from .context.context_manager import DynamicContextManager
 
 logger = logging.getLogger(__name__)
 
 
 class Agent:
     def __init__(self, config: AgentConfig, agent_manager: "AgentManager"):  # type: ignore # noqa: F821
-        self.id = config.id.strip().replace(" ", "_")
+        self.id = config.id
         self.config = config
         self.tool_manager: Optional[ToolManager] = None
         self.memory_manager = DynamicMemoryManager(max_tokens=1000)
+        self.project_context_manager = ProjectContextManager()
         self.context = DynamicContextManager(max_tokens=12000 if self.config.is_primary else 4096)
         self.client: LLMClient = LLMClient(self.config)
         self.metadata: Optional[RunMetadata] = None
@@ -113,7 +114,6 @@ class Agent:
                 os.path.abspath(os.path.join(os.path.dirname(__file__), "../../logs/feedbacks"))
             )
             self.config.feedback_path.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"System feedback: {self.config.feedback_path}")
 
     async def run(self, author: Optional[Author] = None):
         self._init_tools()
@@ -127,6 +127,10 @@ class Agent:
         if memories_param:
             history.insert(0, memories_param)
             logger.debug(f"Recent memories: {json.dumps(memories_param, indent=4)}")
+
+        project_context = self.project_context_manager.load_project_context(self.config.project_context_path)
+        if project_context:
+            history.insert(0, project_context)
         return await self.send_messages(messages=history, author=author)
 
     async def send_messages(

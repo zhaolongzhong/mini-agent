@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     API_URL: str = ""  # Default to localhost
+    AGENTS_CONFIG_FILE: str = ""
     POSTGRES_HOST: Optional[str] = "127.0.0.1"
     POSTGRES_USER: Optional[str] = "postgres"
     POSTGRES_PASSWORD: Optional[str] = "password"
@@ -33,7 +34,7 @@ class Settings(BaseSettings):
         )
 
     model_config = SettingsConfigDict(
-        env_file=str(Path(__file__).parent / ".env"),  # src/cue/.env
+        env_file=str(Path(__file__).parent.parent.parent / ".env"),  # src/cue/.env
         env_file_encoding="utf-8",
         from_attributes=True,
         extra="ignore",

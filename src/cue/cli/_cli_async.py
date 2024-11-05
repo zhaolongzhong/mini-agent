@@ -9,11 +9,12 @@ from rich.text import Text
 from rich.theme import Theme
 from rich.console import Console
 
+from ..config import get_settings
 from ..schemas import RunMetadata, CompletionResponse
 from ..utils.logs import setup_logging
-from ..cli._agents import get_agent_configs
 from ._cli_command import CliCommand, parse_command
 from .._agent_manager import AgentManager
+from .._agent_provider import AgentProvider
 from ..utils.id_generator import generate_run_id
 
 setup_logging()
@@ -36,15 +37,19 @@ class CLI:
 
         self.agent_manager = AgentManager()
         self.executor = ThreadPoolExecutor()
-        configs, active_agent_id = get_agent_configs()
-        self.configs = configs
-        self.active_agent_id = active_agent_id
+        self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
+        primary_agent = self.agent_provider.get_primary_agent()
+        self.active_agent_id = primary_agent.id
+
         self._config_agents()
         self.enable_debug_turn = args.enable_debug_turn
 
     def _config_agents(self) -> str:
         # Register all agents
-        self.agents = {config.id: self.agent_manager.register_agent(config) for _, config in self.configs.items()}
+        self.agents = {
+            config.id: self.agent_manager.register_agent(config)
+            for config in self.agent_provider.get_configs().values()
+        }
         return self.active_agent_id
 
     async def _get_user_input_async(self, prompt: str):

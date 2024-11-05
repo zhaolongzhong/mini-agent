@@ -133,10 +133,10 @@ class GeminiClient(LLMRequest, BaseClient):
         else:
             logger.debug(f"Metadata: {metadata.model_dump_json()}")
 
-        if metadata.current_depth >= metadata.max_turns:
+        if metadata.current_turn >= metadata.max_turns:
             response = input(f"Maximum depth of {metadata.max_turns} reached. Continue?" " (y/n): ")
             if response.lower() in ["y", "yes"]:
-                metadata.current_depth = 0
+                metadata.current_turn = 0
             else:
                 return None
 
@@ -157,8 +157,7 @@ class GeminiClient(LLMRequest, BaseClient):
 
         metadata = RunMetadata(
             user_messages=metadata.user_messages,
-            current_depth=metadata.current_depth + 1,
-            total_depth=metadata.total_depth + 1,
+            current_turn=metadata.current_turn + 1,
         )
 
         return await self.send_completion_request(memory=memory, metadata=metadata)

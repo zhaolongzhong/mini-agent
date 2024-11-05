@@ -64,6 +64,10 @@ class MemoryTool(BaseTool):
         **kwargs,
     ):
         """Perform memory operations like "view", "create", "recall", "update", and "delete" memory."""
+        if self.memory_service is None:
+            error_msg = "Memory tool is called but external memory is not enabled."
+            logger.error(error_msg)
+            raise ToolError(error_msg)
         if command == "view":
             limit = ParameterValidator.safe_int(limit, default=10)
             return await self.view(memory_id=memory_id, limit=limit.value)

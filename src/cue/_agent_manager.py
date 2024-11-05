@@ -91,6 +91,7 @@ class AgentManager:
                     return response
                 else:
                     # auto switch to primary agent
+                    logger.info("Auto switch to primary agent")
                     transfer = AgentTransfer(to_agent_id=self.primary_agent.id, message=response.get_text())
                     await self._handle_transfer(transfer)
                     continue

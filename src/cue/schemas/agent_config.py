@@ -11,7 +11,8 @@ class AgentConfig(BaseModel):
     name: Optional[str] = "default_name"
     is_primary: Optional[bool] = False
     feedback_path: Optional[Path] = None
-    # Detailed description of agent's role, capabilities, and collaboration patterns
+    project_context_path: Optional[str] = None
+    # Detailed description of agent's role, capabilities, and collaboration patterns, which is used for other agents info
     description: Optional[str] = None
     # System message defining agent's behavior, collaboration guidelines, and boundaries
     instruction: Optional[str] = None

@@ -1,11 +1,12 @@
 from typing import Dict, List, Optional
 
 from .llm import ChatModel
+from .config import get_settings
 from .schemas import AgentConfig, RunMetadata, CompletionResponse
 from .utils.logs import _logger, setup_logging
-from .cli._agents import get_agent_configs
 from .tools._tool import Tool
 from ._agent_manager import AgentManager
+from ._agent_provider import AgentProvider
 
 setup_logging()
 
@@ -17,6 +18,7 @@ class AsyncCueClient:
         self.agents: Dict[str, AgentConfig] = {}
         self.active_agent_id: Optional[str] = None
         self.run_metadata = RunMetadata()
+        self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
 
     def _create_default_config(self) -> AgentConfig:
         return AgentConfig(
@@ -38,11 +40,13 @@ class AsyncCueClient:
 
         active_agent_id = None
         if not configs:
-            configs_dict, main_agent_id = get_agent_configs()
+            configs_dict = self.agent_provider.get_configs()
             configs = configs_dict
-            active_agent_id = main_agent_id
+            active_agent_id = self.agent_provider.get_primary_agent().id
         else:
-            active_agent_id = configs[0].id
+            active_agent_id = self.agent_provider.find_primary_agent_id(configs)
+            if not active_agent_id:
+                active_agent_id = configs[0].id
         self.active_agent_id = active_agent_id
 
         for config in configs:
