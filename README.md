@@ -55,6 +55,13 @@ Choose the option that best fits your workflow.
 
 ### Step 4: Run command line
 
+Start backend server first if you use external long-term memory, which requires docker desktop running
+
+```bash
+cd backend/
+./scripts/run.sh
+```
+
 Start the command line:
 
 ```bash
@@ -103,6 +110,12 @@ export CUE_LOG="debug"
 ## Diagram
 
 ![Diagram](assets/diagram.png)
+
+## Prompt Caching
+
+Prompt caching is a crucial optimization that significantly reduces latency and token usage. This feature is foundational for building high-performance AI agent systems, enabling efficient multi-turn conversations while managing costs.
+
+[Learn more about the implementation →](docs/prompt_caching.md)
 
 ## Testing
 
