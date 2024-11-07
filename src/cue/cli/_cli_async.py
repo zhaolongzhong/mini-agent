@@ -15,6 +15,7 @@ from ..utils.logs import setup_logging
 from ._cli_command import CliCommand, parse_command
 from .._agent_manager import AgentManager
 from .._agent_provider import AgentProvider
+from ..utils.debug_utils import DebugUtils
 from ..utils.id_generator import generate_run_id
 
 setup_logging()
@@ -112,7 +113,7 @@ class CLI:
 
                 self.logger.debug(f"{user_input}")
                 run_metadata.user_messages.append(f"{user_input}")
-
+                DebugUtils.log_chat({"user": user_input})
                 response = await self.agent_manager.run(active_agent_id, user_input, run_metadata)
                 if response:
                     agent_id = self.agent_manager.active_agent.id

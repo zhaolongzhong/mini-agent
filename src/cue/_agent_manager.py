@@ -15,6 +15,7 @@ from .schemas import (
     ToolResponseWrapper,
 )
 from .tools._tool import ToolManager
+from .utils.debug_utils import DebugUtils
 from .memory.memory_service_client import MemoryServiceClient
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,7 @@ class AgentManager:
             if not tool_calls:
                 self.active_agent.add_message(response)
                 if self.active_agent.config.is_primary:
+                    DebugUtils.log_chat({"assistant": response.get_text()})
                     return response
                 else:
                     # auto switch to primary agent
@@ -95,6 +97,10 @@ class AgentManager:
                     transfer = AgentTransfer(to_agent_id=self.primary_agent.id, message=response.get_text())
                     await self._handle_transfer(transfer)
                     continue
+
+            text_content = response.get_text()
+            if text_content:
+                DebugUtils.log_chat({"assistant": text_content})
 
             tool_result = await self.active_agent.process_tools_with_timeout(
                 tool_calls=tool_calls, timeout=30, author=response.author
@@ -110,6 +116,7 @@ class AgentManager:
                     continue
                 else:
                     if tool_result.base64_images:
+                        logger.debug("Add base64_image result to message params")
                         tool_result_content = {
                             "type": "image_url",
                             "image_url": {"url": f"data:image/jpeg;base64,{tool_result.base64_images[0]}"},
