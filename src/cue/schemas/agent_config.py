@@ -22,6 +22,7 @@ class AgentConfig(BaseModel):
     max_tokens: Optional[int] = 1000
     stop_sequences: Optional[list[str]] = None
     tools: Optional[list[Any]] = []  # callable or tool enum
+    parallel_tool_calls: bool = True
     conversation_id: Optional[str] = None
     max_actions: Optional[int] = 10
     enable_external_memory: bool = False

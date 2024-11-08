@@ -70,7 +70,7 @@ class OpenAIClient(LLMRequest):
                     "message_tokens": message_tokens,
                 }
                 logger.debug(
-                    f"{self.config.id} input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
+                    f"{self.config.model_dump_json(indent=4)} input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
                     f"\ntools_json: {json.dumps(request.tool_json, indent=4)}"
                 )
                 messages.insert(0, system_message)
@@ -84,6 +84,7 @@ class OpenAIClient(LLMRequest):
                         response_format=request.response_format,
                         tool_choice=request.tool_choice,
                         tools=self.tool_json,
+                        parallel_tool_calls=request.parallel_tool_calls,
                     )
                 else:
                     response = await self.client.chat.completions.create(

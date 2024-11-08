@@ -87,6 +87,7 @@ class AnthropicClient:
                     temperature=request.temperature,
                     tools=request.tool_json,
                     betas=["prompt-caching-2024-07-31"],
+                    tool_choice={"type": "auto", "disable_parallel_tool_use": True},
                 )
 
             else:

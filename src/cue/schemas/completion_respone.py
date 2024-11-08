@@ -69,9 +69,14 @@ class CompletionResponse:
             f"Expected AnthropicMessage or ChatCompletion, got {type(self.response).__name__}"
         )
 
-    def get_text(self) -> Union[str, list[dict]]:
+    def get_text(self) -> Optional[str]:
         if self.response is None:
-            return str(self.error)
+            if isinstance(self.error, ErrorResponse):
+                return self.error.message
+            elif self.error:
+                return str(self.error)
+            else:
+                raise Exception("Unexpected response at CompletionResponse")
 
         if isinstance(self.response, (AnthropicMessage, PromptCachingBetaMessage)):
             return "\n".join(content.text for content in self.response.content if isinstance(content, TextBlock))
@@ -94,6 +99,64 @@ class CompletionResponse:
         raise InvalidResponseTypeError(
             f"Expected AnthropicMessage or ChatCompletion, got {type(self.response).__name__}"
         )
+
+    def get_tool_calls_peek(self, debug=False) -> Optional[str]:
+        """Peek the tool use (action) and preview all arguments with truncated values"""
+        tool_calls = self.get_tool_calls()
+        if not tool_calls:
+            return None
+
+        previews = []
+        for tool in tool_calls:
+            if isinstance(tool, ToolUseBlock):
+                tool_id = tool.id[:10]
+                preview_args = []
+
+                # Process all arguments in the input
+                for key, value in tool.input.items():
+                    str_value = str(value)
+                    if len(str_value) > 20:
+                        str_value = str_value[:17] + "..."
+                    preview_args.append(f"{key}={str_value}")
+
+                preview = f"{tool_id}:({', '.join(preview_args)})"
+                if debug:
+                    preview = f"ToolUseBlock-{preview}"
+                previews.append(preview)
+
+            elif isinstance(tool, ChatCompletionMessageToolCall):
+                tool_id = tool.id[:10]
+
+                try:
+                    import json
+
+                    args = json.loads(tool.function.arguments)
+                    preview_args = []
+
+                    # Process all arguments
+                    for key, value in args.items():
+                        str_value = str(value)
+                        if len(str_value) > 20:
+                            str_value = str_value[:17] + "..."
+                        preview_args.append(f"{key}={str_value}")
+
+                    preview = f"{tool_id}:({', '.join(preview_args)})"
+                    if debug:
+                        preview = f"ChatCompletion-{preview}"
+                    previews.append(preview)
+
+                except json.JSONDecodeError:
+                    preview = f"{tool_id}:(invalid_json)"
+                    if debug:
+                        preview = f"ChatCompletion-{preview}"
+                    previews.append(preview)
+
+            else:
+                raise InvalidResponseTypeError(
+                    f"Expected ToolUseBlock or ChatCompletionMessageToolCall, got {type(tool)}"
+                )
+
+        return " | ".join(previews) if previews else None
 
     def get_usage(self) -> Optional[CompletionUsage]:
         if self.response is None:

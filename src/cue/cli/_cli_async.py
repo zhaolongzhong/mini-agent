@@ -6,9 +6,8 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 
 from rich.text import Text
-from rich.theme import Theme
-from rich.console import Console
 
+from ..utils import ConsoleUtils
 from ..config import get_settings
 from ..schemas import RunMetadata, CompletionResponse
 from ..utils.logs import setup_logging
@@ -20,21 +19,13 @@ from ..utils.id_generator import generate_run_id
 
 setup_logging()
 
-custom_theme = Theme(
-    {
-        "user": "bold blue",
-        "cue": "bold green",
-        "error": "bold red",
-    }
-)
-
 logger = logging.getLogger(__name__)
 
 
 class CLI:
     def __init__(self, args):
         self.logger = logger
-        self.console = Console(theme=custom_theme)
+        self.console_utils = ConsoleUtils()
 
         self.agent_manager = AgentManager()
         self.executor = ThreadPoolExecutor()
@@ -55,7 +46,7 @@ class CLI:
 
     async def _get_user_input_async(self, prompt: str):
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(self.executor, lambda: self.console.input(prompt))
+        return await loop.run_in_executor(self.executor, lambda: self.console_utils.console.input(prompt))
 
     async def run(self):
         self.logger.info("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
@@ -78,16 +69,14 @@ class CLI:
 
                 # Handle empty or too short messages
                 if not command and (not message or len(message) < 3):
-                    error_message = Text("[Cue ]: ", style="cue")
-                    error_message.append("Message must be at least 3 characters long.", style="error")
-                    self.console.print(error_message)
+                    self.console_utils.print_error_msg("Message must be at least 3 characters long.")
                     continue
 
                 # Handle commands
                 if command == CliCommand.HELP:
                     from ._cli_command import print_help
 
-                    print_help(self.console, message)
+                    print_help(self.console_utils.console, message)
                     continue
                 if command == CliCommand.EXIT:
                     self.logger.info("Exit command received. Shutting down.")
@@ -98,7 +87,7 @@ class CLI:
                         snapshot_path = self.agent_manager.active_agent.snapshot()
                         success_msg = Text("[System]: ", style="system")
                         success_msg.append(f"Snapshot saved to {snapshot_path}", style="success")
-                        self.console.print(success_msg)
+                        self.console_utils.console.print(success_msg)
 
                         # If there was additional message content, process it
                         if message and len(message) >= 3:
@@ -108,7 +97,7 @@ class CLI:
                     except Exception as e:
                         error_msg = Text("[System]: ", style="system")
                         error_msg.append(f"Failed to save snapshot: {str(e)}", style="error")
-                        self.console.print(error_msg)
+                        self.console_utils.console.print(error_msg)
                         continue
 
                 self.logger.debug(f"{user_input}")
@@ -119,12 +108,10 @@ class CLI:
                     agent_id = self.agent_manager.active_agent.id
                     if isinstance(response, CompletionResponse):
                         response = response.get_text()
+                        self.console_utils.print_msg(agent_id, response)
                     else:
                         logger.error(f"Unexpected response: {response}")
-                    message = Text()
-                    message.append(f"[{agent_id}]: ", style="cue")
-                    message.append(str(response), style="cue")
-                    self.console.print(message)
+                        self.console_utils.print_error_msg(agent_id, f"Unexpected response: {response}")
 
         except Exception as e:
             self.logger.exception(f"An error occurred: {e}")

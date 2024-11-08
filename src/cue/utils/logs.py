@@ -56,9 +56,8 @@ def _setup_development_config() -> None:
         logger.removeHandler(handler)  # Remove the handler from the logger
 
     handlers = []
-
     console_handler = ConsoleHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.INFO)
     formatter = SimpleFormatter(
         "[%(asctime)s.%(msecs)03d][%(shortlevel)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -94,8 +93,8 @@ def _setup_development_config() -> None:
     # **Set the root logger level here**
     logger.setLevel(logging.DEBUG if env == "debug" else logging.INFO)
     logging.getLogger("asyncio").setLevel(logging.WARN)
-    logging.getLogger("httpcore").setLevel(logging.INFO)
-    logging.getLogger("httpx").setLevel(logging.INFO)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("passlib").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logging.getLogger("anthropic").setLevel(logging.INFO)
@@ -111,4 +110,4 @@ def setup_logging() -> None:
     elif env == "info":
         _basic_config()
         _logger.setLevel(logging.INFO)
-        httpx_logger.setLevel(logging.INFO)
+        httpx_logger.setLevel(logging.WARNING)

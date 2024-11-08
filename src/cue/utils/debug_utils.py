@@ -24,9 +24,11 @@ class DebugUtils:
             size = len(messages)
             for i, message in enumerate(messages, 1):
                 if isinstance(message, BaseModel):
-                    message = message.model_dump()
+                    # message = message.model_dump()
+                    pass
                 if isinstance(message, dict) or isinstance(message, list):
-                    logger.debug(f"{tag} Message {i}/{size}: {json.dumps(message, indent=indent + 2)}")
+                    processed_message = truncate_image_data(message)
+                    logger.debug(f"{tag} Message {i}/{size}: {json.dumps(processed_message, indent=indent + 2)}")
                 else:
                     logger.debug(f"{tag} Message {i}/{size}: {message}")
 
@@ -104,3 +106,39 @@ class DebugUtils:
         else:
             with open(file_path, encoding="utf-8") as f:
                 print(json.load(f))
+
+    @staticmethod
+    def log_chat(msg: dict) -> None:
+        logger.debug(msg)
+        base_dir = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+        user_input_path = base_dir / "logs/chat.jsonl"
+        user_input_path.parent.mkdir(parents=True, exist_ok=True)
+        msg_with_timestamp = {"timestamp": datetime.now().isoformat(), **msg}
+        with open(user_input_path, "a", encoding="utf-8") as f:
+            json.dump(msg_with_timestamp, f)
+            f.write("\n")
+
+
+def truncate_image_data(obj, max_length=50):
+    """Recursively process dictionary/list to truncate image data"""
+    if isinstance(obj, dict):
+        # Case 1: Handle openai image_url structure
+        if obj.get("type") == "image_url" and "image_url" in obj:
+            image_url = obj["image_url"]
+            if "url" in image_url and image_url["url"].startswith("data:image"):
+                new_obj = obj.copy()
+                base64_part = image_url["url"].split("base64,")[1]
+                new_obj["image_url"] = {"url": f"<base64_image_data truncated, length: {len(base64_part)}>"}
+                return new_obj
+        # Case 2: Handle anthropic image with source structure
+        if obj.get("type") == "image" and "source" in obj:
+            source = obj["source"]
+            if source.get("type") == "base64" and "data" in source:
+                new_obj = obj.copy()
+                new_obj["source"] = {**source, "data": f"<base64_image_data truncated, length: {len(source['data'])}>"}
+                return new_obj
+        return {key: truncate_image_data(value, max_length) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [truncate_image_data(item, max_length) for item in obj]
+    else:
+        return obj
