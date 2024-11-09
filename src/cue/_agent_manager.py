@@ -3,6 +3,7 @@ import asyncio
 import logging
 from typing import Dict, List, Optional
 
+from .utils import DebugUtils, console_utils
 from ._agent import Agent
 from .schemas import (
     Author,
@@ -14,9 +15,14 @@ from .schemas import (
     ConversationContext,
     ToolResponseWrapper,
 )
+from .services import ServiceManager
 from .tools._tool import ToolManager
-from .utils.debug_utils import DebugUtils
-from .memory.memory_service_client import MemoryServiceClient
+from .schemas.event_message import (
+    EventMessage,
+    ClientMessage,
+    EventMessageType,
+    PromptEventPayload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,34 +33,70 @@ class AgentManager:
         self._agents: Dict[str, Agent] = {}
         self.active_agent: Optional[Agent] = None
         self.primary_agent: Optional[Agent] = None
-        self.memory_service: Optional[MemoryServiceClient] = None
+        self.service_manager: Optional[ServiceManager] = None
         self.tool_manager: Optional[ToolManager] = None
+        self.run_metadata: Optional[RunMetadata] = None
+        self.console_utils = console_utils
+
+    async def initialize(self, enable_external_memory: Optional[bool] = False):
+        logger.debug("initialize")
+        if enable_external_memory:
+            self.service_manager = await ServiceManager.create(on_receive_user_message=self.on_receive_user_message)
+            await self.service_manager.connect()
+
+        # Update other agents info once we set primary agent
+        self._update_other_agents_info()
+
+    async def clean_up(self):
+        if self.service_manager:
+            await self.service_manager.close()
+
+        cleanup_tasks = []
+        for agent_id in list(self._agents.keys()):
+            try:
+                if hasattr(self._agents[agent_id], "cleanup"):
+                    cleanup_tasks.append(asyncio.create_task(self._agents[agent_id].cleanup()))
+            except Exception as e:
+                logger.error(f"Error cleaning up agent {agent_id}: {e}")
+
+        if cleanup_tasks:
+            await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+
+        self._agents.clear()
+        logger.info("All agents cleaned up and removed.")
 
     async def run(
         self,
-        agent_identifier: str,
+        active_agent_id: str,
         message: str,
         run_metadata: RunMetadata = RunMetadata(),
     ) -> CompletionResponse:
-        self.primary_agent = self.get_agent(agent_identifier)
-        # Update other agents info once we set primary agent
-        self._update_other_agents_info()
-        if run_metadata.enable_external_memory and self.memory_service:
+        if not self.run_metadata:
+            self.run_metadata = run_metadata
+
+        if self.service_manager:
             try:
-                self.memory_service = MemoryServiceClient()
-                await self.memory_service.create_default_assistant()
+                await self.service_manager.assistants.create_default_assistant()
             except Exception as e:
                 logger.error(f"Ran into error while set up memory service: {e}")
-                self.memory_service = None
         if not self.tool_manager:
-            self.tool_manager = ToolManager(self.memory_service)
+            memory_client = None
+            if self.service_manager:
+                memory_client = self.service_manager.memories
+            self.tool_manager = ToolManager(memory_client)
         try:
-            logger.info(f"Starting run with agent {agent_identifier}")
+            logger.info(f"Starting run with agent {active_agent_id}")
             start_time = time.time()
             response = await self._execute_run(self.primary_agent, message, run_metadata)
             duration = time.time() - start_time
             logger.info(f"Run completed in {duration:.2f}s, metadata:\n{run_metadata.model_dump_json(indent=4)}")
 
+            if isinstance(response, CompletionResponse):
+                response = response.get_text()
+                self.console_utils.print_msg(active_agent_id, response)
+            else:
+                logger.error(f"Unexpected response: {response}")
+                self.console_utils.print_error_msg(active_agent_id, f"Unexpected response: {response}")
             return response
         except Exception as e:
             logger.error(f"Error in run: {str(e)}", exc_info=True)
@@ -75,8 +117,9 @@ class AgentManager:
                 break
 
             response: CompletionResponse = await self.active_agent.run(author)
-            author = None
+            await self.broadcast(response)
 
+            author = Author(role="assistant", name="")
             if not isinstance(response, CompletionResponse):
                 if response.error:
                     logger.error(response.error.model_dump())
@@ -208,26 +251,29 @@ class AgentManager:
 
         return True
 
-    async def initialize(self, active_agent_id: str):
-        self.active_agent = self.get_agent(active_agent_id)
+    async def broadcast(self, completion_response: CompletionResponse):
+        if not self.service_manager:
+            return
 
-    async def clean_up(self):
-        if self.memory_service:
-            await self.memory_service.disconnect()
+        msg = EventMessage(
+            type=EventMessageType.ASSISTANT,
+            payload=ClientMessage(role="assistant", content=completion_response.get_text()),
+        )
+        await self.service_manager.broadcast(msg.model_dump_json())
 
-        cleanup_tasks = []
-        for agent_id in list(self._agents.keys()):
-            try:
-                if hasattr(self._agents[agent_id], "cleanup"):
-                    cleanup_tasks.append(asyncio.create_task(self._agents[agent_id].cleanup()))
-            except Exception as e:
-                logger.error(f"Error cleaning up agent {agent_id}: {e}")
+    async def on_receive_user_message(self, event: EventMessage) -> None:
+        logger.debug(f"on_receive_user_message: {event}")
+        if event.type == EventMessageType.PROMPT:
+            if isinstance(event.payload, PromptEventPayload):
+                user_message = event.payload.content
+                if not self.run_metadata:
+                    self.run_metadata = RunMetadata()
+                await self.run(self.active_agent.id, user_message, self.run_metadata)
 
-        if cleanup_tasks:
-            await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-
-        self._agents.clear()
-        logger.info("All agents cleaned up and removed.")
+    async def send_user_message(self, user_input: str) -> None:
+        logger.debug(f"broadcast user message: {user_input}")
+        msg = EventMessage(type=EventMessageType.PROMPT, payload=PromptEventPayload(role="user", content=user_input))
+        await self.service_manager.broadcast(msg.model_dump_json())
 
     def register_agent(self, config: AgentConfig) -> Agent:
         if config.id in self._agents:

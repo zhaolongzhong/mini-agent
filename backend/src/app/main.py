@@ -1,8 +1,12 @@
+import logging
+
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from .api.main import api_router
 from .core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -26,8 +30,3 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.get("/api/v1/health")
 def health_check():
     return {"status": "ok"}
-
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}

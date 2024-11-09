@@ -2,9 +2,7 @@ import os
 import logging
 from logging.handlers import TimedRotatingFileHandler
 
-from rich.style import Style
-from rich.theme import Theme
-from rich.console import Console
+from .console import rich_handler
 
 _logger: logging.Logger = logging.getLogger("mini-agent")
 httpx_logger: logging.Logger = logging.getLogger("httpx")
@@ -15,24 +13,6 @@ class SimpleFormatter(logging.Formatter):
         # Use only the first character of the levelname
         record.shortlevel = record.levelname[0]
         return super().format(record)
-
-
-class ConsoleHandler(logging.StreamHandler):
-    def emit(self, record: logging.LogRecord) -> None:
-        msg = self.format(record)
-        theme = Theme(
-            {
-                "debug": Style(color="grey54"),
-                "info": "cyan",
-                "warning": "magenta",
-                "error": "bold red",
-            }
-        )
-        style = str(record.levelname).lower().strip()
-
-        # Set markup to False to avoid parsing errors
-        console = Console(theme=theme, markup=False)
-        console.print(msg, style=style)
 
 
 def _basic_config() -> None:
@@ -56,14 +36,15 @@ def _setup_development_config() -> None:
         logger.removeHandler(handler)  # Remove the handler from the logger
 
     handlers = []
-    console_handler = ConsoleHandler()
-    console_handler.setLevel(logging.INFO)
     formatter = SimpleFormatter(
         "[%(asctime)s.%(msecs)03d][%(shortlevel)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    console_handler.setFormatter(formatter)
-    handlers.append(console_handler)
+
+    rich_handler.setLevel(logging.DEBUG)
+    rich_handler.setFormatter(formatter)
+    handlers.append(rich_handler)
+
     if environment.lower() in ("development", "testing"):
         # Determine the base directory (three levels up)
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))

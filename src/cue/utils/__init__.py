@@ -1,17 +1,15 @@
 """Initialize the utils package"""
 
-from .console import ConsoleUtils, custom_theme, default_console
+from .console import console_utils
 from .debug_utils import DebugUtils
 from .usage_utils import record_usage
 from .id_generator import generate_id, generate_run_id
 from .token_counter import TokenCounter
 
 __all__ = [
-    "ConsoleUtils",
+    "console_utils",
     "DebugUtils",
     "TokenCounter",
-    "custom_theme",
-    "default_console",
     "generate_id",
     "generate_run_id",
     "record_usage",

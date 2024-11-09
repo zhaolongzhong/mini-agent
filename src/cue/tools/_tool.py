@@ -8,13 +8,13 @@ from .drive import GoogleDriveTool
 from .email import EmailTool
 from .browse import BrowseTool
 from .memory import MemoryTool
+from ..services import MemoryClient
 from .bash_tool import BashTool
 from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
 from .run_script import PythonRunner
 from .utils.function_utils import get_definition_by_model
 from .utils.function_to_json import function_to_json
-from ..memory.memory_service_client import MemoryServiceClient
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class Tool(Enum):
 
 
 class ToolManager:
-    def __init__(self, memory_service: Optional[MemoryServiceClient] = None):
+    def __init__(self, memory_service: Optional[MemoryClient] = None):
         self.tools: Dict[str, BaseTool] = {
             Tool.Bash.value: BashTool(),
             Tool.Edit.value: EditTool(),

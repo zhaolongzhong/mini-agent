@@ -7,15 +7,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 from rich.text import Text
 
-from ..utils import ConsoleUtils
+from ..utils import DebugUtils, console_utils, generate_run_id
 from ..config import get_settings
-from ..schemas import RunMetadata, CompletionResponse
+from ..schemas import RunMetadata
 from ..utils.logs import setup_logging
 from ._cli_command import CliCommand, parse_command
 from .._agent_manager import AgentManager
 from .._agent_provider import AgentProvider
-from ..utils.debug_utils import DebugUtils
-from ..utils.id_generator import generate_run_id
 
 setup_logging()
 
@@ -25,51 +23,53 @@ logger = logging.getLogger(__name__)
 class CLI:
     def __init__(self, args):
         self.logger = logger
-        self.console_utils = ConsoleUtils()
+        self.console_utils = console_utils
 
         self.agent_manager = AgentManager()
         self.executor = ThreadPoolExecutor()
         self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
-        primary_agent = self.agent_provider.get_primary_agent()
-        self.active_agent_id = primary_agent.id
+        self.primary_agent_config = self.agent_provider.get_primary_agent()
+        self.active_agent_id = None
+        self.enable_external_memory = False
 
-        self._config_agents()
         self.enable_debug_turn = args.enable_debug_turn
+        self._config_agents()
 
-    def _config_agents(self) -> str:
+    def _config_agents(self):
         # Register all agents
         self.agents = {
             config.id: self.agent_manager.register_agent(config)
             for config in self.agent_provider.get_configs().values()
         }
-        return self.active_agent_id
 
     async def _get_user_input_async(self, prompt: str):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(self.executor, lambda: self.console_utils.console.input(prompt))
 
     async def run(self):
-        self.logger.info("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
+        self.enable_external_memory = self.primary_agent_config.enable_external_memory
+        await self.agent_manager.initialize(enable_external_memory=self.enable_external_memory)
+        self.agent_manager.primary_agent = self.agents[self.primary_agent_config.id]
+        self.agent_manager.active_agent = self.agent_manager.primary_agent
+        self.logger.debug("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
+
         try:
-            await self.agent_manager.initialize(self.active_agent_id)
-            activate_agent = self.agent_manager.get_agent(self.active_agent_id)
             run_metadata = RunMetadata(
                 run_id=generate_run_id(),
                 enable_turn_debug=self.enable_debug_turn,
-                enable_external_memory=activate_agent.config.enable_external_memory,
+                enable_external_memory=self.primary_agent_config.enable_external_memory,
             )
 
             while True:
                 active_agent_id = self.agent_manager.active_agent.id
-                user_prompt = Text("[User]: ", style="user")
-                user_input = await self._get_user_input_async(user_prompt)
+                user_input = await self._get_user_input_async("")
 
                 # Parse command
                 command, message = parse_command(user_input)
 
                 # Handle empty or too short messages
                 if not command and (not message or len(message) < 3):
-                    self.console_utils.print_error_msg("Message must be at least 3 characters long.")
+                    self.console_utils.print_error_msg(active_agent_id, "Message must be at least 3 characters long.")
                     continue
 
                 # Handle commands
@@ -103,15 +103,11 @@ class CLI:
                 self.logger.debug(f"{user_input}")
                 run_metadata.user_messages.append(f"{user_input}")
                 DebugUtils.log_chat({"user": user_input})
-                response = await self.agent_manager.run(active_agent_id, user_input, run_metadata)
-                if response:
-                    agent_id = self.agent_manager.active_agent.id
-                    if isinstance(response, CompletionResponse):
-                        response = response.get_text()
-                        self.console_utils.print_msg(agent_id, response)
-                    else:
-                        logger.error(f"Unexpected response: {response}")
-                        self.console_utils.print_error_msg(agent_id, f"Unexpected response: {response}")
+
+                if self.enable_external_memory:
+                    await self.agent_manager.send_user_message(user_input)
+                else:
+                    await self.agent_manager.run(active_agent_id, user_input, run_metadata)
 
         except Exception as e:
             self.logger.exception(f"An error occurred: {e}")

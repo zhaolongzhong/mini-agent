@@ -4,10 +4,10 @@ from typing import Union, Literal, ClassVar, Optional, get_args
 from pathlib import Path
 
 from .base import BaseTool, ToolError, ToolResult
+from ..schemas import AssistantMemoryCreate, AssistantMemoryUpdate
+from ..services import MemoryClient
 from ..tools.memory_formatter import MemoryFormatter
 from ..tools.memory_validator import ParameterValidator
-from ..schemas.assistant_memory import AssistantMemoryCreate, AssistantMemoryUpdate
-from ..memory.memory_service_client import MemoryServiceClient
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +29,9 @@ class MemoryTool(BaseTool):
 
     _file_history: dict[Path, list[str]]
 
-    def __init__(self, memory_service: Optional[MemoryServiceClient]):
+    def __init__(self, memory_service: Optional[MemoryClient]):
         self._function = self.memory
-        self.memory_service = memory_service
+        self.memory_client = memory_service
         super().__init__()
 
     async def __call__(
@@ -64,7 +64,7 @@ class MemoryTool(BaseTool):
         **kwargs,
     ):
         """Perform memory operations like "view", "create", "recall", "update", and "delete" memory."""
-        if self.memory_service is None:
+        if self.memory_client is None:
             error_msg = "Memory tool is called but external memory is not enabled."
             logger.error(error_msg)
             raise ToolError(error_msg)
@@ -98,10 +98,10 @@ class MemoryTool(BaseTool):
 
         if memory_ids:
             for memory_id in memory_ids:
-                memory = await self.memory_service.get_memory(memory_id=memory_id)
+                memory = await self.memory_client.get_memory(memory_id=memory_id)
                 response.append(memory)
         else:
-            response = await self.memory_service.get_memories(limit=limit)
+            response = await self.memory_client.get_memories(limit=limit)
         response.reverse()
         memory_contents = MemoryFormatter.format_memory_list(
             memories=response,
@@ -116,7 +116,9 @@ class MemoryTool(BaseTool):
 
     async def get_recent_memories(self, limit: Optional[int] = 10) -> list[str]:
         """Return a list formatted memories entry in desc order by updated_at"""
-        response = await self.memory_service.get_memories(limit=limit)
+        if not self.memory_client:
+            return
+        response = await self.memory_client.get_memories(limit=limit)
         memory_strings = [
             MemoryFormatter.format_single_memory(
                 memory,
@@ -131,7 +133,7 @@ class MemoryTool(BaseTool):
 
     async def recall(self, query: str, limit: Optional[int] = 10) -> ToolResult:
         """Implement the recall command"""
-        response = await self.memory_service.search_memories(query, limit=limit)
+        response = await self.memory_client.search_memories(query, limit=limit)
         retrieved_memories = response.memories
 
         if len(retrieved_memories) == 0:
@@ -155,7 +157,7 @@ class MemoryTool(BaseTool):
     ):
         """Implement the update command, which replaces memory content with new_str in the given memory"""
         try:
-            await self.memory_service.update_memory(memory_id=memory_id, memory=AssistantMemoryUpdate(content=new_str))
+            await self.memory_client.update_memory(memory_id=memory_id, memory=AssistantMemoryUpdate(content=new_str))
             success_msg = f"The memory<id: {memory_id}> has been edited. "
             return ToolResult(output=success_msg)
         except Exception as e:
@@ -164,7 +166,7 @@ class MemoryTool(BaseTool):
     async def create(self, new_str: str):
         """Write the content of a file to a given path; raise a ToolError if an error occurs."""
         try:
-            entry = await self.memory_service.create_memory(AssistantMemoryCreate(content=new_str))
+            entry = await self.memory_client.create(AssistantMemoryCreate(content=new_str))
             return ToolResult(output=f"Memory created successfully with id: {entry.id}")
         except Exception as e:
             raise ToolError(f"Ran into {e} while trying to create a memory for {new_str}") from None
@@ -176,7 +178,7 @@ class MemoryTool(BaseTool):
             if not memory_ids:
                 raise ToolError("No memory IDs provided for deletion")
 
-            result = await self.memory_service.delete_memories(memory_ids=memory_ids)
+            result = await self.memory_client.delete_memories(memory_ids=memory_ids)
 
             # Format the response message based on the result
             if result["success"]:

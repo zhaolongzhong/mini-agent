@@ -1,30 +1,30 @@
 from typing import Any, Optional
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, computed_field
 
 
 class Author(BaseModel):
-    name: str | None = None
     role: str
-    metadata: dict | None = None
+    name: Optional[str] = None
+    metadata: Optional[dict] = None
 
 
 class Content(BaseModel):
-    text: str | None = None
+    content: Optional[str] = None
 
 
 class Metadata(BaseModel):
-    model: str | None = ""
-    chat_completion_message: Any | None = None
-    anthropic_message: Any | None = None
+    model: Optional[str] = ""
+    chat_completion_message: Optional[Any] = None
+    anthropic_message: Optional[Any] = None
 
 
 class MessageBase(BaseModel):
     conversation_id: str
-    author: Author | None = None
-    content: Content | None = None
-    metadata: Optional[Metadata]
+    author: Optional[Author] = None
+    content: Optional[Content] = None
+    metadata: Optional[Metadata] = None
 
 
 class MessageCreate(MessageBase):
@@ -40,5 +40,39 @@ class Message(MessageBase):
     created_at: datetime
     updated_at: datetime
 
-    class ConfigDict:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def created_at_iso(self) -> str:
+        return self.created_at.isoformat()
+
+    @computed_field
+    @property
+    def updated_at_iso(self) -> str:
+        return self.updated_at.isoformat()
+
+
+class MessageChunk(BaseModel):
+    id: str
+    content: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def created_at_iso(self) -> str:
+        return self.created_at.isoformat()
+
+    @computed_field
+    @property
+    def updated_at_iso(self) -> str:
+        return self.updated_at.isoformat()
+
+
+class MessageParam(BaseModel):
+    role: str
+    content: str
+    name: Optional[str] = None

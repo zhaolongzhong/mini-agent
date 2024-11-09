@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.core.config import Settings, get_settings
 from app.embedding_manager import EmbeddingManager
+from app.websocket_manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -37,3 +38,8 @@ def get_embedding_manager(
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_async_db)]
+
+
+@lru_cache
+def get_connection_manager() -> ConnectionManager:
+    return ConnectionManager()

@@ -6,28 +6,39 @@ from datetime import datetime
 import pytest
 import pytest_asyncio
 
-from cue.schemas.assistant import AssistantCreate
-from cue.schemas.assistant_memory import AssistantMemoryCreate, AssistantMemoryUpdate
-from cue.memory.memory_service_client import MemoryServiceClient
+from cue.schemas import AssistantCreate, AssistantMemoryCreate, AssistantMemoryUpdate
+from cue.services import MemoryClient, ServiceManager, AssistantClient
 
 logger = logging.getLogger(__name__)
 
 
 @pytest_asyncio.fixture
-async def memory_client() -> AsyncGenerator[MemoryServiceClient, None]:
-    """Fixture to create and manage MemoryServiceClient instance."""
-    client = MemoryServiceClient()
-    await client.connect()
+async def service_manager() -> AsyncGenerator[ServiceManager, None]:
+    """Fixture to create and manage the ServiceManager instance."""
+    service_manager = await ServiceManager.create()
+    await service_manager.connect()
     try:
-        yield client
+        yield service_manager
     finally:
-        await client.disconnect()
+        await service_manager.close()
 
 
 @pytest_asyncio.fixture
-async def test_assistant(memory_client: MemoryServiceClient):
+async def assistant_client(service_manager: ServiceManager) -> AssistantClient:
+    """Fixture to provide the AssistantClient from the ServiceManager."""
+    return service_manager.assistants
+
+
+@pytest_asyncio.fixture
+async def memory_client(service_manager: ServiceManager) -> MemoryClient:
+    """Fixture to provide the MemoryClient from the ServiceManager."""
+    return service_manager.memories
+
+
+@pytest_asyncio.fixture
+async def test_assistant(assistant_client: AssistantClient):
     """Fixture to create a test assistant and yield its object."""
-    assistant = await memory_client.create_assistant(
+    assistant = await assistant_client.create(
         AssistantCreate(
             name=f"Test Assistant {uuid4()}", metadata={"test": True, "created_at": datetime.now().isoformat()}
         )
@@ -36,7 +47,7 @@ async def test_assistant(memory_client: MemoryServiceClient):
         yield assistant
     finally:
         try:
-            await memory_client.delete_assistant(assistant_id=assistant.id)
+            await assistant_client.delete(assistant_id=assistant.id)
         except Exception as e:
             logger.warning(f"Failed to delete test assistant: {e}")
 
@@ -44,13 +55,13 @@ async def test_assistant(memory_client: MemoryServiceClient):
 @pytest.mark.integration
 class TestMemoryServiceClient:
     @pytest.mark.asyncio
-    async def test_create_memory(self, memory_client: MemoryServiceClient, test_assistant) -> None:
+    async def test_create_memory(self, memory_client: MemoryClient, test_assistant) -> None:
         """Test creating and retrieving a memory."""
         assistant_id = test_assistant.id
         memory_content = "This is a test memory content"
 
         # Create memory
-        created_memory = await memory_client.create_memory(
+        created_memory = await memory_client.create(
             memory=AssistantMemoryCreate(assistant_id=assistant_id, content=memory_content, metadata={"test": True}),
             assistant_id=assistant_id,
         )
@@ -86,7 +97,7 @@ class TestMemoryServiceClient:
         assert retrieved_memory is None, "Retrieved memory should be None now"
 
     @pytest.mark.asyncio
-    async def test_query_memories(self, memory_client: MemoryServiceClient, test_assistant) -> None:
+    async def test_query_memories(self, memory_client: MemoryClient, test_assistant) -> None:
         """Test creating multiple memories and querying them."""
         # Create multiple memories
         assistant_id = test_assistant.id
@@ -97,7 +108,7 @@ class TestMemoryServiceClient:
         ]
 
         for content in memories_content:
-            await memory_client.create_memory(
+            await memory_client.create(
                 memory=AssistantMemoryCreate(content=content),
                 assistant_id=assistant_id,
             )

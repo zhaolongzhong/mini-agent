@@ -1,5 +1,13 @@
+from app.schemas.event_message import (
+    EventMessage,
+    EventMessageType,
+    MessageEventPayload,
+    MessageChunkEventPayload,
+)
+
 from .message import (
     Message,
+    MessageChunk,
     MessageCreate,
     MessageUpdate,
 )
@@ -40,6 +48,11 @@ __all__ = [
     "Message",
     "MessageCreate",
     "MessageUpdate",
+    "MessageChunk",
     "RelevantMemory",
     "RelevantMemoriesResponse",
+    "EventMessage",
+    "EventMessageType",
+    "MessageChunkEventPayload",
+    "MessageEventPayload",
 ]

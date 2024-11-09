@@ -9,11 +9,9 @@ import google.auth.transport.requests
 from google.oauth2 import service_account
 
 from ..tools import ToolManager
-from ..memory import MemoryInterface
 from ..schemas import AgentConfig, RunMetadata, ErrorResponse
 from .base_client import BaseClient
 from .llm_request import LLMRequest
-from ..schemas.tool_call import AssistantMessage, convert_to_assistant_message
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +123,7 @@ class GeminiClient(LLMRequest, BaseClient):
 
     async def send_completion_request(
         self,
-        memory: MemoryInterface,
+        messages: list[dict],
         metadata: RunMetadata,
     ) -> Optional[dict]:
         if metadata is None:
@@ -140,24 +138,17 @@ class GeminiClient(LLMRequest, BaseClient):
             else:
                 return None
 
-        schema_messages = memory.get_message_params()
-        response = await self._send_completion_request(schema_messages)
+        response = await self._send_completion_request(messages)
         if isinstance(response, ErrorResponse):
             return response
 
         tool_calls = response.choices[0].message.tool_calls
         if tool_calls is None:
-            message = AssistantMessage(**response.choices[0].message.model_dump())
-            await memory.save(message)
             return response  # return original response
-        tool_call_message = convert_to_assistant_message(response.choices[0].message)
-        await memory.save(tool_call_message)
-        tool_responses = await self.process_tools_with_timeout(tool_calls, timeout=5)
-        await memory.saveList(tool_responses)
 
         metadata = RunMetadata(
             user_messages=metadata.user_messages,
             current_turn=metadata.current_turn + 1,
         )
 
-        return await self.send_completion_request(memory=memory, metadata=metadata)
+        return await self.send_completion_request(messages=messages, metadata=metadata)

@@ -96,7 +96,7 @@ idna==3.10
     # via yarl
 iniconfig==2.0.0
     # via pytest
-jiter==0.6.1
+jiter==0.7.0
     # via anthropic
     # via openai
 lxml==4.9.4
@@ -117,7 +117,7 @@ oauthlib==3.2.2
     # via requests-oauthlib
 openai==1.54.1
     # via cue
-packaging==24.1
+packaging==24.2
     # via pytest
 pluggy==1.5.0
     # via pytest
@@ -155,14 +155,14 @@ pypdf==4.3.1
     # via cue
 pyreqwest-impersonate==0.5.3
     # via duckduckgo-search
-pyright==1.1.386
+pyright==1.1.388
 pytest==8.3.3
     # via pytest-asyncio
 pytest-asyncio==0.24.0
 python-dotenv==1.0.0
     # via cue
     # via pydantic-settings
-regex==2024.9.11
+regex==2024.11.6
     # via tiktoken
 requests==2.32.3
     # via cue
@@ -176,7 +176,7 @@ rich==13.7.1
     # via cue
 rsa==4.9
     # via google-auth
-ruff==0.7.1
+ruff==0.7.3
 sniffio==1.3.1
     # via anthropic
     # via anyio
@@ -186,12 +186,14 @@ soupsieve==2.6
     # via beautifulsoup4
 sqlalchemy==2.0.30
     # via cue
+tenacity==9.0.0
+    # via cue
 tiktoken==0.8.0
     # via cue
 tomli==2.0.2
     # via mypy
     # via pytest
-tqdm==4.66.6
+tqdm==4.67.0
     # via cue
     # via openai
 typing-extensions==4.12.2
@@ -211,5 +213,7 @@ urllib3==2.2.3
     # via blobfile
     # via docker
     # via requests
+websockets==14.0
+    # via cue
 yarl==1.17.1
     # via aiohttp
