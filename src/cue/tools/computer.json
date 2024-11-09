@@ -1,0 +1,43 @@
+{
+    "type": "function",
+    "function": {
+        "name": "computer",
+        "description": "A tool that allows interaction with the screen, keyboard, and mouse of the current computer",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "key",
+                        "type", 
+                        "mouse_move",
+                        "left_click",
+                        "left_click_drag", 
+                        "right_click",
+                        "middle_click",
+                        "double_click",
+                        "screenshot",
+                        "cursor_position"
+                    ],
+                    "description": "The type of computer interaction to perform. 'key'/'type' require text parameter. 'mouse_move'/'left_click_drag' require coordinate parameter. Other actions take no additional parameters."
+                },
+                "text": {
+                    "type": "string",
+                     "description": "Required for 'key' or 'type' actions. For 'key', use '+' to combine (e.g., 'command+c'). On Mac, converts to AppleScript. Common keys:\n- Modifiers: command, ctrl, alt/option, shift\n- Navigation: up/down (single line), pageup/pagedown (full page), return, tab, esc\n- Special: space, delete\n\nExamples: 'return', 'command+c', 'shift+up'"
+                },
+                "coordinate": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "Required when action is 'mouse_move' or 'left_click_drag'. Must be [x, y] coordinates as non-negative integers. Not accepted for other actions."
+                }
+            },
+            "required": ["action"]
+        }
+    }
+}

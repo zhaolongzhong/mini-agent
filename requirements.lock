@@ -102,13 +102,25 @@ markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
+mouseinfo==0.1.3
+    # via pyautogui
 multidict==6.1.0
     # via aiohttp
     # via yarl
+numpy==2.0.2
+    # via opencv-python
 oauthlib==3.2.2
     # via requests-oauthlib
 openai==1.54.1
     # via cue
+opencv-python==4.10.0.84
+    # via cue
+packaging==24.2
+    # via pytesseract
+pillow==11.0.0
+    # via cue
+    # via pyscreeze
+    # via pytesseract
 propcache==0.2.0
     # via yarl
 proto-plus==1.25.0
@@ -117,6 +129,8 @@ protobuf==5.28.3
     # via google-api-core
     # via googleapis-common-protos
     # via proto-plus
+psutil==6.1.0
+    # via cue
 psycopg2-binary==2.9.9
     # via cue
 pyasn1==0.6.1
@@ -124,6 +138,8 @@ pyasn1==0.6.1
     # via rsa
 pyasn1-modules==0.4.1
     # via google-auth
+pyautogui==0.9.54
+    # via cue
 pycryptodomex==3.21.0
     # via blobfile
 pydantic==2.7.0
@@ -135,17 +151,39 @@ pydantic-core==2.18.1
     # via pydantic
 pydantic-settings==2.2.1
     # via cue
+pygetwindow==0.0.9
+    # via pyautogui
 pygments==2.18.0
     # via rich
+pymsgbox==1.0.9
+    # via pyautogui
+pyobjc-core==10.3.1
+    # via pyautogui
+    # via pyobjc-framework-cocoa
+    # via pyobjc-framework-quartz
+pyobjc-framework-cocoa==10.3.1
+    # via pyobjc-framework-quartz
+pyobjc-framework-quartz==10.3.1
+    # via pyautogui
 pyparsing==3.2.0
     # via httplib2
 pypdf==4.3.1
     # via cue
+pyperclip==1.9.0
+    # via mouseinfo
+pyrect==0.2.0
+    # via pygetwindow
 pyreqwest-impersonate==0.5.3
     # via duckduckgo-search
+pyscreeze==1.0.1
+    # via pyautogui
+pytesseract==0.3.13
+    # via cue
 python-dotenv==1.0.0
     # via cue
     # via pydantic-settings
+pytweening==1.2.0
+    # via pyautogui
 regex==2024.11.6
     # via tiktoken
 requests==2.32.3
@@ -160,6 +198,8 @@ rich==13.7.1
     # via cue
 rsa==4.9
     # via google-auth
+rubicon-objc==0.4.9
+    # via mouseinfo
 sniffio==1.3.1
     # via anthropic
     # via anyio

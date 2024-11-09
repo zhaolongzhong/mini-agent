@@ -5,6 +5,7 @@ from .drive import GoogleDriveTool
 from .email import EmailTool
 from .browse import BrowseTool
 from .memory import MemoryTool
+from .computer import ComputerTool
 from .bash_tool import BashTool
 from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
@@ -19,6 +20,7 @@ __all__ = [
     "ToolError",
     "ToolResult",
     "BashTool",
+    "ComputerTool",
     "EditTool",
     "BrowseTool",
     "GoogleDriveTool",

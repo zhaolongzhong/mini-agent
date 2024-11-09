@@ -9,6 +9,7 @@ from .email import EmailTool
 from .browse import BrowseTool
 from .memory import MemoryTool
 from .restart import RestartTool
+from .computer import ComputerTool
 from ..services import MemoryClient
 from .bash_tool import BashTool
 from .coordinate import CoordinateTool
@@ -25,6 +26,7 @@ class Tool(Enum):
     Edit = EditTool.name
     Python = PythonRunner.name
     Browse = BrowseTool.name
+    Computer = ComputerTool.name
     Email = EmailTool.name
     Drive = GoogleDriveTool.name
     Image = ReadImageTool.name
@@ -40,6 +42,7 @@ class ToolManager:
             Tool.Edit.value: EditTool(),
             Tool.Python.value: PythonRunner(),
             Tool.Browse.value: BrowseTool(),
+            Tool.Computer.value: ComputerTool(),
             Tool.Email.value: EmailTool(),
             Tool.Drive.value: GoogleDriveTool(),
             Tool.Drive.value: GoogleDriveTool(),
