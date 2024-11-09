@@ -39,9 +39,13 @@ class AgentManager:
         self.primary_agent = self.get_agent(agent_identifier)
         # Update other agents info once we set primary agent
         self._update_other_agents_info()
-        if run_metadata.enable_external_memory and not self.memory_service:
-            self.memory_service = MemoryServiceClient()
-            await self.memory_service.create_default_assistant()
+        if run_metadata.enable_external_memory and self.memory_service:
+            try:
+                self.memory_service = MemoryServiceClient()
+                await self.memory_service.create_default_assistant()
+            except Exception as e:
+                logger.error(f"Ran into error while set up memory service: {e}")
+                self.memory_service = None
         if not self.tool_manager:
             self.tool_manager = ToolManager(self.memory_service)
         try:

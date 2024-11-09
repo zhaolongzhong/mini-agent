@@ -4,7 +4,7 @@ import json
 from abc import ABCMeta, abstractmethod
 from typing import Any, Dict, Optional
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import fields, replace, dataclass
 
 from .utils.function_utils import get_definition_by_model
 from .utils.function_to_json import function_to_json
@@ -17,6 +17,28 @@ class ToolResult:
     base64_image: Optional[str] = None
     system: Optional[str] = None
     agent_transfer: Optional[Any] = None
+
+    def __bool__(self):
+        return any(getattr(self, field.name) for field in fields(self))
+
+    def __add__(self, other: "ToolResult"):
+        def combine_fields(field: str | None, other_field: str | None, concatenate: bool = True):
+            if field and other_field:
+                if concatenate:
+                    return field + other_field
+                raise ValueError("Cannot combine tool results")
+            return field or other_field
+
+        return ToolResult(
+            output=combine_fields(self.output, other.output),
+            error=combine_fields(self.error, other.error),
+            base64_image=combine_fields(self.base64_image, other.base64_image, False),
+            system=combine_fields(self.system, other.system),
+        )
+
+    def replace(self, **kwargs):
+        """Returns a new ToolResult with the given fields replaced."""
+        return replace(self, **kwargs)
 
 
 class BaseTool(metaclass=ABCMeta):

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
         "http://localhost:8000/ws",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8000",
+        "http://host.docker.internal:8000",
     ]
 
     SERVER_NAME: str | None = None
