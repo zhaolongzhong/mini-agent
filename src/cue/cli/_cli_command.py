@@ -17,6 +17,7 @@ class CommandInfo:
 
 
 class CliCommand(Enum):
+    STOP_RUN = "stop"
     EXIT = "exit"
     QUIT = "quit"
     SNAPSHOT = "snapshot"
@@ -27,6 +28,7 @@ class CliCommand(Enum):
 
 # Command documentation
 COMMAND_DOCS: Dict[CliCommand, CommandInfo] = {
+    CliCommand.STOP_RUN: CommandInfo(description="Stop the current run", usage="stop", examples=["stop"]),
     CliCommand.EXIT: CommandInfo(description="Exit the CLI", usage="exit or quit", examples=["exit", "quit"]),
     CliCommand.SNAPSHOT: CommandInfo(
         description="Take a snapshot of current conversation context",
@@ -102,6 +104,10 @@ def parse_command(user_input: str) -> tuple[Optional[CliCommand], Optional[str]]
     # Check for basic commands
     if input_lower in [CliCommand.EXIT.value, CliCommand.QUIT.value]:
         return (CliCommand.EXIT, None)
+
+    # Check for stop commands
+    if input_lower in [CliCommand.STOP_RUN.value]:
+        return (CliCommand.STOP_RUN, None)
 
     # Check for snapshot commands
     if input_lower == CliCommand.SNAPSHOT.value or input_lower == CliCommand.SNAPSHOT_SHORT.value:

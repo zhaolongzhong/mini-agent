@@ -1,6 +1,7 @@
 import json
 import asyncio
 import logging
+import platform
 from typing import Any, Callable, Optional, Awaitable
 
 import aiohttp
@@ -29,13 +30,14 @@ class ServiceManager:
         self,
         base_url: str,
         session: aiohttp.ClientSession,
-        on_receive_user_message: Callable[[dict[str, any]], Awaitable[None]] = None,
+        on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
     ):
         self.base_url = base_url
         self.client_id = generate_id(prefix="ws_")
-        self.on_receive_user_message = on_receive_user_message
+        self.on_message = on_message
         self.is_server_available = False
-
+        if platform.system() != "Darwin" and "http://localhost" in self.base_url:
+            self.base_url = self.base_url.replace("http://localhost", "http://host.docker.internal")
         # Set up transports
         self._session = session
         self._http = AioHTTPTransport(self.base_url, self._session)
@@ -51,8 +53,8 @@ class ServiceManager:
                 "generic": self._handle_generic,
                 "message": self._handle_message,
                 "message_chunk": self._handle_message_chunk,
-                "prompt": self._handle_prompt,
-                "assistant": self._handle_assistant,
+                "prompt": self._handle_message,
+                "assistant": self._handle_message,
             },
         )
 
@@ -64,12 +66,14 @@ class ServiceManager:
 
     @classmethod
     async def create(
-        cls, base_url: Optional[str] = None, on_receive_user_message: Callable[[dict[str, any]], Awaitable[None]] = None
+        cls,
+        base_url: Optional[str] = None,
+        on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
     ):
         settings = get_settings()
         base_url = base_url or settings.API_URL
         session = aiohttp.ClientSession()
-        return cls(base_url, session, on_receive_user_message)
+        return cls(base_url, session, on_message)
 
     async def close(self) -> None:
         """Close all connections"""
@@ -117,23 +121,26 @@ class ServiceManager:
         logger.debug(f"Handling generic message: {message}")
 
     async def _handle_message(self, message: dict[str, Any]) -> None:
-        logger.debug(f"Handling message: {message}")
+        logger.debug(f"Handling message: {json.dumps(message, indent=4)}")
+
+        if self.on_message:
+            try:
+                try:
+                    # Attempt to parse message to EventMessage schema
+                    event = EventMessage(**message)
+                except Exception as parse_error:
+                    logger.error(
+                        f"Failed to parse EventMessage schema: {parse_error}. Message content: {json.dumps(message, indent=4)}"
+                    )
+                    return  # Exit early if parsing fails
+
+                await self.on_message(event)
+            except Exception as e:
+                # Catch any other errors in on_message handling
+                logger.error(f"Error in on_message handling: {e}. Message content: {json.dumps(message, indent=4)}")
 
     async def _handle_message_chunk(self, message: dict[str, Any]) -> None:
         logger.debug(f"Handling message chunk: {message}")
-
-    async def _handle_prompt(self, message: dict[str, Any]) -> None:
-        logger.debug(f"Handling prompt: {message}")
-        if self.on_receive_user_message:
-            try:
-                event = EventMessage(**message)
-                await self.on_receive_user_message(event)
-            except Exception as e:
-                logger.error(f"Failed to parse EventMessage: {e}")
-
-    async def _handle_assistant(self, message: dict[str, Any]) -> None:
-        """Handle assistant-related messages."""
-        logger.debug(f"Handling assistant message: {json.dumps(message, indent=4)}")
 
     async def _check_server_availability(self) -> bool:
         """Check if the server is running by performing an HTTP GET request to the health endpoint."""

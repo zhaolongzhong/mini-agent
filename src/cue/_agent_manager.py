@@ -1,7 +1,6 @@
-import time
 import asyncio
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Callable, Optional
 
 from .utils import DebugUtils, console_utils
 from ._agent import Agent
@@ -28,8 +27,16 @@ logger = logging.getLogger(__name__)
 
 
 class AgentManager:
-    def __init__(self):
+    def __init__(
+        self,
+        prompt_callback=None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+        mode: str = "cli",
+    ):
         logger.info("AgentManager initialized")
+        self.prompt_callback = prompt_callback
+        self.loop = loop or asyncio.get_event_loop()
+        self.mode = mode
         self._agents: Dict[str, Agent] = {}
         self.active_agent: Optional[Agent] = None
         self.primary_agent: Optional[Agent] = None
@@ -37,15 +44,22 @@ class AgentManager:
         self.tool_manager: Optional[ToolManager] = None
         self.run_metadata: Optional[RunMetadata] = None
         self.console_utils = console_utils
+        # Removed MessageQueueManager
+        self.user_message_queue: asyncio.Queue[str] = asyncio.Queue()
+        # Reference to the execute_run task
+        self.execute_run_task: Optional[asyncio.Task] = None
+        # Event to signal stopping the run
+        self.stop_run_event: asyncio.Event = asyncio.Event()
 
-    async def initialize(self, enable_external_memory: Optional[bool] = False):
+    async def initialize(self, enable_services: Optional[bool] = False):
         logger.debug("initialize")
-        if enable_external_memory:
-            self.service_manager = await ServiceManager.create(on_receive_user_message=self.on_receive_user_message)
+        if enable_services or self.mode in ["runner", "client"]:
+            self.service_manager = await ServiceManager.create(on_message=self.handle_message)
             await self.service_manager.connect()
 
         # Update other agents info once we set primary agent
         self._update_other_agents_info()
+        await self.initialize_run()
 
     async def clean_up(self):
         if self.service_manager:
@@ -65,68 +79,90 @@ class AgentManager:
         self._agents.clear()
         logger.info("All agents cleaned up and removed.")
 
-    async def run(
-        self,
-        active_agent_id: str,
-        message: str,
-        run_metadata: RunMetadata = RunMetadata(),
-    ) -> CompletionResponse:
-        if not self.run_metadata:
-            self.run_metadata = run_metadata
+    async def initialize_run(self):
+        self.run_metadata = RunMetadata()
 
         if self.service_manager:
             try:
                 await self.service_manager.assistants.create_default_assistant()
             except Exception as e:
-                logger.error(f"Ran into error while set up memory service: {e}")
+                logger.error(f"Error setting up memory service: {e}")
+
         if not self.tool_manager:
-            memory_client = None
-            if self.service_manager:
-                memory_client = self.service_manager.memories
+            memory_client = self.service_manager.memories if self.service_manager else None
             self.tool_manager = ToolManager(memory_client)
-        try:
-            logger.info(f"Starting run with agent {active_agent_id}")
-            start_time = time.time()
-            response = await self._execute_run(self.primary_agent, message, run_metadata)
-            duration = time.time() - start_time
-            logger.info(f"Run completed in {duration:.2f}s, metadata:\n{run_metadata.model_dump_json(indent=4)}")
 
-            if isinstance(response, CompletionResponse):
-                response = response.get_text()
-                self.console_utils.print_msg(active_agent_id, response)
-            else:
-                logger.error(f"Unexpected response: {response}")
-                self.console_utils.print_error_msg(active_agent_id, f"Unexpected response: {response}")
-            return response
-        except Exception as e:
-            logger.error(f"Error in run: {str(e)}", exc_info=True)
-            raise
+    async def run(
+        self,
+        active_agent_id: str,
+        message: str,
+        run_metadata: RunMetadata = RunMetadata(),
+        callback: Optional[Callable[[CompletionResponse], Any]] = None,
+    ) -> None:
+        """Queue a message for processing with optional callback."""
+        if run_metadata:
+            self.run_metadata = run_metadata
+        self.active_agent = self._agents[active_agent_id]
+        # Directly add message to the agent's message history
+        if message:
+            user_message = MessageParam(role="user", content=message)
+            self.active_agent.add_message(user_message)
+        # Log the message
+        logger.debug(f"Queued message for agent {active_agent_id}: {message}")
 
-    async def _execute_run(self, agent: Agent, message: str, run_metadata: RunMetadata):
-        self.active_agent = agent
-        user_message = MessageParam(role="user", content=message)
-        self.active_agent.add_message(user_message)
+        # Start execute_run if not already running
+        if not self.execute_run_task or self.execute_run_task.done():
+            self.execute_run_task = asyncio.create_task(self._execute_run(callback))
+            logger.debug("Started execute_run_task.")
 
+    async def _execute_run(
+        self,
+        callback: Optional[Callable[[CompletionResponse], Any]] = None,
+    ):
+        """Main loop to process messages from the active agent."""
+        logger.debug("execute_run loop started.")
         response = None
         turns_count = 0
 
         author = Author(role="user", name="")
         while True:
-            turns_count += 1
-            if not self.should_continue_run(turns_count, run_metadata):
+            # Check if a stop signal has been received
+            if self.stop_run_event.is_set():
+                logger.info("Stop signal received. Exiting execute_run loop.")
                 break
 
-            response: CompletionResponse = await self.active_agent.run(author)
-            await self.broadcast(response)
+            # Check for dynamically injected user messages
+            while not self.user_message_queue.empty():
+                try:
+                    new_message = self.user_message_queue.get_nowait()
+                    logger.debug(f"Received new user message during run: {new_message}")
+                    # Process the new message immediately
+                    new_user_message = MessageParam(role="user", content=new_message)
+                    self.active_agent.add_message(new_user_message)
+                except asyncio.QueueEmpty:
+                    break
+
+            turns_count += 1
+            if not await self.should_continue_run(turns_count, self.run_metadata):
+                break
+
+            try:
+                response: CompletionResponse = await self.active_agent.run(author)
+            except asyncio.CancelledError:
+                logger.info("execute_run task was cancelled.")
+                break
+            except Exception as e:
+                logger.exception(f"Error during agent run: {e}")
+                break
+
+            await callback(response)
+            await self.broadcast_response(response)
 
             author = Author(role="assistant", name="")
             if not isinstance(response, CompletionResponse):
                 if response.error:
                     logger.error(response.error.model_dump())
                     # Even if there's an error, store the interaction in memory
-                    # This preserves the tool call/response pair for:
-                    # - Maintaining conversation context
-                    # - Avoiding repeated failed attempts
                     self.active_agent.add_message(response)
                     continue
                 else:
@@ -139,7 +175,6 @@ class AgentManager:
                     DebugUtils.log_chat({"assistant": response.get_text()})
                     return response
                 else:
-                    # auto switch to primary agent
                     logger.info("Auto switch to primary agent")
                     transfer = AgentTransfer(to_agent_id=self.primary_agent.id, message=response.get_text())
                     await self._handle_transfer(transfer)
@@ -159,7 +194,7 @@ class AgentManager:
                 if tool_result.agent_transfer:
                     transfer = tool_result.agent_transfer
                     await self._handle_transfer(transfer)
-                    # pick up new active agent in next loop
+                    # Pick up new active agent in next loop
                     continue
                 else:
                     if tool_result.base64_images:
@@ -179,6 +214,7 @@ class AgentManager:
             else:
                 raise Exception(f"Unexpected response: {tool_result}")
 
+        logger.info("Exiting execute_run loop.")
         return response
 
     async def _handle_transfer(self, agent_transfer: AgentTransfer) -> None:
@@ -220,7 +256,7 @@ class AgentManager:
             participants=[from_agent_id, agent_transfer.to_agent_id]
         )
 
-    def should_continue_run(self, turns_count: int, run_metadata: RunMetadata):
+    async def should_continue_run(self, turns_count: int, run_metadata: RunMetadata) -> bool:
         """
         Determines if the game loop should continue based on turn count and user input.
 
@@ -232,48 +268,74 @@ class AgentManager:
             bool: True if the loop should continue, False otherwise
         """
         if run_metadata.enable_turn_debug:
-            response = input(
+            user_response = await self.prompt_callback(
                 f"Maximum turn {run_metadata.max_turns}, current: {turns_count}. Debug. Continue? (y/n, press Enter to continue): "
             )
-            if response.lower() not in ["y", "yes", ""]:
+            if user_response.lower() not in ["y", "yes", ""]:
                 logger.warning("Stopped by user.")
                 return False
+
         if turns_count >= run_metadata.max_turns:
             if self.active_agent.config.is_test:
                 return False
             logger.warning(f"Run reaches max turn: {run_metadata.max_turns}")
-            response = input(
-                f"Maximum turn {run_metadata.max_turns} reached. Continue? (y/n, press Enter to continue): "
+            run_metadata.max_turns += 10  # Dynamically increase max turns
+            user_response = await self.prompt_callback(
+                f"Increase maximum turn to {run_metadata.max_turns}, continue? (y/n, press Enter to continue): "
             )
-            if response.lower() not in ["y", "yes", ""]:
+            if user_response.lower() not in ["y", "yes", ""]:
                 logger.warning("Stopped by user.")
                 return False
 
         return True
 
-    async def broadcast(self, completion_response: CompletionResponse):
+    async def broadcast_response(self, completion_response: CompletionResponse):
+        logger.debug("broadcast_response")
         if not self.service_manager:
             return
 
         msg = EventMessage(
             type=EventMessageType.ASSISTANT,
-            payload=ClientMessage(role="assistant", content=completion_response.get_text()),
+            payload=ClientMessage(role="assistant", content=completion_response.get_text(), name=self.active_agent.id),
         )
         await self.service_manager.broadcast(msg.model_dump_json())
 
-    async def on_receive_user_message(self, event: EventMessage) -> None:
-        logger.debug(f"on_receive_user_message: {event}")
-        if event.type == EventMessageType.PROMPT:
-            if isinstance(event.payload, PromptEventPayload):
-                user_message = event.payload.content
-                if not self.run_metadata:
-                    self.run_metadata = RunMetadata()
-                await self.run(self.active_agent.id, user_message, self.run_metadata)
-
-    async def send_user_message(self, user_input: str) -> None:
+    async def broadcast_user_message(self, user_input: str) -> None:
+        """Broadcast user message through websocket"""
         logger.debug(f"broadcast user message: {user_input}")
         msg = EventMessage(type=EventMessageType.PROMPT, payload=PromptEventPayload(role="user", content=user_input))
         await self.service_manager.broadcast(msg.model_dump_json())
+
+    async def handle_message(self, event: EventMessage) -> None:
+        """Receive user message from websocket"""
+        logger.debug(f"Handling message: {event.model_dump_json(indent=4)}")
+        if event.type == EventMessageType.PROMPT and event.client_id != self.service_manager.client_id:
+            if isinstance(event.payload, PromptEventPayload):
+                user_message = event.payload.content
+                self.console_utils.print_msg("User", user_message)
+                if not self.run_metadata:
+                    self.run_metadata = RunMetadata()
+                if self.execute_run_task and not self.execute_run_task.done():
+                    # Inject the message dynamically
+                    await self.inject_user_message(user_message)
+                    logger.debug("handle_message - User message injected dynamically.")
+                else:
+                    # Start a new run
+                    logger.debug("handle_message - User message queued for processing.")
+                    await self.run(self.active_agent.id, user_message, self.run_metadata, callback=self.handle_response)
+        elif event.type == EventMessageType.ASSISTANT and event.client_id != self.service_manager.client_id:
+            if isinstance(event.payload, PromptEventPayload):
+                message = event.payload.content
+                name = event.payload.name if event.payload.name else "Assistant"
+                self.console_utils.print_msg(name, message)
+
+    async def handle_response(self, response: CompletionResponse):
+        self.console_utils.print_msg(self.active_agent.id, f"{response.get_text()}")
+
+    async def inject_user_message(self, user_input: str) -> None:
+        """Inject a user message into the ongoing run."""
+        logger.debug(f"Injecting user message: {user_input}")
+        await self.user_message_queue.put(user_input)
 
     def register_agent(self, config: AgentConfig) -> Agent:
         if config.id in self._agents:
@@ -321,3 +383,20 @@ class AgentManager:
             for agent in self._agents.values()
             if agent.id not in exclude
         ]
+
+    async def stop_run(self):
+        """Signal the execute_run loop to stop gracefully."""
+        if self.execute_run_task and not self.execute_run_task.done():
+            logger.info("Stopping the ongoing run...")
+            self.stop_run_event.set()
+            try:
+                await self.execute_run_task
+            except asyncio.CancelledError:
+                logger.info("execute_run_task was cancelled.")
+            finally:
+                self.execute_run_task = None
+                self.stop_run_event.clear()
+                logger.info("Run has been stopped.")
+                # todo: handle unfinish tool result, check last message if it's tool, then append tool result
+        else:
+            logger.info("No active run to stop.")

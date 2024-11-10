@@ -57,7 +57,7 @@ class ConnectionManager:
         connections = list(self.user_connections[user_id])
         connections_to_remove = []
         for connection_id in connections:
-            if websocket_request_id and connection_id != websocket_request_id:
+            if websocket_request_id and connection_id == websocket_request_id:  # broadcast to other
                 continue
             connection = self.active_connections.get(connection_id)
             if connection:

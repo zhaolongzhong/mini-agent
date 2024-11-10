@@ -3,9 +3,12 @@ import json
 import asyncio
 import logging
 import argparse
+from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
 from rich.text import Text
+
+from cue.schemas.completion_respone import CompletionResponse
 
 from ..utils import DebugUtils, console_utils, generate_run_id
 from ..config import get_settings
@@ -16,7 +19,6 @@ from .._agent_manager import AgentManager
 from .._agent_provider import AgentProvider
 
 setup_logging()
-
 logger = logging.getLogger(__name__)
 
 
@@ -25,35 +27,92 @@ class CLI:
         self.logger = logger
         self.console_utils = console_utils
 
-        self.agent_manager = AgentManager()
-        self.executor = ThreadPoolExecutor()
         self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
         self.primary_agent_config = self.agent_provider.get_primary_agent()
-        self.active_agent_id = None
+        self.active_agent_id = ""
         self.enable_external_memory = False
-
         self.enable_debug_turn = args.enable_debug_turn
-        self._config_agents()
+        self.mode = self.determine_mode(args)
 
-    def _config_agents(self):
-        # Register all agents
+    def determine_mode(self, args) -> str:
+        """
+        Determine the operating mode based on command-line arguments.
+
+        Args:
+            args: Parsed command-line arguments.
+
+        Returns:
+            str: Mode of operation: 'cli', 'runner', 'client'.
+        """
+        if args.client:
+            return "client"
+        elif args.runner:
+            return "runner"
+        else:
+            return "cli"
+
+    async def _config_agents(self):
+        """Configure all agents."""
         self.agents = {
             config.id: self.agent_manager.register_agent(config)
             for config in self.agent_provider.get_configs().values()
         }
 
-    async def _get_user_input_async(self, prompt: str):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(self.executor, lambda: self.console_utils.console.input(prompt))
+    async def setup(self):
+        """Asynchronous initialization."""
+        logger.debug(f"setup run mode: {self.mode}")
+        # Get the current running loop
+        self.loop = asyncio.get_running_loop()
 
-    async def run(self):
+        # Create executor
+        self.executor = ThreadPoolExecutor(thread_name_prefix="cli_executor")
+
+        # Initialize agent manager
+        self.agent_manager = AgentManager(prompt_callback=self.handle_prompt, loop=self.loop, mode=self.mode)
+
+        # Initialize other components
+        self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
+        self.primary_agent_config = self.agent_provider.get_primary_agent()
+
+        # Configure agents
+        await self._config_agents()
+
+        # Initialize the agent manager
         self.enable_external_memory = self.primary_agent_config.enable_external_memory
-        await self.agent_manager.initialize(enable_external_memory=self.enable_external_memory)
+        await self.agent_manager.initialize(enable_services=self.enable_external_memory)
+
+        # Set up primary agent
         self.agent_manager.primary_agent = self.agents[self.primary_agent_config.id]
         self.agent_manager.active_agent = self.agent_manager.primary_agent
-        self.logger.debug("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
 
+    def _sync_get_input(self, prompt: str) -> str:
+        """Synchronous input function."""
+        return self.console_utils.console.input(prompt)
+
+    async def _get_user_input_async(self, prompt: str) -> str:
+        """Get user input asynchronously using the executor."""
         try:
+            input_func = partial(self._sync_get_input, prompt)
+            return await self.loop.run_in_executor(self.executor, input_func)
+        except Exception as e:
+            logger.error(f"Error getting user input: {e}", exc_info=True)
+            raise
+
+    async def handle_prompt(self, prompt: str) -> str:
+        """Handles prompts from the AgentManager by asking the user via the CLI."""
+        return await self._get_user_input_async(prompt)
+
+    async def handle_response(self, response: CompletionResponse):
+        """Handle responses from the agent."""
+        self.console_utils.print_msg(f"{self.active_agent_id}_cli", f"{response.get_text()}")
+
+    async def run(self):
+        """Main run loop for the CLI."""
+        try:
+            await self.setup()
+
+            self.logger.debug("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
+
             run_metadata = RunMetadata(
                 run_id=generate_run_id(),
                 enable_turn_debug=self.enable_debug_turn,
@@ -61,62 +120,109 @@ class CLI:
             )
 
             while True:
-                active_agent_id = self.agent_manager.active_agent.id
-                user_input = await self._get_user_input_async("")
+                try:
+                    self.active_agent_id = self.agent_manager.active_agent.id
 
-                # Parse command
-                command, message = parse_command(user_input)
+                    user_input = await self._get_user_input_async("")
 
-                # Handle empty or too short messages
-                if not command and (not message or len(message) < 3):
-                    self.console_utils.print_error_msg(active_agent_id, "Message must be at least 3 characters long.")
-                    continue
+                    # Parse command
+                    command, message = parse_command(user_input)
 
-                # Handle commands
-                if command == CliCommand.HELP:
-                    from ._cli_command import print_help
-
-                    print_help(self.console_utils.console, message)
-                    continue
-                if command == CliCommand.EXIT:
-                    self.logger.info("Exit command received. Shutting down.")
-                    break
-
-                if command == CliCommand.SNAPSHOT:
-                    try:
-                        snapshot_path = self.agent_manager.active_agent.snapshot()
-                        success_msg = Text("[System]: ", style="system")
-                        success_msg.append(f"Snapshot saved to {snapshot_path}", style="success")
-                        self.console_utils.console.print(success_msg)
-
-                        # If there was additional message content, process it
-                        if message and len(message) >= 3:
-                            user_input = message
-                        else:
-                            continue
-                    except Exception as e:
-                        error_msg = Text("[System]: ", style="system")
-                        error_msg.append(f"Failed to save snapshot: {str(e)}", style="error")
-                        self.console_utils.console.print(error_msg)
+                    if not command and not message or message and message.lower() in ["y", "yes", ""]:
                         continue
 
-                self.logger.debug(f"{user_input}")
-                run_metadata.user_messages.append(f"{user_input}")
-                DebugUtils.log_chat({"user": user_input})
+                    # Handle empty or too short messages
+                    if not command and (not message or len(message) < 3):
+                        logger.debug(f"command: {command}, message: {message}")
+                        self.console_utils.print_error_msg(
+                            self.active_agent_id, "Message must be at least 3 characters long."
+                        )
+                        continue
 
-                if self.enable_external_memory:
-                    await self.agent_manager.send_user_message(user_input)
-                else:
-                    await self.agent_manager.run(active_agent_id, user_input, run_metadata)
+                    # Handle commands
+                    if command == CliCommand.HELP:
+                        from ._cli_command import print_help
+
+                        print_help(self.console_utils.console, message)
+                        continue
+
+                    if command == CliCommand.EXIT:
+                        self.logger.info("Exit command received. Shutting down.")
+                        break
+                    if command == CliCommand.STOP_RUN:
+                        self.logger.info("Stop command received. Stopping current run.")
+                        await self.agent_manager.stop_run()
+                        continue
+
+                    if command == CliCommand.SNAPSHOT:
+                        try:
+                            snapshot_path = self.agent_manager.active_agent.snapshot()
+                            success_msg = Text("[System]: ", style="system")
+                            success_msg.append(f"Snapshot saved to {snapshot_path}", style="success")
+                            self.console_utils.console.print(success_msg)
+
+                            if message and len(message) >= 3:
+                                user_input = message
+                            else:
+                                continue
+                        except Exception as e:
+                            error_msg = Text("[System]: ", style="system")
+                            error_msg.append(f"Failed to save snapshot: {str(e)}", style="error")
+                            self.console_utils.console.print(error_msg)
+                            continue
+
+                    # Process user input
+                    self.logger.debug(f"Processing user input: {user_input}")
+                    run_metadata.user_messages.append(f"{user_input}")
+                    DebugUtils.log_chat({"user": user_input})
+
+                    if self.mode == "client":
+                        await self.send_message(user_input)
+                    else:
+                        await self.run_loop(user_input, run_metadata)
+
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self.logger.error(f"Error in main loop: {e}", exc_info=True)
+                    self.console_utils.print_error_msg(self.active_agent_id, f"Error: {str(e)}")
 
         except Exception as e:
             self.logger.exception(f"An error occurred: {e}")
             raise
         finally:
-            self.logger.info("Cleaning up the agent manager...")
+            await self.cleanup()
+
+    async def send_message(self, user_input) -> None:
+        try:
+            await self.agent_manager.broadcast_user_message(user_input)
+        except Exception as e:
+            self.console_utils.print_error_msg(self.active_agent_id, f"Error sending message: {str(e)}")
+
+    async def run_loop(self, user_input, run_metadata) -> None:
+        try:
+            if self.agent_manager.execute_run_task and not self.agent_manager.execute_run_task.done():
+                # Inject the message dynamically
+                await self.agent_manager.inject_user_message(user_input)
+                self.logger.debug("User message injected dynamically.")
+            else:
+                # Start a new run
+                await self.agent_manager.run(
+                    self.active_agent_id, user_input, run_metadata, callback=self.handle_response
+                )
+                self.logger.debug("User message queued for processing.")
+        except Exception as e:
+            self.console_utils.print_error_msg(self.active_agent_id, f"Error during run: {str(e)}")
+
+    async def cleanup(self):
+        """Clean up resources."""
+        self.logger.info("Cleaning up the agent manager...")
+        try:
             await self.agent_manager.clean_up()
             self.executor.shutdown(wait=True)
             self.logger.debug("Cleanup complete.")
+        except Exception as e:
+            self.logger.error(f"Error during cleanup: {e}", exc_info=True)
 
 
 def _parse_args():
@@ -125,6 +231,15 @@ def _parse_args():
     parser.add_argument("-r", "--run", action="store_true", help="Run the interactive CLI.")
     parser.add_argument("-c", "--config", action="store_true", help="Print the default configuration.")
     parser.add_argument("-d", "--enable_debug_turn", action="store_true", help="Pause for each run loop turn.")
+    parser.add_argument(
+        "-client", "--client", action="store_true", help="Run as a second remote client with websocket."
+    )
+    parser.add_argument(
+        "-runner",
+        "--runner",
+        action="store_true",
+        help="Run in runner mode, communicating via websocket without local interface.",
+    )
     parser.add_argument(
         "--log-level",
         type=str,

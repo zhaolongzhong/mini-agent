@@ -21,6 +21,7 @@ class ClientMessage(BaseModel):
     )
     role: str = Field(..., description="Role of the sender.")
     content: Optional[str] = Field(None, description="Content of the message.")
+    name: Optional[str] = Field(None, description="Name of author of the message.")
     message_json: Optional[str] = Field(None, description="Original JSON data used to create this message.")
     created_at: datetime = Field(default_factory=datetime.now, description="Timestamp when the message was created.")
 
