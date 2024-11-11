@@ -14,6 +14,7 @@ from tenacity import (
 )
 
 from .transport import WebSocketTransport
+from ..schemas.event_message import EventMessage
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,8 @@ class WebSocketManager:
                     message_type = message.get("type")
                     if message_type in self._message_handlers:
                         try:
-                            await self._message_handlers[message_type](message)
+                            event = EventMessage(**message)
+                            await self._message_handlers[message_type](event)
                         except Exception as e:
                             logger.error(f"Error in message handler for type {message_type}: {e}")
                     else:

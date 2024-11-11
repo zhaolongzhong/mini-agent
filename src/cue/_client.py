@@ -59,6 +59,7 @@ class AsyncCueClient:
             self.agents[default_config.id] = self.agent_manager.register_agent(default_config)
             self.active_agent_id = default_config.id
 
+        await self.agent_manager.initialize()
         self.logger.info(f"Initialized with {len(self.agents)} agents. Active agent: {self.active_agent_id}")
 
     async def send_message(self, message: str, agent_id: Optional[str] = None) -> str:
@@ -70,7 +71,7 @@ class AsyncCueClient:
         self.logger.debug(f"Sending message to agent {target_agent_id}: {message}")
         self.run_metadata.user_messages.append(message)
 
-        response = await self.agent_manager.run(target_agent_id, message, self.run_metadata)
+        response = await self.agent_manager.start_run(target_agent_id, message, self.run_metadata)
 
         if isinstance(response, CompletionResponse):
             return response.get_text()

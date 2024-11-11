@@ -9,7 +9,7 @@ class SystemMessageBuilder:
         self.config = config
         self.other_agents_info = ""
         self.conversation_context: Optional[ConversationContext] = None
-        self.enable_external_memory = config.enable_external_memory
+        self.enable_external_memory = config.enable_services
 
     def build_instruction_block(self) -> str:
         """Build the core instruction block for the system message."""

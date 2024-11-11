@@ -64,7 +64,7 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
         max_tokens=2000,
         conversation_id="",
         feature_flag=FeatureFlag(is_cli=True, is_eval=False),
-        enable_external_memory=False,
+        enable_services=False,
         tools=[Tool.Edit, Tool.Bash],
         is_test=True,
     )

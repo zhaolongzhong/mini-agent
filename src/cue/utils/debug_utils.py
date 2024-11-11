@@ -108,8 +108,9 @@ class DebugUtils:
                 print(json.load(f))
 
     @staticmethod
-    def log_chat(msg: dict) -> None:
-        logger.debug(msg)
+    def log_chat(msg: dict, tag: Optional[str] = None) -> None:
+        """Save user ans assistant message to a file"""
+        logger.debug(f"{tag} {msg}")
         base_dir = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
         user_input_path = base_dir / "logs/chat.jsonl"
         user_input_path.parent.mkdir(parents=True, exist_ok=True)

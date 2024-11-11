@@ -1,6 +1,7 @@
 import sys
 import logging
 import builtins
+from typing import Optional
 from threading import Lock
 
 from rich.text import Text
@@ -112,7 +113,7 @@ class ConsoleUtils:
         # Print the prompt after the message
         self.prompt_manager.print_prompt()
 
-    def print_error_msg(self, agent_id: str, message: str) -> None:
+    def print_error_msg(self, message: str, agent_id: Optional[str]) -> None:
         """Print an error message from an agent."""
         self.prompt_manager.reset_prompt()
         # Clear the current line
@@ -120,6 +121,8 @@ class ConsoleUtils:
         sys.stdout.flush()
         # Create and print the styled error message
         text = Text()
+        if not agent_id:
+            agent_id = "system"
         text.append(f"[{agent_id}]: ", style="assistant")
         text.append(str(message), style="error")
         self.console.print(text)

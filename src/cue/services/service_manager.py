@@ -104,37 +104,26 @@ class ServiceManager:
             return
         await self._ws_manager.send_message(message)
 
-    async def _handle_client_leave(self, message: dict[str, Any]) -> None:
-        logger.info("Client has left.")
+    async def _handle_client_leave(self, message: EventMessage) -> None:
+        logger.info(f"Client has left: {message.payload.client_id}")
 
-    async def _handle_client_connect(self, message: dict[str, Any]) -> None:
-        logger.info("Client has connected.")
+    async def _handle_client_connect(self, message: EventMessage) -> None:
+        logger.info(f"Client has connected: {message.payload.client_id}")
 
-    async def _handle_ping(self, message: dict[str, Any]) -> None:
+    async def _handle_ping(self, message: EventMessage) -> None:
         await self._ws_manager.send_message("pong")
         logger.debug("Responded to ping with pong.")
 
-    async def _handle_pong(self, message: dict[str, Any]) -> None:
+    async def _handle_pong(self, message: EventMessage) -> None:
         logger.debug("Received pong.")
 
-    async def _handle_generic(self, message: dict[str, Any]) -> None:
+    async def _handle_generic(self, message: EventMessage) -> None:
         logger.debug(f"Handling generic message: {message}")
 
-    async def _handle_message(self, message: dict[str, Any]) -> None:
-        logger.debug(f"Handling message: {json.dumps(message, indent=4)}")
-
+    async def _handle_message(self, message: EventMessage) -> None:
         if self.on_message:
             try:
-                try:
-                    # Attempt to parse message to EventMessage schema
-                    event = EventMessage(**message)
-                except Exception as parse_error:
-                    logger.error(
-                        f"Failed to parse EventMessage schema: {parse_error}. Message content: {json.dumps(message, indent=4)}"
-                    )
-                    return  # Exit early if parsing fails
-
-                await self.on_message(event)
+                await self.on_message(message)
             except Exception as e:
                 # Catch any other errors in on_message handling
                 logger.error(f"Error in on_message handling: {e}. Message content: {json.dumps(message, indent=4)}")

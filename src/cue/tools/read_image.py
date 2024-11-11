@@ -4,9 +4,8 @@ import base64
 from typing import Literal, ClassVar, Optional
 from dataclasses import dataclass
 
-from cue.tools.utils.function_utils import get_definition_by_model
-
 from .base import BaseTool
+from ..tools.utils.function_utils import get_definition_by_model
 
 
 @dataclass(frozen=True)

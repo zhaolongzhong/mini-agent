@@ -25,6 +25,6 @@ class AgentConfig(BaseModel):
     parallel_tool_calls: bool = True
     conversation_id: Optional[str] = None
     max_actions: Optional[int] = 10
-    enable_external_memory: bool = False
+    enable_services: bool = False
     feature_flag: FeatureFlag = Field(default_factory=FeatureFlag)
     is_test: bool = False

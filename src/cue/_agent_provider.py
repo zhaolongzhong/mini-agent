@@ -20,7 +20,7 @@ main_agent = AgentConfig(
     temperature=0.8,
     max_tokens=2000,
     tools=[Tool.Edit, Tool.Bash, Tool.Memory, Tool.Coordinate],
-    enable_external_memory=True,
+    enable_services=True,
 )
 
 agent_o = AgentConfig(
@@ -173,7 +173,7 @@ class AgentProvider:
             is_primary=config_dict.get("is_primary", False),
             temperature=config_dict.get("temperature", 0.7),
             max_tokens=config_dict.get("max_tokens", 1000),
-            enable_external_memory=config_dict.get("enable_external_memory", False),
+            enable_services=config_dict.get("enable_external_memory", False),
         )
 
     @staticmethod

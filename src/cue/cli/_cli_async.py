@@ -3,16 +3,15 @@ import json
 import asyncio
 import logging
 import argparse
+from typing import Optional
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
 from rich.text import Text
 
-from cue.schemas.completion_respone import CompletionResponse
-
 from ..utils import DebugUtils, console_utils, generate_run_id
 from ..config import get_settings
-from ..schemas import RunMetadata
+from ..schemas import RunMetadata, CompletionResponse
 from ..utils.logs import setup_logging
 from ._cli_command import CliCommand, parse_command
 from .._agent_manager import AgentManager
@@ -26,11 +25,7 @@ class CLI:
     def __init__(self, args):
         self.logger = logger
         self.console_utils = console_utils
-
-        self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
-        self.primary_agent_config = self.agent_provider.get_primary_agent()
-        self.active_agent_id = ""
-        self.enable_external_memory = False
+        self.enable_services = False
         self.enable_debug_turn = args.enable_debug_turn
         self.mode = self.determine_mode(args)
 
@@ -70,20 +65,21 @@ class CLI:
         # Initialize agent manager
         self.agent_manager = AgentManager(prompt_callback=self.handle_prompt, loop=self.loop, mode=self.mode)
 
-        # Initialize other components
-        self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
-        self.primary_agent_config = self.agent_provider.get_primary_agent()
+        if self.mode != "client":
+            # Initialize other components
+            self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
+            self.primary_agent_config = self.agent_provider.get_primary_agent()
 
-        # Configure agents
-        await self._config_agents()
+            # Configure agents
+            await self._config_agents()
+
+            # Set up primary agent
+            self.agent_manager.primary_agent = self.agents[self.primary_agent_config.id]
+            self.agent_manager.active_agent = self.agent_manager.primary_agent
+            self.enable_services = self.primary_agent_config.enable_services
 
         # Initialize the agent manager
-        self.enable_external_memory = self.primary_agent_config.enable_external_memory
-        await self.agent_manager.initialize(enable_services=self.enable_external_memory)
-
-        # Set up primary agent
-        self.agent_manager.primary_agent = self.agents[self.primary_agent_config.id]
-        self.agent_manager.active_agent = self.agent_manager.primary_agent
+        await self.agent_manager.initialize(enable_services=self.enable_services)
 
     def _sync_get_input(self, prompt: str) -> str:
         """Synchronous input function."""
@@ -102,10 +98,6 @@ class CLI:
         """Handles prompts from the AgentManager by asking the user via the CLI."""
         return await self._get_user_input_async(prompt)
 
-    async def handle_response(self, response: CompletionResponse):
-        """Handle responses from the agent."""
-        self.console_utils.print_msg(f"{self.active_agent_id}_cli", f"{response.get_text()}")
-
     async def run(self):
         """Main run loop for the CLI."""
         try:
@@ -116,13 +108,11 @@ class CLI:
             run_metadata = RunMetadata(
                 run_id=generate_run_id(),
                 enable_turn_debug=self.enable_debug_turn,
-                enable_external_memory=self.primary_agent_config.enable_external_memory,
+                enable_services=self.enable_services,
             )
 
             while True:
                 try:
-                    self.active_agent_id = self.agent_manager.active_agent.id
-
                     user_input = await self._get_user_input_async("")
 
                     # Parse command
@@ -134,9 +124,7 @@ class CLI:
                     # Handle empty or too short messages
                     if not command and (not message or len(message) < 3):
                         logger.debug(f"command: {command}, message: {message}")
-                        self.console_utils.print_error_msg(
-                            self.active_agent_id, "Message must be at least 3 characters long."
-                        )
+                        self.console_utils.print_error_msg("Message must be at least 3 characters long.")
                         continue
 
                     # Handle commands
@@ -179,13 +167,16 @@ class CLI:
                     if self.mode == "client":
                         await self.send_message(user_input)
                     else:
-                        await self.run_loop(user_input, run_metadata)
+                        if not self.agent_manager.active_agent:
+                            raise Exception("No active agent found")
+                        active_agent_id = self.agent_manager.active_agent.id
+                        await self.run_loop(active_agent_id, user_input, run_metadata)
 
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
                     self.logger.error(f"Error in main loop: {e}", exc_info=True)
-                    self.console_utils.print_error_msg(self.active_agent_id, f"Error: {str(e)}")
+                    self.console_utils.print_error_msg(f"Error: {str(e)}")
 
         except Exception as e:
             self.logger.exception(f"An error occurred: {e}")
@@ -197,22 +188,15 @@ class CLI:
         try:
             await self.agent_manager.broadcast_user_message(user_input)
         except Exception as e:
-            self.console_utils.print_error_msg(self.active_agent_id, f"Error sending message: {str(e)}")
+            self.console_utils.print_error_msg(f"Error sending message: {str(e)}")
 
-    async def run_loop(self, user_input, run_metadata) -> None:
+    async def run_loop(self, agent_id: str, user_input: str, run_metadata: RunMetadata) -> Optional[CompletionResponse]:
         try:
-            if self.agent_manager.execute_run_task and not self.agent_manager.execute_run_task.done():
-                # Inject the message dynamically
-                await self.agent_manager.inject_user_message(user_input)
-                self.logger.debug("User message injected dynamically.")
-            else:
-                # Start a new run
-                await self.agent_manager.run(
-                    self.active_agent_id, user_input, run_metadata, callback=self.handle_response
-                )
-                self.logger.debug("User message queued for processing.")
+            response = await self.agent_manager.start_run(agent_id, user_input, run_metadata)
+            self.logger.debug(f"User message queued for processing. response: {response}")
+            return response
         except Exception as e:
-            self.console_utils.print_error_msg(self.active_agent_id, f"Error during run: {str(e)}")
+            self.console_utils.print_error_msg(f"Error during run: {str(e)}")
 
     async def cleanup(self):
         """Clean up resources."""

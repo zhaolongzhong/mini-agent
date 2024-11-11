@@ -63,7 +63,7 @@ class Agent:
 
     async def _get_recent_memories(self) -> Optional[dict]:
         """Should be called whenever there is a memory update"""
-        if not self.config.enable_external_memory or Tool.Memory not in self.config.tools:
+        if not self.config.enable_services or Tool.Memory not in self.config.tools:
             return None
         try:
             memory_tool: MemoryTool = self.tool_manager.tools[Tool.Memory.value]
