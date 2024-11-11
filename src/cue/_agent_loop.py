@@ -5,6 +5,7 @@ from typing import Any, Union, Callable, Optional
 from .utils import DebugUtils
 from ._agent import Agent
 from .schemas import Author, RunMetadata, MessageParam, AgentTransfer, CompletionResponse, ToolResponseWrapper
+from .tools._tool import ToolManager
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class AgentLoop:
     async def run(
         self,
         agent: Agent,
+        tool_manager: ToolManager,
         run_metadata: RunMetadata,
         callback: Optional[Callable[[CompletionResponse], Any]] = None,
         prompt_callback: Optional[Callable] = None,
@@ -55,7 +57,7 @@ class AgentLoop:
                 break
 
             try:
-                response: CompletionResponse = await agent.run(author)
+                response: CompletionResponse = await agent.run(tool_manager, author)
             except asyncio.CancelledError:
                 logger.info("execute_run task was cancelled.")
                 break
@@ -95,8 +97,11 @@ class AgentLoop:
             if text_content:
                 DebugUtils.log_chat({"assistant": text_content}, "agent_loop")
 
-            tool_result = await agent.process_tools_with_timeout(
-                tool_calls=tool_calls, timeout=30, author=response.author
+            tool_result = await agent.client.process_tools_with_timeout(
+                tool_manager=tool_manager,
+                tool_calls=tool_calls,
+                timeout=30,
+                author=response.author,
             )
 
             if isinstance(tool_result, ToolResponseWrapper):

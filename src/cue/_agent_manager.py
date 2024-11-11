@@ -150,6 +150,7 @@ class AgentManager:
                 run_metadata=self.run_metadata,
                 callback=callback,
                 prompt_callback=self.prompt_callback,
+                tool_manager=self.tool_manager,
             )
             if isinstance(response, AgentTransfer):
                 if response.run_metadata:
@@ -272,7 +273,7 @@ class AgentManager:
             logger.warning(f"Agent with id {config.id} already exists, returning existing agent.")
             return self._agents[config.id]
 
-        agent = Agent(config=config, agent_manager=self)
+        agent = Agent(config=config)
         self._agents[agent.config.id] = agent
         logger.info(
             f"register_agent {agent.config.id} (name: {config.id}), tool: {config.tools} available agents: {list(self._agents.keys())}"
