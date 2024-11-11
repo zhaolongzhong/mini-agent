@@ -105,9 +105,8 @@ class AgentLoop:
             )
 
             if isinstance(tool_result, ToolResponseWrapper):
-                agent.add_message(response)
-                agent.add_message(tool_result)
-
+                # Add tool call and tool result pair
+                agent.add_messages([response, tool_result])
                 # Handle explicit transfer request
                 agent_transfer = tool_result.agent_transfer
                 if agent_transfer:

@@ -93,7 +93,10 @@ class Agent:
             self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
 
     def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
-        self.context.add_message(message)
+        self.add_messages([message])
+
+    def add_messages(self, messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam]]) -> None:
+        self.context.add_messages(messages)
 
     def snapshot(self) -> str:
         """Take a snapshot of current message list and save to a file"""

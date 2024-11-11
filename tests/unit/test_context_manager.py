@@ -65,7 +65,7 @@ class TestDynamicContextManager:
         for msg in messages:
             current_tokens = context_manager._get_total_tokens()
             logging.info(f"Before adding message - Total tokens: {current_tokens}")
-            context_manager.add_message(msg)
+            context_manager.add_messages([msg])
             logging.info(f"Added message - Role: {msg.get('role')}, Tokens: {mock_count_dict_tokens(msg)}")
 
         # Total tokens: 700 (below limit)
@@ -80,10 +80,10 @@ class TestDynamicContextManager:
             create_tool_result("Tool result", tool_call_id_2),  # HIGH
         ]
 
+        context_manager.add_messages(tool_sequence)
         for msg in tool_sequence:
             current_tokens = context_manager._get_total_tokens()
             logging.info(f"Before adding tool message - Total tokens: {current_tokens}")
-            context_manager.add_message(msg)
             logging.info(f"Added tool message - Role: {msg.get('role')}")
 
     def test_context_stats(self, context_manager, monkeypatch):
@@ -95,7 +95,7 @@ class TestDynamicContextManager:
         monkeypatch.setattr(context_manager.token_counter, "count_dict_tokens", mock_count_dict_tokens)
         monkeypatch.setattr(context_manager.token_counter, "count_messages_tokens", lambda x: len(x) * 100)
 
-        context_manager.add_message(create_message("user", "Test message"))
+        context_manager.add_messages([create_message("user", "Test message")])
 
         stats = context_manager.get_context_stats()
         assert stats["message_count"] == 1
@@ -105,7 +105,7 @@ class TestDynamicContextManager:
 
     def test_clear_context(self, context_manager):
         """Test context clearing"""
-        context_manager.add_message(create_message("user", "Test message"))
+        context_manager.add_messages([create_message("user", "Test message")])
         assert len(context_manager.messages) == 1
 
         context_manager.clear_context()
@@ -128,13 +128,11 @@ class TestDynamicContextManager:
             create_tool_result("Tool result", tool_call_id_1),
         ]
 
-        for msg in tool_sequence:
-            context_manager.add_message(msg)
-            logging.info(f"Added tool sequence message - Role: {msg.get('role')}")
+        context_manager.add_messages(tool_sequence)
 
         # Add more messages to trigger batch removal
         for i in range(5):
-            context_manager.add_message(create_message("user", f"Message {i}"))
+            context_manager.add_messages([create_message("user", f"Message {i}")])
             logging.info(f"Added message {i}")
 
         # Verify tool sequence is preserved
@@ -213,10 +211,7 @@ class TestDynamicContextManager:
             tool_result_3,
         ]
 
-        for msg in messages:
-            context_manager.add_message(msg)
-            logging.info(f"Added message - Role: {msg.get('role')}, Tool call ID: {msg.get('tool_call_id')}")
-
+        context_manager.add_messages(messages)
         # Verify initial integrity
         self._verify_tool_sequence_integrity(context_manager.messages)
 
@@ -229,8 +224,8 @@ class TestDynamicContextManager:
             {"role": "assistant", "content": "Final reply"},
         ]
 
+        context_manager.add_messages(additional_messages)
         for msg in additional_messages:
-            context_manager.add_message(msg)
             logging.info(f"Added additional message - Role: {msg.get('role')}, Tool call ID: {msg.get('tool_call_id')}")
 
         # Verify that sequences are still intact, even if some were removed
@@ -256,7 +251,7 @@ class TestDynamicContextManager:
         # Test Case 3: Force removal of all tool sequences
         # Add many messages to force removal of all tool sequences
         for i in range(10):
-            context_manager.add_message({"role": "user", "content": f"Forced removal message {i}"})
+            context_manager.add_messages([{"role": "user", "content": f"Forced removal message {i}"}])
 
         final_messages = context_manager.messages
 

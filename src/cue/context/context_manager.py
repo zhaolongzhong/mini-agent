@@ -4,8 +4,8 @@ from typing import Any, Dict, List, Union
 
 from pydantic import BaseModel
 
+from ..utils import TokenCounter, truncate_safely
 from ..schemas import MessageParam, CompletionResponse, ToolResponseWrapper
-from ..utils.token_counter import TokenCounter
 
 logger = logging.getLogger(__name__)
 
@@ -60,37 +60,41 @@ class DynamicContextManager:
             "is_at_capacity": total_tokens >= self.max_tokens,
         }
 
+    def get_messages(self) -> list[dict]:
+        return self.messages
+
     def clear_context(self) -> None:
         """Clear all messages from the context window."""
         self.messages.clear()
 
-    def add_message(
-        self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam, Dict[str, Any], BaseModel]
+    def add_messages(
+        self,
+        new_messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam, Dict[str, Any], BaseModel]],
     ) -> None:
-        """Add a new message and manage the sliding window."""
+        """Add new messages and manage the sliding window."""
         original_size = len(self.messages)
-
-        if isinstance(message, CompletionResponse):
-            self.messages.append(message.to_params())
-        elif isinstance(message, ToolResponseWrapper):
-            if message.tool_messages:
-                self.messages.extend(message.tool_messages)
-            elif message.tool_result_message:
-                self.messages.append(message.tool_result_message)
+        for message in new_messages:
+            if isinstance(message, CompletionResponse):
+                self.messages.append(message.to_params())
+            elif isinstance(message, ToolResponseWrapper):
+                if message.tool_messages:
+                    self.messages.extend(message.tool_messages)
+                elif message.tool_result_message:
+                    self.messages.append(message.tool_result_message)
+                else:
+                    raise Exception(
+                        f"Only params or tool result allowed to add message list, receive type: {type(message)}"
+                    )
+            elif isinstance(message, (MessageParam, dict, BaseModel)):
+                message_dict = message.model_dump() if isinstance(message, BaseModel) else message
+                self.messages.append(message_dict)
             else:
                 raise Exception(
-                    f"Only params or tool result allowed to add message list, receive type: {type(message)}"
+                    f"Only params, tool result, dict or BaseModel allowed to add message list, receive type: {type(message)}"
                 )
-        elif isinstance(message, (MessageParam, dict, BaseModel)):
-            message_dict = message.model_dump() if isinstance(message, BaseModel) else message
-            self.messages.append(message_dict)
-        else:
-            raise Exception(
-                f"Only params, tool result, dict or BaseModel allowed to add message list, receive type: {type(message)}"
-            )
+            self.messages_since_removal += 1
 
         total_tokens = self._get_total_tokens()
-        self.messages_since_removal += 1
 
         # Only remove when we exceed the limit
         if total_tokens > self.max_tokens:
@@ -103,7 +107,7 @@ class DynamicContextManager:
             "total_tokens": total_tokens,
             "messages_since_removal": self.messages_since_removal,
         }
-        logger.debug(f"add_message metadata: {json.dumps(metadata, indent=4)}")
+        logger.debug(f"add_messages result: {json.dumps(metadata, indent=4)}")
 
     def _has_tool_calls(self, msg: Dict) -> bool:
         """Check if a message contains tool calls."""
@@ -181,14 +185,28 @@ class DynamicContextManager:
             if not self._is_tool_result(cur_msg):
                 break
 
+            tool_ids = []
             tool_call_id = cur_msg.get("tool_call_id")
-            logger.debug(f"Checking tool result with ID: {tool_call_id}, remaining IDs: {remaining_ids}")
-            if tool_call_id in remaining_ids:
-                sequence_indices.add(i)
-                remaining_ids.remove(tool_call_id)
-                logger.debug(f"Added index {i} to sequence, remaining IDs: {remaining_ids}")
-                if not remaining_ids:  # All tool results found
-                    break
+            if tool_call_id:
+                tool_ids.append(tool_call_id)
+            elif isinstance(cur_msg.get("content", []), list):
+                for tool_result in cur_msg.get("content", []):
+                    if isinstance(tool_result, dict) and tool_result.get("type") == "tool_result":
+                        id = tool_result.get("tool_use_id")
+                        tool_ids.append(id)
+                    else:
+                        logger.error(f"Content has unexpected type: {tool_result}")
+            else:
+                logger.error(f"Unexpected type: {cur_msg}")
+
+            logger.debug(f"Checking tool result with ID: {tool_ids}, remaining IDs: {remaining_ids}")
+            for tool_id in tool_ids:
+                if tool_id in remaining_ids:
+                    sequence_indices.add(i)
+                    remaining_ids.remove(tool_id)
+                    logger.debug(f"Added index {i} to sequence, remaining IDs: {remaining_ids}")
+                    if not remaining_ids:  # All tool results found
+                        break
 
         if remaining_ids:
             logger.warning(f"Not all tool results found. Missing IDs: {remaining_ids}")
@@ -225,28 +243,29 @@ class DynamicContextManager:
                     continue
 
                 # Calculate tokens for the whole sequence
-                sequence_tokens = sum(self._count_dict_tokens(self.messages[i]) for i in sequence_indices)
-
-                # Remove the sequence if it fits in our budget
-                if removed_tokens + sequence_tokens <= tokens_to_remove:
-                    removed_tokens += sequence_tokens
-                    # Keep track of the highest index we need to remove
-                    messages_to_remove = max(messages_to_remove, max(sequence_indices) + 1)
+                sequence_tokens = 0
+                for i in sequence_indices:
+                    loc_msg = self.messages[i]
+                    is_tool_result = self._is_tool_result(loc_msg)
+                    is_tool_call = self._has_tool_calls(loc_msg)
+                    tokens = self._count_dict_tokens(self.messages[i])
+                    sequence_tokens += tokens
                     logger.debug(
-                        f"Including tool sequence in removal: indices {sequence_indices}, " f"tokens: {sequence_tokens}"
+                        f"About to remove i: {i} is_tool_call: {is_tool_call}, is_tool_result: {is_tool_result}, sequence_tokens: {sequence_tokens}): {truncate_safely(json.dumps(self.messages[i]), 200)}"
                     )
 
-                # Move past this sequence
+                removed_tokens += sequence_tokens
+                messages_to_remove = max(messages_to_remove, max(sequence_indices) + 1)
                 current_idx = max(sequence_indices) + 1
             else:
                 # Regular message
                 msg_tokens = self._count_dict_tokens(self.messages[current_idx])
-                if removed_tokens + msg_tokens <= tokens_to_remove:
-                    removed_tokens += msg_tokens
-                    messages_to_remove = current_idx + 1
+                removed_tokens += msg_tokens
+                messages_to_remove = current_idx + 1
                 current_idx += 1
 
         # Remove messages from the start
+        logger.debug(f"Remove messages from the start, messages_to_remove: {messages_to_remove}")
         if messages_to_remove > 0:
             removed = self.messages[:messages_to_remove]
             self.messages = self.messages[messages_to_remove:]
@@ -255,6 +274,7 @@ class DynamicContextManager:
             for msg in removed:
                 logger.info(
                     f"Removed message: role={msg.get('role')}, "
+                    f"content={truncate_safely(msg.get('content'))}, "
                     f"tool_call_id={msg.get('tool_call_id')}, "
                     f"tool_calls={msg.get('tool_calls')}"
                 )
