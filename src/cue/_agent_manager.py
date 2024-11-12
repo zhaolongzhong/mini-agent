@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Callable, Optional
 
-from .utils import console_utils
+from .utils import DebugUtils, console_utils
 from ._agent import Agent
 from .schemas import (
     AgentConfig,
@@ -151,6 +151,7 @@ class AgentManager:
                 callback=callback,
                 prompt_callback=self.prompt_callback,
                 tool_manager=self.tool_manager,
+                service_manager=self.service_manager,
             )
             if isinstance(response, AgentTransfer):
                 if response.run_metadata:
@@ -213,8 +214,13 @@ class AgentManager:
         messages.append(transfer_message)
 
         self.active_agent = self._agents[agent_transfer.to_agent_id]
-        for msg in messages:
-            await self.active_agent.add_message(msg)
+        await self.active_agent.add_messages(messages)
+        DebugUtils.take_snapshot(
+            messages=messages,
+            suffix=f"transfer_to_{self.active_agent.id}_{self.active_agent.config.model}",
+            with_timestamp=True,
+            subfolder="transfer",
+        )
         self.active_agent.conversation_context = ConversationContext(
             participants=[from_agent_id, agent_transfer.to_agent_id]
         )

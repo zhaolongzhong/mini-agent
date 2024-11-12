@@ -46,18 +46,26 @@ class AnthropicClient:
                 "type": "text",
             }
 
-            system_message = {
-                **base_system_message,
-                "cache_control": {"type": "ephemeral"},
-            }
             # The Messages API accepts a top-level `system` parameter, not \"system\" as an input message role.
             messages = [msg for msg in request.messages if msg["role"] != "system"]
             messages = self._process_messages(messages)
 
-            system_message_tokens = TokenCounter.count_token(str(system_message))
+            estimate_input_tokens = await self.count_tokens(request, base_system_message, messages)
+
+            system_messages = []
+            system_messages.append(base_system_message)
+            if request.system_context:
+                system_context = {
+                    "type": "text",
+                    "text": request.system_context,
+                }
+                system_messages.append(system_context)
+            system_messages[-1]["cache_control"] = {"type": "ephemeral"}
+
+            system_message_tokens = TokenCounter.count_token(str(base_system_message))
             tool_tokens = TokenCounter.count_token(str(request.tool_json))
             message_tokens = TokenCounter.count_token(str(messages))
-            estimate_input_tokens = await self.count_tokens(request, base_system_message, messages)
+
             input_tokens = {
                 "system_tokens": system_message_tokens,
                 "tool_tokens": tool_tokens,
@@ -65,13 +73,15 @@ class AnthropicClient:
                 "input_tokens": system_message_tokens + tool_tokens + message_tokens,
                 "estimate_input_tokens": estimate_input_tokens,
             }
+            if request.metadata:
+                input_tokens["token_stats"] = request.metadata.token_stats
 
             if request.enable_prompt_caching:
                 logger.debug("_inject_prompt_caching")
                 self._inject_prompt_caching(messages)
 
             logger.debug(
-                f"{self.config.id} input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
+                f"{self.config.id} input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(base_system_message, indent=4)}"
                 f"\ntools_json: {json.dumps(request.tool_json, indent=4)}"
             )
             DebugUtils.debug_print_messages(
@@ -81,7 +91,7 @@ class AnthropicClient:
             if request.tool_json:
                 response = await self.client.with_options(max_retries=2).beta.prompt_caching.messages.create(
                     model=request.model,
-                    system=[system_message],
+                    system=system_messages,
                     messages=messages,
                     max_tokens=request.max_tokens,
                     temperature=request.temperature,
@@ -93,7 +103,7 @@ class AnthropicClient:
             else:
                 response = await self.client.with_options(max_retries=2).beta.prompt_caching.messages.create(
                     model=request.model,
-                    system=[system_message],
+                    system=system_messages,
                     messages=messages,
                     max_tokens=request.max_tokens,
                     temperature=request.temperature,
@@ -149,8 +159,8 @@ class AnthropicClient:
         processed_messages = [self.format_message(msg) for msg in messages]
         return self._validate_final_message_role(processed_messages)
 
-    def _inject_prompt_caching(self, messages):
-        breakpoints_remaining = 3
+    def _inject_prompt_caching(self, messages, num_breakpoints=3):
+        breakpoints_remaining = num_breakpoints
 
         # Loop through messages from newest to oldest
         for message in reversed(messages):  # Message 5 -> 4 -> 3 -> 2 -> 1
@@ -188,7 +198,7 @@ class AnthropicClient:
         tool_call_id = generate_id(prefix="toolu_", length=4)
         return tool_call_id
 
-    async def count_tokens(self, request: CompletionRequest, system_message: str, messages: list[dict]) -> int:
+    async def count_tokens(self, request: CompletionRequest, system_message: dict, messages: list[dict]) -> int:
         try:
             # https://docs.anthropic.com/en/docs/build-with-claude/token-counting
             result = await self.client.beta.messages.count_tokens(

@@ -18,7 +18,8 @@ main_agent = AgentConfig(
     instruction="You are primary assistant.",
     model=ChatModel.GPT_4O_MINI.id,
     temperature=0.8,
-    max_tokens=2000,
+    max_tokens=5000,
+    max_context_tokens=12000,
     tools=[Tool.Edit, Tool.Bash, Tool.Memory, Tool.Coordinate],
     enable_services=True,
 )
@@ -79,7 +80,7 @@ class AgentProvider:
         self.config_file = config_file
         self._default_configs = {
             "main": main_agent,
-            # "agent_o": agent_o,
+            "agent_o": agent_o,
             # "agent_claude": agent_claude,
             # "system_operator": system_operator,
             # "browse_agent": browse_agent,

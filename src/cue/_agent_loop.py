@@ -6,6 +6,7 @@ from .utils import DebugUtils
 from ._agent import Agent
 from .schemas import Author, RunMetadata, MessageParam, AgentTransfer, CompletionResponse, ToolResponseWrapper
 from .tools._tool import ToolManager
+from .services.service_manager import ServiceManager
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class AgentLoop:
         run_metadata: RunMetadata,
         callback: Optional[Callable[[CompletionResponse], Any]] = None,
         prompt_callback: Optional[Callable] = None,
+        service_manager: Optional[ServiceManager] = None,
     ) -> Optional[Union[CompletionResponse, AgentTransfer]]:
         """
         Run the agent execution loop.
@@ -57,7 +59,12 @@ class AgentLoop:
                 break
 
             try:
-                response: CompletionResponse = await agent.run(tool_manager, author)
+                response: CompletionResponse = await agent.run(
+                    tool_manager=tool_manager,
+                    run_metadata=run_metadata,
+                    service_manager=service_manager,
+                    author=author,
+                )
             except asyncio.CancelledError:
                 logger.info("execute_run task was cancelled.")
                 break

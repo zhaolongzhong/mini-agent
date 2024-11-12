@@ -22,4 +22,5 @@ class CompletionRequest(BaseModel):
     )
     metadata: Optional[RunMetadata] = None
     system_prompt_suffix: Optional[str] = ""
+    system_context: Optional[str] = ""
     enable_prompt_caching: Optional[bool] = True

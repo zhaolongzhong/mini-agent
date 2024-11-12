@@ -10,12 +10,16 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.console import Console
 
-from ..schemas.completion_respone import CompletionResponse
+from ..schemas.completion_respone import CompletionUsage
 
 logger = getLogger(__name__)
 
 
-def record_usage(response: CompletionResponse):
+def record_usage(
+    response: Optional[CompletionUsage],
+    subfolder: Optional[str] = "usage",
+    filename: Optional[str] = None,
+) -> Optional[dict]:
     """
     Record API usage statistics to a JSONL file.
 
@@ -30,7 +34,11 @@ def record_usage(response: CompletionResponse):
 
     # Get base directory and create full path
     base_dir = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
-    usage_path = base_dir / "logs/usage.jsonl"
+    _filename = filename if filename else "usage"
+
+    if not subfolder:
+        subfolder = "usage"
+    usage_path = base_dir / "logs" / subfolder / f"{_filename}.jsonl"
 
     # Create directory if it doesn't exist
     usage_path.parent.mkdir(parents=True, exist_ok=True)
@@ -47,6 +55,34 @@ def record_usage(response: CompletionResponse):
     with open(usage_path, "a", encoding="utf-8") as f:
         json.dump(usage_entry, f)
         f.write("\n")
+    return usage_entry
+
+
+def record_usage_details(
+    usage_details: dict,
+    subfolder: Optional[str] = "usage",
+    filename: Optional[str] = "usage_detail",
+) -> Optional[dict]:
+    """
+    Record API usage statistics to a JSONL file.
+    """
+
+    # Get base directory and create full path
+    base_dir = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+    _filename = filename if filename else "usage"
+
+    if not subfolder:
+        subfolder = "usage"
+    usage_path = base_dir / "logs" / subfolder / f"{_filename}.jsonl"
+
+    # Create directory if it doesn't exist
+    usage_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Append to JSONL file
+    with open(usage_path, "a", encoding="utf-8") as f:
+        json.dump(usage_details, f)
+        f.write("\n")
+    return usage_details
 
 
 def analyze_usage(
@@ -173,8 +209,8 @@ def create_stats_table(stats: Dict[str, Any], model_name: str) -> Table:
         ("Total Requests", f"{stats['count']:,}"),
         ("Total Input Tokens", f"{stats['total_input_tokens']:,}"),
         ("Total Output Tokens", f"{stats['total_output_tokens']:,}"),
-        ("Average Input Tokens", f"{stats['avg_input_tokens']:.2f}"),
-        ("Average Output Tokens", f"{stats['avg_output_tokens']:.2f}"),
+        ("Average Input Tokens", f"{stats['avg_input_tokens']:f}"),
+        ("Average Output Tokens", f"{stats['avg_output_tokens']:f}"),
     ]
 
     for metric, value in common_metrics:
@@ -232,7 +268,7 @@ def analyze_model_usage(usage_file: str, model_name: str, console: Console):
 def main():
     """Main function to run the usage analysis."""
     console = Console()
-    usage_file = "logs/usage.jsonl"
+    usage_file = "logs/usage/usage.jsonl"
 
     console.print("[bold blue]Running usage analysis...[/bold blue]")
     console.print("=" * 80)

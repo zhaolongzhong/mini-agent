@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from .llm import LLMClient
 from .tools import Tool, MemoryTool, ToolManager
-from .utils import DebugUtils, record_usage
+from .utils import DebugUtils, TokenCounter, record_usage, record_usage_details
 from .context import DynamicContextManager, ProjectContextManager
 from .schemas import (
     Author,
@@ -21,6 +21,7 @@ from .schemas import (
     ToolResponseWrapper,
     ToolCallToolUseBlock,
 )
+from .services import ServiceManager
 from ._agent_summarizer import ContentSummarizer
 from .memory.memory_manager import DynamicMemoryManager
 from .system_message_builder import SystemMessageBuilder
@@ -35,10 +36,10 @@ class Agent:
         self.tool_manager: Optional[ToolManager] = None
         self.summarizer = ContentSummarizer(AgentConfig(model="gpt-4o-mini"))
         self.memory_manager = DynamicMemoryManager(max_tokens=1000)
-        self.project_context_manager = ProjectContextManager()
+        self.project_context_manager = ProjectContextManager(path=self.config.project_context_path)
         self.context = DynamicContextManager(
             model=self.config.model,
-            max_tokens=12000 if self.config.is_primary else 4096,
+            max_tokens=config.max_context_tokens,
             summarizer=self.summarizer,
         )
         self.client: LLMClient = LLMClient(self.config)
@@ -49,30 +50,38 @@ class Agent:
         self.conversation_context: Optional[ConversationContext] = None  # current conversation context
         self.system_message_builder = SystemMessageBuilder(self.id, self.config)
         self.setup_feedback()
+        self.initialized: bool = False
+        self.token_counter = TokenCounter()
+        self.token_stats = {
+            "system": 0,
+            "tool": 0,
+            "project": 0,
+            "memories": 0,
+            "summaries": 0,
+            "messages": 0,
+            "actual_usage": {},
+        }
+        self.metrics = {"token_stats": self.token_stats}
+        self.service_manager: Optional[ServiceManager] = None
+        self.system_context: Optional[str] = None  # memories and project context
+        self.system_message_param: Optional[str] = None
 
     def get_system_message(self) -> MessageParam:
         self.system_message_builder.set_conversation_context(self.conversation_context)
         self.system_message_builder.set_other_agents_info(self.other_agents_info)
         return self.system_message_builder.build()
 
-    async def _get_recent_memories(self) -> Optional[dict]:
+    async def _update_recent_memories(self) -> Optional[str]:
         """Should be called whenever there is a memory update"""
         if not self.config.enable_services or Tool.Memory not in self.config.tools:
             return None
         try:
             memory_tool: MemoryTool = self.tool_manager.tools[Tool.Memory.value]
-            memories = await memory_tool.get_recent_memories(limit=5)
-            if memories:
-                memories.reverse()  # # oldest -> newest order, oldest first, FIFO when limit reached
-                for memory in memories:
-                    if memory.strip():
-                        self.memory_manager.add_memory(memory)
-
-                # Get formatted memories respecting token limits
-                return self.memory_manager.get_formatted_memories()
-
+            memory_dict = await memory_tool.get_recent_memories(limit=5)
+            self.memory_manager.add_memories(memory_dict)
+            self.memory_manager.update_recent_memories()
         except Exception as e:
-            logger.error(f"Ran into {e} while trying to get recent memories.")
+            logger.error(f"Ran into error while trying to get recent memories: {e}")
             return None
 
     def _generate_description(self) -> str:
@@ -88,17 +97,36 @@ class Agent:
         description += f" Agent {self.id} is able to use these tools: {', '.join(tool_names)}"
         return description
 
-    def _init_tools(self, tool_manager: ToolManager):
+    async def _initialize(self, tool_manager: ToolManager, service_manager: Optional[ServiceManager] = None):
+        if not self._initialize:
+            return
+
+        logger.debug(f"initialize ... \n{self.config.model_dump_json(indent=4)}")
         if not self.tool_manager:
             self.tool_manager = tool_manager
         if not self.tool_json and self.config.tools:
             self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
+            self.token_stats["tool"] = self.token_counter.count_dict_tokens(self.tool_json)
+        self.service_manager = service_manager
+        self.system_message_param = self.get_system_message()
+        await self.update_context()
+
+        self.summarizer.update_context(self.system_context)
+        self.initialized = True
 
     async def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
         await self.add_messages([message])
 
     async def add_messages(self, messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam]]) -> None:
-        await self.context.add_messages(messages)
+        has_truncated_history = await self.context.add_messages(messages)
+        if has_truncated_history:
+            """Only update context when there are truncated messages to make the most of prompt caching"""
+            try:
+                logger.debug("skip We have truncated messages, update context")
+                # await self.update_context()
+            except Exception as e:
+                logger.debug(f"Ran into error when update context: {e}")
+        self.token_stats["context_window"] = self.context.get_context_stats()
 
     def snapshot(self) -> str:
         """Take a snapshot of current message list and save to a file"""
@@ -111,6 +139,71 @@ class Agent:
                 os.path.abspath(os.path.join(os.path.dirname(__file__), "../../logs/feedbacks"))
             )
             self.config.feedback_path.mkdir(parents=True, exist_ok=True)
+
+    async def update_context(self) -> None:
+        logger.debug("update_context ...")
+        await self._update_recent_memories()
+        self.project_context_manager.update_context()
+
+    def update_stats(self, key: str, current_value: str, context_key: str) -> tuple[str, int]:
+        """
+        Common method to update metrics and token stats for a given context component.
+        """
+        if not current_value:
+            return "", 0
+
+        # Update metrics stats
+        local_stats = self.metrics.get(key, {"prev": "", "curr": ""})
+        if local_stats.get("curr") != current_value:
+            local_stats["prev"] = local_stats.get("curr", "")
+            local_stats["curr"] = current_value
+            local_stats["updated"] = True
+        else:
+            # it's same value in this turn
+            local_stats["prev"] = local_stats.get("curr")
+            local_stats["updated"] = False
+
+        self.metrics[key] = local_stats
+
+        # Count tokens
+        tokens = self.token_counter.count_token(current_value)
+        self.token_stats[context_key] = tokens
+
+        # Log if needed
+        logger.debug(f"{key}: {json.dumps(current_value, indent=4)}")
+
+        return current_value, tokens
+
+    def build_system_context(self) -> str:
+        """Build the system context with stats tracking."""
+        new_system_context = ""
+
+        # Process project context
+        project_value, _ = self.update_stats("project", self.project_context_manager.project_context, "project")
+        new_system_context += project_value if project_value else ""
+
+        # Process recent memories
+        memories_value, _ = self.update_stats("memories", self.memory_manager.recent_memories, "memories")
+        new_system_context += memories_value if memories_value else ""
+
+        # Process message summaries
+        summaries_value, _ = self.update_stats("summaries", self.context.get_summaries(), "summaries")
+        new_system_context += summaries_value if summaries_value else ""
+
+        # Update system context if changed
+        if self.system_context != new_system_context:
+            self.system_context = new_system_context
+            self.token_stats["context_updated"] = True
+            self.metrics["context_updated"] = True
+            logger.debug(
+                f"System context updated, metrics: {json.dumps(self.metrics, indent=4)}, \n{json.dumps({'old': self.system_context, 'new': new_system_context})}"
+            )
+
+        else:
+            self.metrics["context_updated"] = False
+            self.token_stats["context_updated"] = False
+
+        return self.system_context
 
     async def build_message_params(self) -> list[dict]:
         """
@@ -130,47 +223,62 @@ class Agent:
             msg.model_dump() if hasattr(msg, "model_dump") else msg.dict() if hasattr(msg, "dict") else msg
             for msg in messages
         ]
-        # Get recent memories
-        memories_param = await self._get_recent_memories()
-        if memories_param:
-            message_params.insert(0, memories_param)
-            logger.debug(f"Recent memories: {json.dumps(memories_param, indent=4)}")
 
-        # Get project context
-        project_context = self.project_context_manager.load_project_context(self.config.project_context_path)
-        if project_context:
-            message_params.insert(0, project_context)
         return message_params
 
-    async def run(self, tool_manager: ToolManager, author: Optional[Author] = None):
-        self._init_tools(tool_manager)
-        message_params = await self.build_message_params()
-        return await self.send_messages(messages=message_params, author=author)
+    async def run(
+        self,
+        tool_manager: ToolManager,
+        run_metadata: RunMetadata,
+        service_manager: Optional[ServiceManager] = None,
+        author: Optional[Author] = None,
+    ):
+        try:
+            self.metadata = run_metadata
+            await self._initialize(tool_manager, service_manager)
+            message_params = await self.build_message_params()
+            tokens = self.token_counter.count_dict_tokens(message_params)
+            self.token_stats["messages"] = tokens
+            return await self.send_messages(messages=message_params, run_metadata=run_metadata, author=author)
+        except Exception as e:
+            logger.error(f"Ran into error during run: {e}")
+            raise
 
     async def send_messages(
         self,
         messages: List[Union[BaseModel, Dict]],
-        metadata: Optional[RunMetadata] = None,
+        run_metadata: Optional[RunMetadata] = None,
         author: Optional[Author] = None,
     ) -> Union[CompletionResponse, ToolCallToolUseBlock]:
         if not self.metadata:
-            self.metadata = metadata
+            self.metadata = run_metadata
 
         messages_dict = [
             msg.model_dump(exclude_none=True, exclude_unset=True) if isinstance(msg, BaseModel) else msg
             for msg in messages
         ]
 
+        system_message_content = self.get_system_message().content
+        self.token_stats["system"] = self.token_counter.count_token(system_message_content)
+        system_context = self.build_system_context()
+        self.metadata.token_stats = self.token_stats
+        self.metadata.metrics = self.metrics
         completion_request = CompletionRequest(
             author=Author(name=self.id, role="assistant") if not author else author,
             model=self.config.model,
             messages=messages_dict,
-            metadata=metadata,
+            metadata=self.metadata,
             tool_json=self.tool_json,
-            system_prompt_suffix=self.get_system_message().content,
+            system_prompt_suffix=system_message_content,
+            system_context=system_context,
         )
+
         response = await self.client.send_completion_request(completion_request)
-        record_usage(response)
+        usage_dict = record_usage(response)
+        self.token_stats["actual_usage"] = usage_dict
+        # todo: recordd
+        record_usage_details(self.token_stats)
+        logger.debug(f"metrics: {json.dumps(self.metrics, indent=4)}")
         logger.debug(f"{self.id} response: {response}")
         return response
 

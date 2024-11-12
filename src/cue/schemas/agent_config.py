@@ -20,6 +20,8 @@ class AgentConfig(BaseModel):
     api_key: Optional[str] = None
     temperature: Optional[float] = 0.8
     max_tokens: Optional[int] = 1000
+    max_context_tokens: Optional[int] = 12000
+    memory_tokens: Optional[int] = 1000  # maximum memory token for each request
     stop_sequences: Optional[list[str]] = None
     tools: Optional[list[Any]] = []  # callable or tool enum
     parallel_tool_calls: bool = True

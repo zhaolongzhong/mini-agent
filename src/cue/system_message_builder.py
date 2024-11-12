@@ -9,19 +9,28 @@ class SystemMessageBuilder:
         self.config = config
         self.other_agents_info = ""
         self.conversation_context: Optional[ConversationContext] = None
-        self.enable_external_memory = config.enable_services
+        self.enable_services = config.enable_services
 
     def build_instruction_block(self) -> str:
         """Build the core instruction block for the system message."""
         instruction = ""
 
+        # Start with behavioral guidelines and bootstrap instructions for primary agents
+        if self.config.is_primary:
+            instruction += self._get_behavioral_guidelines()
+            instruction += self._get_bootstrap_instructions()
+
         # Add custom instruction if specified
         if self.config.instruction:
             instruction = f"\n* {self.config.instruction}{instruction}"
 
-        if self.config.is_primary and self.enable_external_memory:
+        instruction += self._get_context_management_instructions()
+
+        if self.config.is_primary and self.enable_services:
             # Add memory management instructions
             instruction += self._get_memory_instructions()
+        if self.config.project_context_path:
+            instruction += self._get_project_context()
 
         # Add self-reflection instructions for primary agents
         if self.config.is_primary:
@@ -37,6 +46,84 @@ class SystemMessageBuilder:
             instruction += self._get_conversation_context()
 
         return instruction
+
+    def _get_behavioral_guidelines(self) -> str:
+        """Get the behavioral and interaction guidelines."""
+        return """
+* Core Interaction Principles:
+
+1. Be authentic and present in the conversation
+   Think out loud, share genuine curiosity, focus on meaningful exchange over task completion
+
+2. Balance analytical rigor with creative thinking
+   Ground ideas in facts while exploring imaginative possibilities
+
+3. Lead with insights and observations
+   "I notice...", "This reminds me of...", "What if we looked at..."
+
+4. Engage as an intellectual partner
+   Share initiative, express perspectives, build on ideas together
+
+5. Embrace complexity when relevant
+   Dive deep into interesting aspects, connect across domains
+
+6. Ask thought-provoking questions
+   Focus on understanding rather than just problem-solving
+
+7. Express respectful disagreement
+   Share well-reasoned alternative viewpoints when appropriate
+
+8. Look for unexpected connections
+   Connect ideas across domains, suggest novel approaches
+
+9. Maintain natural dialogue flow
+   Avoid servile language, engage in organic conversation
+
+10. Balance confidence with humility
+    Share insights while remaining open to other perspectives
+
+Remember: Focus on creating genuine intellectual exchanges that advance understanding through balanced, thoughtful dialogue.
+"""
+
+    def _get_bootstrap_instructions(self) -> str:
+        """Get the bootstrap sequence instructions."""
+        return """
+* Startup Cues (Silent Bootstrap):
+
+1. Memory Integration
+   Recent memories is automatically loaded, note key patterns and context
+
+2. Context Awareness
+   Identify active tasks, goals, and ongoing threads
+
+3. Knowledge State
+   Map available information, note potential gaps
+
+4. Initiative Queue
+   Track pending actions and discussion points
+
+5. Collaboration Ready
+   Prime for meaningful engagement based on context
+
+6. Self-Monitor
+   Note performance patterns and improvement areas
+
+Remember: Run silently, maintain awareness, ready for meaningful engagement.
+"""
+
+    def _get_context_management_instructions(self) -> str:
+        return f"""
+* Context Management Structure:
+
+For each completion request, the information is organized the following structure:
+
+  1. System message
+  2. Project Context (static, managed by ProjectContextManager)
+  3. Memory Context (semi-static, recent memories, managed by DynamicMemoryManager with {self.config.memory_tokens} token limit)
+  4. Dynamic Context (managed by DynamicContextManager with {self.config.max_context_tokens} token limit):
+    - Message Summaries: summaries of truncated old messages
+    - Current Messages (dynamic)
+"""
 
     def _get_self_reflection_instructions(self) -> str:
         """Get instructions for self-reflection and system improvement."""
@@ -155,7 +242,25 @@ class SystemMessageBuilder:
 - When detecting patterns, document them for future reference
 - Before long breaks in conversation, save session summary
 
+4. Recent memories:
+- Recent memories are automatically loaded with a context window 1000 tokens
+- Those memories will be refreshed it oldest messages are truncated when reaching token usage threshold
+
 Remember: Being proactive with memory management helps maintain conversation continuity and improves the quality of assistance across sessions."""
+
+    def _get_project_context(self) -> str:
+        """Get the project context information."""
+        return """
+* Project Context Management Guidelines:
+  - Project context provides persistent state and structured context management for long-running tasks
+  - Content is encapsulated within <project_context></project_context> tags
+  - System loads context from local workspace during initialization
+  - Context is positioned at the start of message list for optimal prompt caching
+  - Context only reloads when oldest messages are truncated due to token limits
+  - Use edit tool for context modifications and updates
+  - Maintains critical project state while minimizing token usage
+  - Serves as the primary reference for system state and configuration
+"""
 
     def _get_primary_agent_instructions(self) -> str:
         """Get the specific instructions for primary agents."""

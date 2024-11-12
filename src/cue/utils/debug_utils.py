@@ -49,7 +49,13 @@ class DebugUtils:
         return msg
 
     @staticmethod
-    def take_snapshot(messages: List[Union[Dict, BaseModel]], pretty: bool = True, suffix: Optional[str] = None):
+    def take_snapshot(
+        messages: List[Union[Dict, BaseModel]],
+        pretty: bool = True,
+        subfolder: Optional[str] = None,
+        suffix: Optional[str] = None,
+        with_timestamp: Optional[bool] = False,
+    ):
         """
         Record current message list to a file in JSONL format
 
@@ -59,6 +65,8 @@ class DebugUtils:
                 - Pydantic BaseModel
             pretty: If True, format the JSON with indentation for better readability
             suffix: If provided, append it at the end otherwise use timestamp
+            with_timestamp: If provided, append timestamp
+            subfolder: If provided, create a subfolder
 
         Returns:
             Path: Path to the created snapshot file
@@ -67,16 +75,23 @@ class DebugUtils:
             return
 
         if suffix:
+            if with_timestamp:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                suffix = f"{suffix}_{timestamp}"
             filename_suffix = suffix
         else:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename_suffix = timestamp
 
         base_dir = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+        if subfolder:
+            snapshot_base_path = base_dir / "logs/snapshot" / subfolder
+        else:
+            snapshot_base_path = base_dir / "logs/snapshot"
 
         if pretty:
             file_name = f"snapshot_{filename_suffix}_readable.json"
-            snapshot_path = base_dir / "logs/snapshot" / file_name
+            snapshot_path = snapshot_base_path / file_name
             snapshot_path.parent.mkdir(parents=True, exist_ok=True)
             serialized_messages = [DebugUtils._serialize_message(msg) for msg in messages]
 
@@ -84,7 +99,7 @@ class DebugUtils:
                 json.dump(serialized_messages, f, ensure_ascii=False, indent=2)
 
         file_name = f"snapshot_{filename_suffix}.jsonl"
-        snapshot_path = base_dir / "logs/snapshot" / file_name
+        snapshot_path = snapshot_base_path / file_name
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(snapshot_path, "w", encoding="utf-8") as f:
@@ -108,9 +123,8 @@ class DebugUtils:
                 print(json.load(f))
 
     @staticmethod
-    def log_chat(msg: dict, tag: Optional[str] = None) -> None:
+    def log_chat(msg: dict, _tag: Optional[str] = None) -> None:
         """Save user ans assistant message to a file"""
-        logger.debug(f"{tag} {msg}")
         base_dir = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
         user_input_path = base_dir / "logs/chat.jsonl"
         user_input_path.parent.mkdir(parents=True, exist_ok=True)

@@ -114,22 +114,22 @@ class MemoryTool(BaseTool):
         logger.debug(f"view memories: {len(response)}, memory_contents: {memory_contents[:500]}")
         return ToolResult(output=memory_contents)
 
-    async def get_recent_memories(self, limit: Optional[int] = 10) -> list[str]:
-        """Return a list formatted memories entry in desc order by updated_at"""
+    async def get_recent_memories(self, limit: Optional[int] = 10) -> dict[str, str]:
+        """Return a dict formatted memories entry in asc order by updated_at"""
         if not self.memory_client:
             return
         response = await self.memory_client.get_memories(limit=limit)
-        memory_strings = [
-            MemoryFormatter.format_single_memory(
+        memory_dict = {
+            memory.id: MemoryFormatter.format_single_memory(
                 memory,
                 include_score=False,
                 include_metadata=False,
                 date_format="%Y-%m-%d %H:%M:%S",
                 indent_level=2,
             )
-            for memory in response
-        ]
-        return memory_strings
+            for memory in reversed(response)
+        }
+        return memory_dict
 
     async def recall(self, query: str, limit: Optional[int] = 10) -> ToolResult:
         """Implement the recall command"""

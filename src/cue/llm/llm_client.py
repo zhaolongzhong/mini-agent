@@ -75,7 +75,7 @@ class LLMClient(LLMRequest):
                 raise ValueError(f"Unsupported tool call type: {type(tool_call)}")
 
             if tool_name not in tool_manager.tools and tool_name:
-                error_message = f"Tool '{tool_name}' not found. {tool_manager.tools.keys()}"
+                error_message = f"Tool '{tool_name}' not found. The name can be only one of those names: {tool_manager.tools.keys()}."
                 logger.error(f"{error_message}, tool_call: {tool_call}")
                 tool_results.append(
                     self.create_error_response(

@@ -4,7 +4,7 @@ from typing import Any, Union, Optional
 
 from pydantic import BaseModel
 
-from ..utils import TokenCounter
+from ..utils import DebugUtils, TokenCounter
 from ..schemas import MessageParam, CompletionResponse, ToolResponseWrapper
 from .._agent_summarizer import ContentSummarizer
 from ..utils.mesage_params_utils import has_tool_calls, is_tool_result
@@ -17,7 +17,7 @@ class DynamicContextManager:
         self,
         model: str,
         max_tokens: int = 4096,
-        batch_remove_percentage: float = 0.25,
+        batch_remove_percentage: float = 0.30,
         summarizer: Optional[ContentSummarizer] = None,
     ):
         """
@@ -31,7 +31,7 @@ class DynamicContextManager:
         """
         self.model = model
         self.max_tokens = max_tokens
-        self.batch_remove_size = int(max_tokens * batch_remove_percentage)
+        self.batch_remove_percentage = batch_remove_percentage
         self.messages: list[dict] = []
         self.summaries: list[str] = []
         self.token_counter = TokenCounter()
@@ -39,6 +39,15 @@ class DynamicContextManager:
         # Track window stability for cache optimization
         self.last_removal_tokens = 0  # Track tokens at last removal
         self.messages_since_removal = 0  # Track messages added since last removal
+        self.summaries_content: Optional[str] = None
+
+    def _get_batch_remove_size(self) -> int:
+        total = self._get_total_tokens()
+        extra_remove_size = 0
+        if total > self.max_tokens:
+            extra_remove_size = total - self.max_tokens
+        batch_remove_size = int(self.max_tokens * self.batch_remove_percentage) + extra_remove_size
+        return batch_remove_size
 
     def _get_total_tokens(self) -> int:
         """Get the total token count for all messages in the current window."""
@@ -69,29 +78,29 @@ class DynamicContextManager:
         return {
             "message_count": len(self.messages),
             "total_tokens": total_tokens,
+            "max_tokens": self.max_tokens,
             "remaining_tokens": self.max_tokens - total_tokens,
             "is_at_capacity": total_tokens >= self.max_tokens,
         }
 
-    def get_messages(self) -> list[dict]:
-        messages = self.messages.copy()
+    def _update_summaries_content(self):
         if not self.summaries:
-            return messages
-
+            return
         # Take only the last few summaries if we have more
         recent_summaries = self.summaries[-6:] if len(self.summaries) > 6 else self.summaries
 
         numbered_summaries = [f"{i + 1}. {summary.strip()}" for i, summary in enumerate(recent_summaries) if summary]
 
         contents = "\n".join(numbered_summaries)
+        self.summaries_content = contents
 
-        if contents:
-            summary_message = {
-                "role": "user",
-                "content": (f"Here is some previous context for reference: " f"<summaries>{contents}</summaries>"),
-            }
-            messages.insert(0, summary_message)
+    def get_summaries(self) -> Optional[str]:
+        if not self.summaries_content:
+            return None
+        return f"Here is summaries of truncated old messages <summaries>{self.summaries_content}</summaries>"
 
+    def get_messages(self) -> list[dict]:
+        messages = self.messages.copy()
         return messages
 
     def clear_context(self) -> None:
@@ -101,8 +110,24 @@ class DynamicContextManager:
     async def add_messages(
         self,
         new_messages: list[Union[CompletionResponse, ToolResponseWrapper, MessageParam, dict[str, Any], BaseModel]],
-    ) -> None:
-        """Add new messages and manage the sliding window."""
+    ) -> bool:
+        """Add new messages to the conversation history and manage the sliding window token limit.
+
+        This method handles the addition of new messages while maintaining the conversation
+        within the specified token limit. If the token limit is exceeded, older messages
+        may be removed and optionally summarized.
+
+        Args:
+            new_messages: A list of messages to add. Can contain CompletionResponse,
+                ToolResponseWrapper, MessageParam, dict, or BaseModel instances.
+
+        Returns:
+            bool: True if any messages were removed due to token limit management,
+                False if all messages were retained.
+
+        Raises:
+            Exception: If an unsupported message type is provided.
+        """
         original_size = len(self.messages)
         for message in new_messages:
             if isinstance(message, CompletionResponse):
@@ -126,22 +151,42 @@ class DynamicContextManager:
             self.messages_since_removal += 1
 
         total_tokens = self._get_total_tokens()
+        original_tokens = total_tokens
 
+        has_truncated = False
         # Only remove when we exceed the limit
         if total_tokens > self.max_tokens:
+            orignal_len = len(self.messages)
+            DebugUtils.take_snapshot(messages=self.messages, suffix="batch_remove_before", subfolder="batch_remove")
             removed_messages = self._batch_remove_messages()
+            DebugUtils.take_snapshot(messages=self.messages, suffix="batch_remove_after", subfolder="batch_remove")
+
+            new_len = len(self.messages)
+            has_truncated = len(removed_messages) > 0
             total_tokens = self._get_total_tokens()
-            if self.summarizer:
+            if not has_truncated:
+                logger.error(
+                    f"Reach max tokens, but not remove any messages, orignal_len: {orignal_len}, new_len:{new_len}"
+                )
+            if self.summarizer and has_truncated:
+                logger.debug(
+                    f"Summarize removed messages: {len(removed_messages)}, new stats: {self.get_context_stats()}"
+                )
                 summary = await self.summarizer.summarize(self.model, removed_messages)
                 self.summaries.append(summary)
 
         metadata = {
+            "max_token": self.max_tokens,
             "original_size": original_size,
             "final_size": len(self.messages),
-            "total_tokens": total_tokens,
+            "original_tokens": original_tokens,
+            "new_total_tokens": total_tokens,
             "messages_since_removal": self.messages_since_removal,
+            "has_truncated": has_truncated,
         }
         logger.debug(f"add_messages result: {json.dumps(metadata, indent=4)}")
+        self._update_summaries_content()
+        return has_truncated
 
     def _find_tool_sequence_indices(self, start_idx: int) -> set[int]:
         """
@@ -211,7 +256,7 @@ class DynamicContextManager:
         if not self.messages:
             return []
 
-        tokens_to_remove = self.batch_remove_size
+        tokens_to_remove = self._get_batch_remove_size()
         message_tokens = {}
         removed_tokens = 0
         messages_to_remove = 0
@@ -234,7 +279,15 @@ class DynamicContextManager:
                 # Check if adding sequence would exceed target by too much
                 if removed_tokens + sequence_tokens > tokens_to_remove:
                     excess = (removed_tokens + sequence_tokens) - tokens_to_remove
-                    if excess > tokens_to_remove * 0.1:  # 10% threshold
+                    metrics = {
+                        "tokens_to_remove": tokens_to_remove,
+                        "sequence_tokens": sequence_tokens,
+                        "removed_tokens": removed_tokens,
+                        "excess": excess,
+                        "messages_to_remove": messages_to_remove,
+                    }
+                    logger.debug(f"About to remove extra tokens: {json.dumps(metrics, indent=4)}")
+                    if excess > tokens_to_remove * 0.25:  # 25% threshold
                         break
 
                 removed_tokens += sequence_tokens
@@ -249,6 +302,7 @@ class DynamicContextManager:
                 current_idx += 1
 
         # Remove messages and update tracking
+        logger.debug(f"messages_to_remove: {messages_to_remove}, removed_tokens: {removed_tokens}")
         removed = self.messages[:messages_to_remove]
         self.messages = self.messages[messages_to_remove:]
         self.last_removal_tokens = self._get_total_tokens()

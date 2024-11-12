@@ -34,7 +34,7 @@ class TestDynamicContextManager:
     def test_initialization(self, context_manager):
         """Test proper initialization of DynamicContextManager"""
         assert context_manager.max_tokens == 1000
-        assert context_manager.batch_remove_size == 250  # 25% of max_tokens
+        assert context_manager._get_batch_remove_size() == 250  # 25% of max_tokens
         assert len(context_manager.get_messages()) == 0
 
     @pytest.mark.asyncio

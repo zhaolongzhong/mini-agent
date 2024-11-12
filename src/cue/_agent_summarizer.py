@@ -1,6 +1,8 @@
 import logging
 from typing import Optional
+from datetime import datetime
 
+from .utils import DebugUtils, TokenCounter, record_usage
 from .llm.llm_client import LLMClient
 from .schemas.agent_config import AgentConfig
 from .utils.mesage_params_utils import get_text_from_message_params
@@ -14,6 +16,11 @@ class ContentSummarizer:
         self.model = config.model
         self.client: LLMClient = LLMClient(config)
         self.tag = self.__class__.__name__
+        self.token_counter = TokenCounter()
+        self.system_context: Optional[str] = None
+
+    def update_context(self, system_context: str) -> None:
+        self.system_context = system_context
 
     async def summarize(self, model: str, messages: list[dict], instruction: Optional[str] = None) -> Optional[str]:
         """Summarize message content using LLM with optional custom instruction.
@@ -52,7 +59,9 @@ class ContentSummarizer:
             Optional[str]: Summarized content or None if summarization fails
         """
         # Build the prompt with default instruction and optional custom instruction
-        base_instruction = "Please summarize those content. Be specific on details and be concise."
+        base_instruction = """
+Those messages above will be truncated from message list, please utilize system message and context info to summarize those content by extracting useful info.
+This summaries will be added to the beginning of the message list again. Be specific on details such as filename or path etc, and be concise."""
         final_instruction = f"{base_instruction} {instruction}" if instruction else base_instruction
 
         message = {
@@ -60,15 +69,50 @@ class ContentSummarizer:
             "content": f"<content>{content}</content> {final_instruction}",
         }
 
+        if not self.system_context:
+            logger.warning("No system context are provided ")
         request = CompletionRequest(
             model=self.model,
             messages=[message],
             temperature=0.4,
+            system_prompt_suffix=self.system_context,  # use context as system message
         )
+
+        system_token = self.token_counter.count_token(self.system_context)
+        messages_token = self.token_counter.count_dict_tokens(message)
+        total_tokens = system_token + messages_token
+        token_stats = {
+            "system_context": system_token,
+            "messages_token": messages_token,
+            "total_tokens": total_tokens,
+        }
 
         try:
             completion_response = await self.client.send_completion_request(request=request)
-            return completion_response.get_text()
+            summary = completion_response.get_text()
+
+            try:
+                usage_dict = record_usage(completion_response, subfolder="usage", filename="summarization")
+                token_stats["actual_usage"] = usage_dict
+                metrics = {
+                    "timestamp": datetime.now().isoformat(),
+                    "model": self.model,
+                    "token_stats": token_stats,
+                    "system_context": self.system_context,
+                    "message": message,
+                    "summary": summary,
+                }
+
+                DebugUtils.take_snapshot(
+                    messages=[metrics],
+                    suffix="summarization",
+                    with_timestamp=True,
+                    subfolder="summarization",
+                )
+            except Exception as e:
+                logger.error(f"Running into error when record metrics for summarization: {e}")
+
+            return summary
         except Exception as e:
             logger.error(f"{self.tag} error: {str(e)}")
             return None

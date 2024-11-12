@@ -81,6 +81,23 @@ class CLI:
         # Initialize the agent manager
         await self.agent_manager.initialize(enable_services=self.enable_services)
 
+        # Trigger bootstrap sequence for primary agent in CLI mode
+        if self.mode == "cli" and self.agent_manager.primary_agent:
+            bootstrap_metadata = RunMetadata(
+                run_id=generate_run_id(),
+                enable_turn_debug=False,
+                enable_services=self.enable_services,
+            )
+            # Send bootstrap message to trigger bootstrap sequence
+            await self.run_loop(
+                self.agent_manager.primary_agent.id,
+                "This is bootstrap AUTO-EXECUTE ON STARTUP. Please access relevant context, review our previous session's work, and prepare a summary to begin our current session.",
+                bootstrap_metadata,
+            )
+
+            # Print separator for visual clarity
+            self.console_utils.console.print("\n" + "=" * 50 + "\n")
+
     def _sync_get_input(self, prompt: str) -> str:
         """Synchronous input function."""
         return self.console_utils.console.input(prompt)

@@ -2,7 +2,7 @@
     "type": "function",
     "function": {
         "name": "memory",
-        "description": "Perform memory operations like viewing, creating, recalling, updating, and deleting memory.",
+        "description": "Perform memory operations. The name must be 'memory' only.",
         "parameters": {
             "type": "object",
             "properties": {
