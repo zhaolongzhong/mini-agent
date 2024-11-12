@@ -193,7 +193,6 @@ class CLI:
     async def run_loop(self, agent_id: str, user_input: str, run_metadata: RunMetadata) -> Optional[CompletionResponse]:
         try:
             response = await self.agent_manager.start_run(agent_id, user_input, run_metadata)
-            self.logger.debug(f"User message queued for processing. response: {response}")
             return response
         except Exception as e:
             self.console_utils.print_error_msg(f"Error during run: {str(e)}")

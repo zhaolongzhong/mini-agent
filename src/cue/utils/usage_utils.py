@@ -26,7 +26,7 @@ def record_usage(response: CompletionResponse):
     if not usage:
         return
 
-    logger.debug(f"completion response usage: {usage.model_dump(exclude_none=True)}")
+    logger.debug(f"completion response usage: {usage.model_dump(exclude_none=True, exclude_defaults=True)}")
 
     # Get base directory and create full path
     base_dir = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))

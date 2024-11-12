@@ -103,7 +103,7 @@ class AgentManager:
         # Directly add message to the agent's message history
         if message:
             user_message = MessageParam(role="user", content=message)
-            self.active_agent.add_message(user_message)
+            await self.active_agent.add_message(user_message)
         logger.debug(f"run - queued message for agent {active_agent_id}: {message}")
 
         # Start execute_run if not already running
@@ -192,7 +192,7 @@ class AgentManager:
         if agent_transfer.to_agent_id not in self._agents:
             available_agents = ", ".join(self._agents.keys())
             error_msg = f"Target agent '{agent_transfer.to_agent_id}' not found. Transfer to primary: {agent_transfer.transfer_to_primary}. Available agents: {available_agents}"
-            self.active_agent.add_message(MessageParam(role="user", content=error_msg))
+            await self.active_agent.add_message(MessageParam(role="user", content=error_msg))
             logger.error(error_msg)
             return
 
@@ -214,7 +214,7 @@ class AgentManager:
 
         self.active_agent = self._agents[agent_transfer.to_agent_id]
         for msg in messages:
-            self.active_agent.add_message(msg)
+            await self.active_agent.add_message(msg)
         self.active_agent.conversation_context = ConversationContext(
             participants=[from_agent_id, agent_transfer.to_agent_id]
         )

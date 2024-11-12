@@ -113,7 +113,7 @@ class ConsoleUtils:
         # Print the prompt after the message
         self.prompt_manager.print_prompt()
 
-    def print_error_msg(self, message: str, agent_id: Optional[str]) -> None:
+    def print_error_msg(self, message: str, agent_id: Optional[str] = None) -> None:
         """Print an error message from an agent."""
         self.prompt_manager.reset_prompt()
         # Clear the current line

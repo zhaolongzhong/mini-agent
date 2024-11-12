@@ -1,28 +1,41 @@
 import json
 import logging
-from typing import Any, Dict, List, Union
+from typing import Any, Union, Optional
 
 from pydantic import BaseModel
 
-from ..utils import TokenCounter, truncate_safely
+from ..utils import TokenCounter
 from ..schemas import MessageParam, CompletionResponse, ToolResponseWrapper
+from .._agent_summarizer import ContentSummarizer
+from ..utils.mesage_params_utils import has_tool_calls, is_tool_result
 
 logger = logging.getLogger(__name__)
 
 
 class DynamicContextManager:
-    def __init__(self, max_tokens: int = 4096, batch_remove_percentage: float = 0.25):
+    def __init__(
+        self,
+        model: str,
+        max_tokens: int = 4096,
+        batch_remove_percentage: float = 0.25,
+        summarizer: Optional[ContentSummarizer] = None,
+    ):
         """
         Initialize the DynamicContextManager with a maximum token limit.
 
         Args:
+            model (str): LLM model id
             max_tokens (int): Maximum number of tokens to maintain in context
             batch_remove_percentage (float): Percentage of tokens to remove when limit is reached
+            summarizer (ContentSummarizer): Summarize messages
         """
+        self.model = model
         self.max_tokens = max_tokens
         self.batch_remove_size = int(max_tokens * batch_remove_percentage)
-        self.messages: List[Dict] = []
+        self.messages: list[dict] = []
+        self.summaries: list[str] = []
         self.token_counter = TokenCounter()
+        self.summarizer = summarizer
         # Track window stability for cache optimization
         self.last_removal_tokens = 0  # Track tokens at last removal
         self.messages_since_removal = 0  # Track messages added since last removal
@@ -50,7 +63,7 @@ class DynamicContextManager:
 
         return total_tokens
 
-    def get_context_stats(self) -> Dict[str, Any]:
+    def get_context_stats(self) -> dict[str, Any]:
         """Get statistics about the current context window."""
         total_tokens = self._get_total_tokens()
         return {
@@ -61,15 +74,33 @@ class DynamicContextManager:
         }
 
     def get_messages(self) -> list[dict]:
-        return self.messages
+        messages = self.messages.copy()
+        if not self.summaries:
+            return messages
+
+        # Take only the last few summaries if we have more
+        recent_summaries = self.summaries[-6:] if len(self.summaries) > 6 else self.summaries
+
+        numbered_summaries = [f"{i + 1}. {summary.strip()}" for i, summary in enumerate(recent_summaries) if summary]
+
+        contents = "\n".join(numbered_summaries)
+
+        if contents:
+            summary_message = {
+                "role": "user",
+                "content": (f"Here is some previous context for reference: " f"<summaries>{contents}</summaries>"),
+            }
+            messages.insert(0, summary_message)
+
+        return messages
 
     def clear_context(self) -> None:
         """Clear all messages from the context window."""
         self.messages.clear()
 
-    def add_messages(
+    async def add_messages(
         self,
-        new_messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam, Dict[str, Any], BaseModel]],
+        new_messages: list[Union[CompletionResponse, ToolResponseWrapper, MessageParam, dict[str, Any], BaseModel]],
     ) -> None:
         """Add new messages and manage the sliding window."""
         original_size = len(self.messages)
@@ -98,8 +129,11 @@ class DynamicContextManager:
 
         # Only remove when we exceed the limit
         if total_tokens > self.max_tokens:
-            self._batch_remove_messages()
+            removed_messages = self._batch_remove_messages()
             total_tokens = self._get_total_tokens()
+            if self.summarizer:
+                summary = await self.summarizer.summarize(self.model, removed_messages)
+                self.summaries.append(summary)
 
         metadata = {
             "original_size": original_size,
@@ -108,47 +142,6 @@ class DynamicContextManager:
             "messages_since_removal": self.messages_since_removal,
         }
         logger.debug(f"add_messages result: {json.dumps(metadata, indent=4)}")
-
-    def _has_tool_calls(self, msg: Dict) -> bool:
-        """Check if a message contains tool calls."""
-
-        def get_role(msg) -> str:
-            if isinstance(msg, BaseModel):
-                return msg.role if hasattr(msg, "role") else None
-            return msg.get("role")
-
-        role = get_role(msg)
-        if role != "assistant":
-            return False
-
-        if msg.get("tool_calls", []):
-            return True
-
-        if isinstance(msg.get("content", []), list):
-            for item in msg.get("content", []):
-                if isinstance(item, dict) and item.get("type") == "tool_use":
-                    return True
-
-        return msg.get("type", "") == "tool_use"
-
-    def _is_tool_result(self, msg: Dict) -> bool:
-        """Check if a message is a tool result."""
-
-        def get_role(msg) -> str:
-            if isinstance(msg, BaseModel):
-                return msg.role if hasattr(msg, "role") else None
-            return msg.get("role")
-
-        role = get_role(msg)
-        if role == "tool":
-            return True
-        if role != "user":
-            return False
-        if isinstance(msg.get("content", []), list):
-            for item in msg.get("content", []):
-                if isinstance(item, dict) and item.get("type") == "tool_result":
-                    return True
-        return msg.get("type", "") == "tool_result"
 
     def _find_tool_sequence_indices(self, start_idx: int) -> set[int]:
         """
@@ -160,7 +153,7 @@ class DynamicContextManager:
             return sequence_indices
 
         msg = self.messages[start_idx]
-        if not self._has_tool_calls(msg):
+        if not has_tool_calls(msg):
             return sequence_indices
 
         sequence_indices.add(start_idx)
@@ -182,7 +175,7 @@ class DynamicContextManager:
         remaining_ids = tool_call_ids.copy()
         for i in range(start_idx + 1, len(self.messages)):
             cur_msg = self.messages[i]
-            if not self._is_tool_result(cur_msg):
+            if not is_tool_result(cur_msg):
                 break
 
             tool_ids = []
@@ -214,77 +207,51 @@ class DynamicContextManager:
         logger.debug(f"Final sequence indices: {sequence_indices}")
         return sequence_indices
 
-    def _batch_remove_messages(self) -> None:
-        """Remove a batch of oldest messages while preserving tool sequences."""
+    def _batch_remove_messages(self) -> list[Any]:
         if not self.messages:
-            return
+            return []
 
-        total_tokens = self._get_total_tokens()
-        tokens_to_remove = self.batch_remove_size  # Always remove the configured batch size
-
-        logger.info(
-            f"Starting batch removal - Total tokens: {total_tokens}, "
-            f"To remove: {tokens_to_remove}, "
-            f"Messages since last removal: {self.messages_since_removal}"
-        )
-
+        tokens_to_remove = self.batch_remove_size
+        message_tokens = {}
         removed_tokens = 0
         messages_to_remove = 0
-
-        # Keep checking messages from the start until we've removed enough tokens
         current_idx = 0
+
+        def get_message_tokens(idx):
+            if idx not in message_tokens:
+                message_tokens[idx] = self._count_dict_tokens(self.messages[idx])
+            return message_tokens[idx]
+
         while removed_tokens < tokens_to_remove and current_idx < len(self.messages):
-            if self._has_tool_calls(self.messages[current_idx]):
-                # Get all indices in this tool sequence using the existing method
+            if has_tool_calls(self.messages[current_idx]):
                 sequence_indices = self._find_tool_sequence_indices(current_idx)
                 if not sequence_indices:
-                    # No complete sequence found, move to next message
                     current_idx += 1
                     continue
 
-                # Calculate tokens for the whole sequence
-                sequence_tokens = 0
-                for i in sequence_indices:
-                    loc_msg = self.messages[i]
-                    is_tool_result = self._is_tool_result(loc_msg)
-                    is_tool_call = self._has_tool_calls(loc_msg)
-                    tokens = self._count_dict_tokens(self.messages[i])
-                    sequence_tokens += tokens
-                    logger.debug(
-                        f"About to remove i: {i} is_tool_call: {is_tool_call}, is_tool_result: {is_tool_result}, sequence_tokens: {sequence_tokens}): {truncate_safely(json.dumps(self.messages[i]), 200)}"
-                    )
+                sequence_tokens = sum(get_message_tokens(i) for i in sequence_indices)
+
+                # Check if adding sequence would exceed target by too much
+                if removed_tokens + sequence_tokens > tokens_to_remove:
+                    excess = (removed_tokens + sequence_tokens) - tokens_to_remove
+                    if excess > tokens_to_remove * 0.1:  # 10% threshold
+                        break
 
                 removed_tokens += sequence_tokens
-                messages_to_remove = max(messages_to_remove, max(sequence_indices) + 1)
-                current_idx = max(sequence_indices) + 1
+                max_sequence_idx = max(sequence_indices)
+                messages_to_remove = max(messages_to_remove, max_sequence_idx + 1)
+                current_idx = max_sequence_idx + 1
+
             else:
-                # Regular message
-                msg_tokens = self._count_dict_tokens(self.messages[current_idx])
+                msg_tokens = get_message_tokens(current_idx)
                 removed_tokens += msg_tokens
                 messages_to_remove = current_idx + 1
                 current_idx += 1
 
-        # Remove messages from the start
-        logger.debug(f"Remove messages from the start, messages_to_remove: {messages_to_remove}")
-        if messages_to_remove > 0:
-            removed = self.messages[:messages_to_remove]
-            self.messages = self.messages[messages_to_remove:]
-
-            # Log removed messages
-            for msg in removed:
-                logger.info(
-                    f"Removed message: role={msg.get('role')}, "
-                    f"content={truncate_safely(msg.get('content'))}, "
-                    f"tool_call_id={msg.get('tool_call_id')}, "
-                    f"tool_calls={msg.get('tool_calls')}"
-                )
-
-        # Update tracking
+        # Remove messages and update tracking
+        removed = self.messages[:messages_to_remove]
+        self.messages = self.messages[messages_to_remove:]
         self.last_removal_tokens = self._get_total_tokens()
         self.messages_since_removal = 0
 
-        logger.info(
-            f"Batch removal complete. Removed {removed_tokens} tokens, "
-            f"messages: {messages_to_remove}, "
-            f"remaining tokens: {self.last_removal_tokens}"
-        )
+        return removed

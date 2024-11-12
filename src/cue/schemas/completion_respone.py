@@ -179,9 +179,7 @@ class CompletionResponse:
 
     def __str__(self):
         response = self.response.model_dump() if self.response else None
-        return (
-            f"Text: {self.get_text()}, Tools: {self.get_tool_calls()}, Usage: {self.get_usage()} Response: {response}"
-        )
+        return f"Text: {self.get_text()}, Tools: {self.get_tool_calls()}, Usage: {self.get_usage().model_dump(exclude_defaults=True)} Response: {response}"
 
     def to_params(self):
         response = self.response

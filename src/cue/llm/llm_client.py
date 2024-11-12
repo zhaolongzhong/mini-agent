@@ -74,8 +74,7 @@ class LLMClient(LLMRequest):
             else:
                 raise ValueError(f"Unsupported tool call type: {type(tool_call)}")
 
-            create_agent_handoff = "create_agent_handoff"
-            if tool_name not in tool_manager.tools and tool_name not in create_agent_handoff:
+            if tool_name not in tool_manager.tools and tool_name:
                 error_message = f"Tool '{tool_name}' not found. {tool_manager.tools.keys()}"
                 logger.error(f"{error_message}, tool_call: {tool_call}")
                 tool_results.append(
@@ -108,9 +107,11 @@ class LLMClient(LLMRequest):
                     break
             except asyncio.TimeoutError:
                 error_message = f"Timeout while calling tool <{tool_name}> after {timeout}s."
+                logger.error(error_message)
                 tool_results.append(self.create_error_response(tool_id, error_message, tool_name))
             except Exception as e:
                 error_message = f"Error while calling tool <{tool_name}>: {e}"
+                logger.error(error_message)
                 tool_results.append(self.create_error_response(tool_id, error_message, tool_name))
 
         response = None

@@ -21,6 +21,7 @@ from .schemas import (
     ToolResponseWrapper,
     ToolCallToolUseBlock,
 )
+from ._agent_summarizer import ContentSummarizer
 from .memory.memory_manager import DynamicMemoryManager
 from .system_message_builder import SystemMessageBuilder
 
@@ -32,9 +33,14 @@ class Agent:
         self.id = config.id
         self.config = config
         self.tool_manager: Optional[ToolManager] = None
+        self.summarizer = ContentSummarizer(AgentConfig(model="gpt-4o-mini"))
         self.memory_manager = DynamicMemoryManager(max_tokens=1000)
         self.project_context_manager = ProjectContextManager()
-        self.context = DynamicContextManager(max_tokens=12000 if self.config.is_primary else 4096)
+        self.context = DynamicContextManager(
+            model=self.config.model,
+            max_tokens=12000 if self.config.is_primary else 4096,
+            summarizer=self.summarizer,
+        )
         self.client: LLMClient = LLMClient(self.config)
         self.metadata: Optional[RunMetadata] = None
         self.description = self._generate_description()
@@ -48,10 +54,6 @@ class Agent:
         self.system_message_builder.set_conversation_context(self.conversation_context)
         self.system_message_builder.set_other_agents_info(self.other_agents_info)
         return self.system_message_builder.build()
-
-    def _get_message_params(self) -> List[Dict]:
-        """Retrieve a list of message parameter dictionaries for the completion API call."""
-        return self.context.messages
 
     async def _get_recent_memories(self) -> Optional[dict]:
         """Should be called whenever there is a memory update"""
@@ -92,11 +94,11 @@ class Agent:
         if not self.tool_json and self.config.tools:
             self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
 
-    def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
-        self.add_messages([message])
+    async def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
+        await self.add_messages([message])
 
-    def add_messages(self, messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam]]) -> None:
-        self.context.add_messages(messages)
+    async def add_messages(self, messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam]]) -> None:
+        await self.context.add_messages(messages)
 
     def snapshot(self) -> str:
         """Take a snapshot of current message list and save to a file"""
@@ -110,23 +112,40 @@ class Agent:
             )
             self.config.feedback_path.mkdir(parents=True, exist_ok=True)
 
-    async def run(self, tool_manager: ToolManager, author: Optional[Author] = None):
-        self._init_tools(tool_manager)
-        messages = self._get_message_params()  # convert message params
+    async def build_message_params(self) -> list[dict]:
+        """
+        Build a list of message parameter dictionaries for the completion API call.
+
+        The method constructs the message parameters in order from most static to least static data
+        to optimize prompt caching efficiency. The construction follows this sequence:
+        1. Project context (static)
+        2. Relevant memories (semi-static)
+        3. Summary of removed messages (if any)
+        4. Current message list (dynamic)
+        """
+        # Get message list
+        messages = self.context.get_messages()
         logger.debug(f"{self.id} run message param size: {len(messages)}")
-        history = [
+        message_params = [
             msg.model_dump() if hasattr(msg, "model_dump") else msg.dict() if hasattr(msg, "dict") else msg
             for msg in messages
         ]
+        # Get recent memories
         memories_param = await self._get_recent_memories()
         if memories_param:
-            history.insert(0, memories_param)
+            message_params.insert(0, memories_param)
             logger.debug(f"Recent memories: {json.dumps(memories_param, indent=4)}")
 
+        # Get project context
         project_context = self.project_context_manager.load_project_context(self.config.project_context_path)
         if project_context:
-            history.insert(0, project_context)
-        return await self.send_messages(messages=history, author=author)
+            message_params.insert(0, project_context)
+        return message_params
+
+    async def run(self, tool_manager: ToolManager, author: Optional[Author] = None):
+        self._init_tools(tool_manager)
+        message_params = await self.build_message_params()
+        return await self.send_messages(messages=message_params, author=author)
 
     async def send_messages(
         self,
@@ -169,7 +188,7 @@ class Agent:
         if max_messages == 0:
             return ""
 
-        history = self._get_message_params()
+        history = self.context.get_messages()
 
         # Since the last two messages are the transfer command and its result,
         # we exclude them and then take up to max_messages from the remaining history

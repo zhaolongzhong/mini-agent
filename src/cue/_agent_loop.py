@@ -48,7 +48,7 @@ class AgentLoop:
                     new_message = self.user_message_queue.get_nowait()
                     logger.debug(f"Received new user message during run: {new_message}")
                     new_user_message = MessageParam(role="user", content=new_message)
-                    agent.add_message(new_user_message)
+                    await agent.add_message(new_user_message)
                 except asyncio.QueueEmpty:
                     break
 
@@ -72,14 +72,14 @@ class AgentLoop:
             if not isinstance(response, CompletionResponse):
                 if response.error:
                     logger.error(response.error.model_dump())
-                    agent.add_message(response)
+                    await agent.add_message(response)
                     continue
                 else:
                     raise Exception(f"Unexpected response: {response}")
 
             tool_calls = response.get_tool_calls()
             if not tool_calls:
-                agent.add_message(response)
+                await agent.add_message(response)
                 if agent.config.is_primary:
                     DebugUtils.log_chat({"assistant": response.get_text()}, "agent_loop")
                     return response
@@ -106,7 +106,7 @@ class AgentLoop:
 
             if isinstance(tool_result, ToolResponseWrapper):
                 # Add tool call and tool result pair
-                agent.add_messages([response, tool_result])
+                await agent.add_messages([response, tool_result])
                 # Handle explicit transfer request
                 agent_transfer = tool_result.agent_transfer
                 if agent_transfer:
@@ -124,7 +124,7 @@ class AgentLoop:
                         tool_result_content,
                     ]
                     message_param = {"role": "user", "content": contents}
-                    agent.add_message(message_param)
+                    await agent.add_message(message_param)
             else:
                 raise Exception(f"Unexpected response: {tool_result}")
 

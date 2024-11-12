@@ -4,11 +4,12 @@ from typing import Dict, Optional
 import pytest
 
 from cue.context.context_manager import DynamicContextManager
+from cue.utils.mesage_params_utils import has_tool_calls, is_tool_result
 
 
 @pytest.fixture
 def context_manager():
-    return DynamicContextManager(max_tokens=1000, batch_remove_percentage=0.25)
+    return DynamicContextManager(model="gpt-4o-mini", max_tokens=1000, batch_remove_percentage=0.25)
 
 
 def create_message(role: str, content: str, has_tool_calls: bool = False, tool_call_id: Optional[str] = None) -> Dict:
@@ -34,7 +35,7 @@ class TestDynamicContextManager:
         """Test proper initialization of DynamicContextManager"""
         assert context_manager.max_tokens == 1000
         assert context_manager.batch_remove_size == 250  # 25% of max_tokens
-        assert len(context_manager.messages) == 0
+        assert len(context_manager.get_messages()) == 0
 
     @pytest.mark.asyncio
     async def test_batch_message_removal(self, context_manager, monkeypatch):
@@ -65,11 +66,11 @@ class TestDynamicContextManager:
         for msg in messages:
             current_tokens = context_manager._get_total_tokens()
             logging.info(f"Before adding message - Total tokens: {current_tokens}")
-            context_manager.add_messages([msg])
+            await context_manager.add_messages([msg])
             logging.info(f"Added message - Role: {msg.get('role')}, Tokens: {mock_count_dict_tokens(msg)}")
 
         # Total tokens: 700 (below limit)
-        current_count = len(context_manager.messages)
+        current_count = len(context_manager.get_messages())
         logging.info(f"Current message count: {current_count}")
         assert current_count == 6
 
@@ -80,13 +81,14 @@ class TestDynamicContextManager:
             create_tool_result("Tool result", tool_call_id_2),  # HIGH
         ]
 
-        context_manager.add_messages(tool_sequence)
+        await context_manager.add_messages(tool_sequence)
         for msg in tool_sequence:
             current_tokens = context_manager._get_total_tokens()
             logging.info(f"Before adding tool message - Total tokens: {current_tokens}")
             logging.info(f"Added tool message - Role: {msg.get('role')}")
 
-    def test_context_stats(self, context_manager, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_context_stats(self, context_manager, monkeypatch):
         """Test context statistics reporting"""
 
         def mock_count_dict_tokens(data):
@@ -95,7 +97,7 @@ class TestDynamicContextManager:
         monkeypatch.setattr(context_manager.token_counter, "count_dict_tokens", mock_count_dict_tokens)
         monkeypatch.setattr(context_manager.token_counter, "count_messages_tokens", lambda x: len(x) * 100)
 
-        context_manager.add_messages([create_message("user", "Test message")])
+        await context_manager.add_messages([create_message("user", "Test message")])
 
         stats = context_manager.get_context_stats()
         assert stats["message_count"] == 1
@@ -103,13 +105,14 @@ class TestDynamicContextManager:
         assert stats["remaining_tokens"] == 900
         assert not stats["is_at_capacity"]
 
-    def test_clear_context(self, context_manager):
+    @pytest.mark.asyncio
+    async def test_clear_context(self, context_manager):
         """Test context clearing"""
-        context_manager.add_messages([create_message("user", "Test message")])
-        assert len(context_manager.messages) == 1
+        await context_manager.add_messages([create_message("user", "Test message")])
+        assert len(context_manager.get_messages()) == 1
 
         context_manager.clear_context()
-        assert len(context_manager.messages) == 0
+        assert len(context_manager.get_messages()) == 0
 
     @pytest.mark.asyncio
     async def test_tool_sequence_preservation(self, context_manager, monkeypatch):
@@ -128,21 +131,21 @@ class TestDynamicContextManager:
             create_tool_result("Tool result", tool_call_id_1),
         ]
 
-        context_manager.add_messages(tool_sequence)
+        await context_manager.add_messages(tool_sequence)
 
         # Add more messages to trigger batch removal
         for i in range(5):
-            context_manager.add_messages([create_message("user", f"Message {i}")])
+            await context_manager.add_messages([create_message("user", f"Message {i}")])
             logging.info(f"Added message {i}")
 
         # Verify tool sequence is preserved
-        messages = context_manager.messages
-        tool_call_indices = [i for i, msg in enumerate(messages) if context_manager._has_tool_calls(msg)]
+        messages = context_manager.get_messages()
+        tool_call_indices = [i for i, msg in enumerate(messages) if has_tool_calls(msg)]
 
         for idx in tool_call_indices:
             if idx + 1 < len(messages):
                 next_msg = messages[idx + 1]
-                assert context_manager._is_tool_result(next_msg), "Tool call should be followed by tool result"
+                assert is_tool_result(next_msg), "Tool call should be followed by tool result"
 
     @pytest.mark.asyncio
     async def test_tool_sequence_id_matching(self, context_manager, monkeypatch):
@@ -211,9 +214,9 @@ class TestDynamicContextManager:
             tool_result_3,
         ]
 
-        context_manager.add_messages(messages)
+        await context_manager.add_messages(messages)
         # Verify initial integrity
-        self._verify_tool_sequence_integrity(context_manager.messages)
+        self._verify_tool_sequence_integrity(context_manager.get_messages())
 
         # Test Case 2: Force removal of older tool sequences
         # Add more messages to force removal of older sequences
@@ -224,12 +227,12 @@ class TestDynamicContextManager:
             {"role": "assistant", "content": "Final reply"},
         ]
 
-        context_manager.add_messages(additional_messages)
+        await context_manager.add_messages(additional_messages)
         for msg in additional_messages:
             logging.info(f"Added additional message - Role: {msg.get('role')}, Tool call ID: {msg.get('tool_call_id')}")
 
         # Verify that sequences are still intact, even if some were removed
-        remaining_messages = context_manager.messages
+        remaining_messages = context_manager.get_messages()
         self._verify_tool_sequence_integrity(remaining_messages)
 
         # Verify that older sequences were removed completely (not partially)
@@ -250,10 +253,12 @@ class TestDynamicContextManager:
 
         # Test Case 3: Force removal of all tool sequences
         # Add many messages to force removal of all tool sequences
+        msgs = []
         for i in range(10):
-            context_manager.add_messages([{"role": "user", "content": f"Forced removal message {i}"}])
+            msgs.append({"role": "user", "content": f"Forced removal message {i}"})
+        await context_manager.add_messages(msgs)
 
-        final_messages = context_manager.messages
+        final_messages = context_manager.get_messages()
 
         # Count tool-related messages
         tool_call_count = sum(1 for msg in final_messages if msg.get("tool_calls"))
