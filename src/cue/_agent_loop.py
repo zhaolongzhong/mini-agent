@@ -6,7 +6,6 @@ from .utils import DebugUtils
 from ._agent import Agent
 from .schemas import Author, RunMetadata, MessageParam, AgentTransfer, CompletionResponse, ToolResponseWrapper
 from .tools._tool import ToolManager
-from .services.service_manager import ServiceManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,6 @@ class AgentLoop:
         run_metadata: RunMetadata,
         callback: Optional[Callable[[CompletionResponse], Any]] = None,
         prompt_callback: Optional[Callable] = None,
-        service_manager: Optional[ServiceManager] = None,
     ) -> Optional[Union[CompletionResponse, AgentTransfer]]:
         """
         Run the agent execution loop.
@@ -62,7 +60,6 @@ class AgentLoop:
                 response: CompletionResponse = await agent.run(
                     tool_manager=tool_manager,
                     run_metadata=run_metadata,
-                    service_manager=service_manager,
                     author=author,
                 )
             except asyncio.CancelledError:
@@ -130,7 +127,7 @@ class AgentLoop:
                         {"type": "text", "text": "Please check previous query info related to this image"},
                         tool_result_content,
                     ]
-                    message_param = {"role": "user", "content": contents}
+                    message_param = MessageParam(role="user", content=contents, model=tool_result.model)
                     await agent.add_message(message_param)
             else:
                 raise Exception(f"Unexpected response: {tool_result}")

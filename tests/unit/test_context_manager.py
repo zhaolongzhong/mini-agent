@@ -106,15 +106,6 @@ class TestDynamicContextManager:
         assert not stats["is_at_capacity"]
 
     @pytest.mark.asyncio
-    async def test_clear_context(self, context_manager):
-        """Test context clearing"""
-        await context_manager.add_messages([create_message("user", "Test message")])
-        assert len(context_manager.get_messages()) == 1
-
-        context_manager.clear_context()
-        assert len(context_manager.get_messages()) == 0
-
-    @pytest.mark.asyncio
     async def test_tool_sequence_preservation(self, context_manager, monkeypatch):
         """Test that tool call sequences are preserved during batch removal"""
 

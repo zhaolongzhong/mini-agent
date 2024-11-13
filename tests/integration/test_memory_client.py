@@ -53,7 +53,7 @@ async def test_assistant(assistant_client: AssistantClient):
 
 
 @pytest.mark.integration
-class TestMemoryServiceClient:
+class TestMemoryClient:
     @pytest.mark.asyncio
     async def test_create_memory(self, memory_client: MemoryClient, test_assistant) -> None:
         """Test creating and retrieving a memory."""

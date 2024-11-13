@@ -5,11 +5,19 @@ from typing import Any, Union, Optional
 from pydantic import BaseModel
 
 from ..utils import DebugUtils, TokenCounter
+from .message import MessageManager
 from ..schemas import MessageParam, CompletionResponse, ToolResponseWrapper
 from .._agent_summarizer import ContentSummarizer
+from ..services.service_manager import ServiceManager
 from ..utils.mesage_params_utils import has_tool_calls, is_tool_result
 
 logger = logging.getLogger(__name__)
+
+
+class MessageFields:
+    """Message core field names."""
+
+    MSG_ID = "msg_id"
 
 
 class DynamicContextManager:
@@ -40,6 +48,19 @@ class DynamicContextManager:
         self.last_removal_tokens = 0  # Track tokens at last removal
         self.messages_since_removal = 0  # Track messages added since last removal
         self.summaries_content: Optional[str] = None
+        self.message_manager: MessageManager = MessageManager()
+
+    def set_service_manager(self, service_manager: ServiceManager):
+        self.service_manager = service_manager
+        self.message_manager.set_service_manager(service_manager)
+
+    async def initialize(self):
+        logger.debug("initialize")
+        messages = await self.message_manager.get_messages_asc(limit=10)
+        if messages:
+            self.clear_messages()
+            await self.add_messages(messages, skip_persistence=True)
+        logger.debug(f"initial messages: {len(self.messages)}")
 
     def _get_batch_remove_size(self) -> int:
         total = self._get_total_tokens()
@@ -62,7 +83,7 @@ class DynamicContextManager:
         total_tokens = 0
         for msg in self.messages:
             if isinstance(msg, BaseModel):
-                tokens = self._count_tokens(msg.model_dump_json())
+                tokens = self._count_tokens(msg.model_dump_json(exclude=[MessageFields.MSG_ID, "model"]))
                 total_tokens += tokens
             elif isinstance(msg, dict):
                 tokens = self._count_dict_tokens(msg)
@@ -100,16 +121,65 @@ class DynamicContextManager:
         return f"Here is summaries of truncated old messages <summaries>{self.summaries_content}</summaries>"
 
     def get_messages(self) -> list[dict]:
-        messages = self.messages.copy()
-        return messages
+        """
+        Get all messages in the context window, excluding internal tracking fields.
 
-    def clear_context(self) -> None:
+        Returns:
+            list[dict]: Messages with internal tracking fields removed
+        """
+        return [{k: v for k, v in message.items() if k != MessageFields.MSG_ID} for message in self.messages]
+
+    def clear_messages(self) -> None:
         """Clear all messages from the context window."""
         self.messages.clear()
+
+    def _prepare_message_dict(
+        self,
+        message: Union[CompletionResponse, ToolResponseWrapper, MessageParam, dict[str, Any], BaseModel],
+        msg_id: Optional[str] = None,
+    ) -> Union[dict[str, Any], list[dict[str, Any]]]:
+        """
+        Convert message to dictionary format and optionally add msg_id.
+
+        Args:
+            message: Message to convert
+            msg_id: Optional internal ID to add to the message
+
+        Returns:
+            dict or list[dict]: Prepared message dictionary or list of dictionaries
+        """
+        if isinstance(message, CompletionResponse):
+            message_dict = message.to_params()
+        elif isinstance(message, ToolResponseWrapper):
+            if message.tool_messages:
+                # For tool messages list, add msg_id to each message
+                if msg_id:
+                    return [{**msg, MessageFields.MSG_ID: msg_id} for msg in message.tool_messages]
+                return message.tool_messages
+            elif message.tool_result_message:
+                message_dict = message.tool_result_message
+            else:
+                raise Exception(
+                    f"Only params or tool result allowed to add message list, receive type: {type(message)}"
+                )
+        elif isinstance(message, (MessageParam, dict)):
+            message_dict = (
+                message.model_dump(exclude="model", exclude_none=True) if isinstance(message, BaseModel) else message
+            )
+        else:
+            raise Exception(
+                f"Only params, tool result, dict or BaseModel allowed to add message list, receive type: {type(message)}"
+            )
+
+        if msg_id and (MessageFields.MSG_ID not in message_dict or not message_dict[MessageFields.MSG_ID]):
+            message_dict[MessageFields.MSG_ID] = msg_id
+
+        return message_dict
 
     async def add_messages(
         self,
         new_messages: list[Union[CompletionResponse, ToolResponseWrapper, MessageParam, dict[str, Any], BaseModel]],
+        skip_persistence: Optional[bool] = False,
     ) -> bool:
         """Add new messages to the conversation history and manage the sliding window token limit.
 
@@ -120,6 +190,8 @@ class DynamicContextManager:
         Args:
             new_messages: A list of messages to add. Can contain CompletionResponse,
                 ToolResponseWrapper, MessageParam, dict, or BaseModel instances.
+            skip_persistence: If True, skips saving messages to database (used when messages
+                are loaded from DB). Defaults to False.
 
         Returns:
             bool: True if any messages were removed due to token limit management,
@@ -128,27 +200,32 @@ class DynamicContextManager:
         Raises:
             Exception: If an unsupported message type is provided.
         """
+        if not new_messages:
+            logger.warning("No messages to add, skipping")
+            return False
+
         original_size = len(self.messages)
         for message in new_messages:
-            if isinstance(message, CompletionResponse):
-                self.messages.append(message.to_params())
-            elif isinstance(message, ToolResponseWrapper):
-                if message.tool_messages:
-                    self.messages.extend(message.tool_messages)
-                elif message.tool_result_message:
-                    self.messages.append(message.tool_result_message)
-                else:
-                    raise Exception(
-                        f"Only params or tool result allowed to add message list, receive type: {type(message)}"
-                    )
-            elif isinstance(message, (MessageParam, dict, BaseModel)):
-                message_dict = message.model_dump() if isinstance(message, BaseModel) else message
-                self.messages.append(message_dict)
+            msg_id = None
+            if not skip_persistence:
+                if isinstance(message, (CompletionResponse, ToolResponseWrapper, MessageParam)):
+                    persisted_message = await self.message_manager.persist_message(message.to_message_create())
+                    if persisted_message:
+                        msg_id = persisted_message.id
             else:
-                raise Exception(
-                    f"Only params, tool result, dict or BaseModel allowed to add message list, receive type: {type(message)}"
-                )
-            self.messages_since_removal += 1
+                pass
+            message_dict = self._prepare_message_dict(message, msg_id)
+
+            if isinstance(message_dict, list):
+                # Handle tool messages list
+                self.messages.extend(message_dict)
+                self.messages_since_removal += len(message_dict)
+            elif message_dict:
+                self.messages.append(message_dict)
+                self.messages_since_removal += 1
+            else:
+                logger.error(f"Unexpected message: {message}")
+                continue
 
         total_tokens = self._get_total_tokens()
         original_tokens = total_tokens

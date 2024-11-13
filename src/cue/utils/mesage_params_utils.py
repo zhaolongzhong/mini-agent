@@ -55,29 +55,32 @@ def get_text_from_message_params(
     model: str,
     messages: list[dict],
     content_max_length: Optional[int] = 100,
+    prepend_message_id: Optional[bool] = False,
 ) -> str:
     if "claude" in model:
         return get_text_from_message_params_claude(
             messages=messages,
             content_max_length=content_max_length,
+            prepend_message_id=prepend_message_id,
         )
     return get_text_from_message_params_openai(
         messages=messages,
         content_max_length=content_max_length,
+        prepend_message_id=prepend_message_id,
     )
 
 
 def get_text_from_message_params_claude(
     messages: list[dict],
     content_max_length: Optional[int] = 100,
+    prepend_message_id: Optional[bool] = False,
 ) -> str:
     message_content = ""
 
-    for _idx, msg in enumerate(messages):
+    for msg in messages:
         role = msg.get("role", None)
-
+        text = ""
         if role == "user":
-            text = ""
             if is_tool_result(msg):
                 results = msg.get("content", [])
                 for result in results:
@@ -100,10 +103,7 @@ def get_text_from_message_params_claude(
                             text += "skip image content"
                         else:
                             logger.error(f"Unexpected content: {msg}")
-            if text:
-                message_content += text + "\n"
         elif role == "assistant":
-            text = ""
             if has_tool_calls(msg):
                 for content in msg.get("content", []):
                     if content.get("type", None) == "text":
@@ -124,24 +124,28 @@ def get_text_from_message_params_claude(
                             text += "skip image content"
                         else:
                             logger.error(f"Unexpected content: {msg}")
-            if text:
-                message_content += text + "\n"
         else:
-            logger.error(f"Unexpected role: {role}")
+            raise (f"Unexpected role: {role}")
+
+        if text:
+            if prepend_message_id:
+                text = prepend_id_to_content(text, msg)
+            message_content += text + "\n"
     return message_content
 
 
 def get_text_from_message_params_openai(
     messages: list[dict],
     content_max_length: Optional[int] = 100,
+    prepend_message_id: Optional[bool] = False,
 ) -> str:
     message_content = ""
 
-    for _idx, msg in enumerate(messages):
+    for msg in messages:
         role = msg.get("role", None)
 
+        text = ""
         if role == "user":
-            text = ""
             if is_tool_result(msg):
                 text += f"name: {msg.get('name','')}, role: tool, tool_call_id: {msg.get('tool_call_id')}"
                 text += truncate_safely(msg.get("content"), content_max_length)
@@ -156,10 +160,7 @@ def get_text_from_message_params_openai(
                             text += "skip image content"
                         else:
                             logger.error(f"Unexpected content: {msg}")
-            if text:
-                message_content += text + "\n"
         elif role == "assistant":
-            text = ""
             if has_tool_calls(msg):
                 # handle content first if there is any
                 if isinstance(msg.get("content"), str):
@@ -189,13 +190,33 @@ def get_text_from_message_params_openai(
                             text += truncate_safely(content.get("text"), content_max_length)
                         else:
                             logger.error(f"Unexpected content: {msg}")
-            if text:
-                message_content += text
         elif role == "tool":
             text = f"role: tool, tool_call_id: {msg.get('tool_call_id', '')}, name: {msg.get('name', '')}, "
             text += f"content: {truncate_safely(msg.get('content'), content_max_length)}"
-            message_content += text + "\n"
 
         else:
-            logger.error(f"Unexpected role: {role}")
+            raise Exception(f"Unexpected role: {role}")
+        if text:
+            if prepend_message_id:
+                text = prepend_id_to_content(text, msg)
+            message_content += text + "\n"
     return message_content
+
+
+def prepend_id_to_content(content: str, message: dict, id_format: str = "id: {id}", separator: str = "\n") -> str:
+    """
+    Prepend message ID to content with customizable format.
+
+    Args:
+        content: The message content to prepend ID to
+        message: Message dictionary that may contain an internal_id
+        id_format: Format string for the ID line
+        separator: Separator between ID and content
+    """
+    if not content:
+        return content
+
+    message_id = message.get("msg_id")
+    if message_id:
+        return f"{id_format.format(id=message_id)}{separator}{content}"
+    return content

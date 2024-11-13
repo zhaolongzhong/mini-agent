@@ -77,6 +77,7 @@ class LLMClient(LLMRequest):
             if tool_name not in tool_manager.tools and tool_name:
                 error_message = f"Tool '{tool_name}' not found. The name can be only one of those names: {tool_manager.tools.keys()}."
                 logger.error(f"{error_message}, tool_call: {tool_call}")
+                tool_name = tool_name.replace(".", "")
                 tool_results.append(
                     self.create_error_response(
                         tool_id,
@@ -121,6 +122,7 @@ class LLMClient(LLMRequest):
                 tool_result_message=tool_result_message,
                 author=author,
                 agent_transfer=agent_transfer,
+                model=self.model,
             )
         else:
             response = ToolResponseWrapper(
@@ -128,6 +130,7 @@ class LLMClient(LLMRequest):
                 author=author,
                 base64_images=base64_images,
                 agent_transfer=agent_transfer,
+                model=self.model,
             )
 
         return response

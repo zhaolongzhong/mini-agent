@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 
 from sqlalchemy import desc, select
@@ -7,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .crud_base import CRUDBaseAsync
 from ..models.message import Message
 from ..schemas.message import MessageCreate, MessageUpdate
+from ..utils.id_generator import generate_id
 
 
 class CRUDMessage(CRUDBaseAsync[Message, MessageCreate, MessageUpdate]):
@@ -16,11 +16,8 @@ class CRUDMessage(CRUDBaseAsync[Message, MessageCreate, MessageUpdate]):
         *,
         obj_in: MessageCreate,
     ) -> Message:
-        obj_in_data = obj_in.model_dump()
-        db_obj = Message(
-            **obj_in_data,
-            id=str(uuid.uuid4()),
-        )
+        obj_in_data = obj_in.model_dump(exclude_none=True, exclude_unset=True)
+        db_obj = self.model(**obj_in_data, id=generate_id(prefix="msg_"))
 
         db.add(db_obj)
         await db.commit()

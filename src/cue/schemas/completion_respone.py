@@ -16,6 +16,7 @@ from anthropic.types.beta import (
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 
 from ..schemas.error import ErrorResponse
+from ..schemas.message import Author, Content, Metadata, MessageCreate
 
 ToolCallToolUseBlock = Union[ChatCompletionMessageToolCall, ToolUseBlock]
 
@@ -198,6 +199,57 @@ class CompletionResponse:
                 return ChatCompletionAssistantMessageParam(role="assistant", content=error.model_dump_json())
             else:
                 print(f"Unexpected subclass of CompletionResponse: {type(response)}, {self.model}")
+
+    def to_message_create(self) -> MessageCreate:
+        response = self.response
+        error = self.error
+
+        if "claude" in self.model:
+            if isinstance(response, (AnthropicMessage, PromptCachingBetaMessage)):
+                if isinstance(response, PromptCachingBetaMessage):
+                    author = Author(role=response.role)
+                    metadata = Metadata(model=response.model, payload=response.model_dump())
+                    original = response.content
+                    if isinstance(original, str):
+                        content = Content(content=original)
+                    elif isinstance(original, BaseModel):
+                        content = original.model_dump()
+                    elif isinstance(original, list):
+                        content = Content(
+                            content=[item.model_dump() if isinstance(item, BaseModel) else item for item in original]
+                        )
+                    else:
+                        raise Exception(f"Unhandled content: {original}")
+                    return MessageCreate(author=author, content=content, metadata=metadata)
+                else:
+                    raise Exception(f"Unhandled response: {response}")
+            elif isinstance(self.error, ErrorResponse):
+                author = Author(role="assistant")
+                content = Content(content=error.model_dump_json())
+                metadata = Metadata(model=self.model)
+                return MessageCreate(author=author, content=content, metadata=metadata)
+            else:
+                raise Exception(f"Unexpected subclass of CompletionResponse: {type(response)}, {self.model}")
+        else:
+            if isinstance(response, ChatCompletion):
+                message = response.choices[0].message
+                author = Author(role=message.role)
+                metadata = Metadata(model=response.model, payload=response.model_dump())
+                if message.content:
+                    content = Content(content=message.content)
+                elif message.tool_calls:
+                    content = Content(content=[item.model_dump() for item in message.tool_calls])
+                else:
+                    raise Exception(f"Unhandled message: {message}")
+
+                return MessageCreate(author=author, content=content, metadata=metadata)
+            elif isinstance(self.error, ErrorResponse):
+                author = Author(role="assistant")
+                content = Content(content=error.model_dump_json())
+                metadata = Metadata(model=self.model)
+                return MessageCreate(author=author, content=content, metadata=metadata)
+            else:
+                raise Exception(f"Unexpected subclass of CompletionResponse: {type(response)}, {self.model}")
 
     def _response_to_anthropic_params(
         self,

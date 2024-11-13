@@ -51,7 +51,11 @@ async def create_conversation(
     """
     Create new conversation.
     """
-    conversation = await crud.conversation.create_with_author(db=db, obj_in=obj_in)
+    obj_in.title = obj_in.title.lower()
+    existing_obj = await crud.conversation.get_by_title(db=db, title=obj_in.title)
+    if existing_obj:
+        return existing_obj
+    conversation = await crud.conversation.create_with_id(db=db, obj_in=obj_in)
     return conversation
 
 

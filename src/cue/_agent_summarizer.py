@@ -33,7 +33,9 @@ class ContentSummarizer:
         Returns:
             Optional[str]: Summarized content or None if summarization fails
         """
-        message_content = get_text_from_message_params(model=model, messages=messages, content_max_length=200)
+        message_content = get_text_from_message_params(
+            model=model, messages=messages, content_max_length=200, prepend_message_id=True
+        )
         return await self._summarize_content(message_content, instruction)
 
     async def summarize_text(self, text: str, instruction: Optional[str] = None) -> Optional[str]:
@@ -61,7 +63,8 @@ class ContentSummarizer:
         # Build the prompt with default instruction and optional custom instruction
         base_instruction = """
 Those messages above will be truncated from message list, please utilize system message and context info to summarize those content by extracting useful info.
-This summaries will be added to the beginning of the message list again. Be specific on details such as filename or path etc, and be concise."""
+This summaries will be added to the beginning of the message list again. Be specific on details such as filename or path etc, and be concise.
+"""
         final_instruction = f"{base_instruction} {instruction}" if instruction else base_instruction
 
         message = {

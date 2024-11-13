@@ -93,6 +93,7 @@ class ServiceManager:
             logger.error(f"Server availability check failed: {e}")
             return
         await self._ws_manager.connect()
+        await self._create_default_assistant()
 
     async def disconnect(self) -> None:
         """Close all connections"""
@@ -167,3 +168,9 @@ class ServiceManager:
         except Exception as e:
             logger.error(f"Unexpected error during health check: {e}")
             raise
+
+    async def _create_default_assistant(self):
+        assistant_id = await self.assistants.create_default_assistant()
+        self.memories.set_default_assistant_id(assistant_id)
+        conversation_id = await self.conversations.create_default_conversation()
+        self.messages.set_default_conversation_id(conversation_id)

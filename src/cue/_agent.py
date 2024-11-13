@@ -50,7 +50,7 @@ class Agent:
         self.conversation_context: Optional[ConversationContext] = None  # current conversation context
         self.system_message_builder = SystemMessageBuilder(self.id, self.config)
         self.setup_feedback()
-        self.initialized: bool = False
+        self.has_initialized: bool = False
         self.token_counter = TokenCounter()
         self.token_stats = {
             "system": 0,
@@ -65,6 +65,9 @@ class Agent:
         self.service_manager: Optional[ServiceManager] = None
         self.system_context: Optional[str] = None  # memories and project context
         self.system_message_param: Optional[str] = None
+
+    def set_service_manager(self, service_manager: ServiceManager):
+        self.context.set_service_manager(service_manager)
 
     def get_system_message(self) -> MessageParam:
         self.system_message_builder.set_conversation_context(self.conversation_context)
@@ -97,8 +100,8 @@ class Agent:
         description += f" Agent {self.id} is able to use these tools: {', '.join(tool_names)}"
         return description
 
-    async def _initialize(self, tool_manager: ToolManager, service_manager: Optional[ServiceManager] = None):
-        if not self._initialize:
+    async def _initialize(self, tool_manager: ToolManager):
+        if self.has_initialized:
             return
 
         logger.debug(f"initialize ... \n{self.config.model_dump_json(indent=4)}")
@@ -107,26 +110,29 @@ class Agent:
         if not self.tool_json and self.config.tools:
             self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
             self.token_stats["tool"] = self.token_counter.count_dict_tokens(self.tool_json)
-        self.service_manager = service_manager
         self.system_message_param = self.get_system_message()
         await self.update_context()
+        await self.context.initialize()
 
         self.summarizer.update_context(self.system_context)
-        self.initialized = True
+        self.has_initialized = True
 
     async def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
         await self.add_messages([message])
 
     async def add_messages(self, messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam]]) -> None:
-        has_truncated_history = await self.context.add_messages(messages)
-        if has_truncated_history:
-            """Only update context when there are truncated messages to make the most of prompt caching"""
-            try:
-                logger.debug("skip We have truncated messages, update context")
-                # await self.update_context()
-            except Exception as e:
-                logger.debug(f"Ran into error when update context: {e}")
-        self.token_stats["context_window"] = self.context.get_context_stats()
+        try:
+            has_truncated_history = await self.context.add_messages(messages)
+            if has_truncated_history:
+                """Only update context when there are truncated messages to make the most of prompt caching"""
+                try:
+                    logger.debug("We have truncated messages, update context")
+                    await self.update_context()
+                except Exception as e:
+                    logger.debug(f"Ran into error when update context: {e}")
+            self.token_stats["context_window"] = self.context.get_context_stats()
+        except Exception as e:
+            logger.error(f"Ran into error when add messages: {e}")
 
     def snapshot(self) -> str:
         """Take a snapshot of current message list and save to a file"""
@@ -230,12 +236,11 @@ class Agent:
         self,
         tool_manager: ToolManager,
         run_metadata: RunMetadata,
-        service_manager: Optional[ServiceManager] = None,
         author: Optional[Author] = None,
     ):
         try:
             self.metadata = run_metadata
-            await self._initialize(tool_manager, service_manager)
+            await self._initialize(tool_manager)
             message_params = await self.build_message_params()
             tokens = self.token_counter.count_dict_tokens(message_params)
             self.token_stats["messages"] = tokens

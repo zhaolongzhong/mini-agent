@@ -1,22 +1,22 @@
-# src/cue/memory/client.py
 import logging
 from typing import List, Optional
 
 from ..schemas import (
-    Message,
     Conversation,
-    MessageCreate,
-    MessageUpdate,
     ConversationCreate,
     ConversationUpdate,
 )
-from .transport import ResourceClient
+from .transport import HTTPTransport, ResourceClient, WebSocketTransport
 
 logger = logging.getLogger(__name__)
 
 
 class ConversationClient(ResourceClient):
     """Client for conversation-related operations"""
+
+    def __init__(self, http: HTTPTransport, ws: Optional[WebSocketTransport] = None):
+        super().__init__(http, ws)
+        self._default_conversation_id: Optional[str] = None
 
     async def create(
         self,
@@ -42,39 +42,10 @@ class ConversationClient(ResourceClient):
     async def delete(self, conversation_id: str) -> None:
         await self._http.request("DELETE", f"/conversations/{conversation_id}")
 
-
-class MessageClient(ResourceClient):
-    """Client for message-related operations"""
-
-    async def create(self, message: MessageCreate) -> Message:
-        response = await self._http.request("POST", "/messages/", data=message.model_dump())
-        return Message(**response)
-
-    async def get(self, message_id: str) -> Message:
-        response = await self._http.request("GET", f"/messages/{message_id}")
-        return Message(**response)
-
-    async def get_conversation_messages(self, conversation_id: str, skip: int = 0, limit: int = 100) -> List[Message]:
-        response = await self._http.request(
-            "GET", f"/conversation/{conversation_id}/messages", params={"skip": skip, "limit": limit}
-        )
-        return [Message(**msg) for msg in response]
-
-    async def update(self, message_id: str, update_data: MessageUpdate) -> Message:
-        response = await self._http.request("PUT", f"/messages/{message_id}", data=update_data.model_dump())
-        return Message(**response)
-
-    async def delete(self, message_id: str) -> None:
-        await self._http.request("DELETE", f"/messages/{message_id}")
-
-    async def send_websocket_message(self, message: dict[str, any]) -> None:
-        """
-        Send a message through WebSocket connection.
-
-        Args:
-            message (Dict[str, Any]): The message to send through the WebSocket connection
-
-        Raises:
-            ConnectionError: If WebSocket connection is not established
-            RuntimeError: If sending message fails
-        """
+    async def create_default_conversation(self) -> Optional[str]:
+        """Create a default conversation"""
+        conversation = await self.create(title="default")
+        if not conversation:
+            return
+        self._default_conversation_id = conversation.id
+        return self._default_conversation_id

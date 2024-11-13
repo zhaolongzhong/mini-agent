@@ -4,8 +4,6 @@ from typing import Any, List, Optional
 from pydantic import TypeAdapter
 
 from ..schemas import (
-    Assistant,
-    AssistantCreate,
     AssistantMemory,
     AssistantMemoryCreate,
     AssistantMemoryUpdate,
@@ -23,20 +21,14 @@ class MemoryClient(ResourceClient):
         super().__init__(http, ws)
         self._default_assistant_id: Optional[str] = None
 
-    async def create_default_assistant(self):
-        """Create an default assistant to persist memories across multiple conversation"""
-        assistant = AssistantCreate(name="default")
-        response = await self._http.request("POST", "/assistants/", data=assistant.model_dump())
-        if not response:
-            return
-        assistant = Assistant(**response)
-        self._default_assistant_id = assistant.id
+    def set_default_assistant_id(self, assistant_id):
+        self._default_assistant_id = assistant_id
 
     async def get_safe_assistant_id(self, assistant_id: Optional[str] = None) -> str:
         """If no assistant id provided, use default assistant"""
         if not assistant_id:
             if not self._default_assistant_id:
-                await self.create_default_assistant()
+                raise Exception("No default assistant id provided.")
             assistant_id = self._default_assistant_id
         return assistant_id
 

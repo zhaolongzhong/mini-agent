@@ -1,8 +1,7 @@
 from .user import User, UserCreate
 from .error import ErrorResponse
 from .token import Token
-from .author import Author
-from .message import Message, MessageParam, MessageCreate, MessageUpdate
+from .message import Author, Content, Message, Metadata, AuthorRole, MessageChunk, MessageCreate, MessageUpdate
 from .assistant import Assistant, AssistantCreate
 from .run_usage import RunUsage, RunUsageAndLimits
 from .tool_call import AssistantMessage
@@ -11,6 +10,7 @@ from .conversation import Conversation, ConversationCreate, ConversationUpdate
 from .feature_flag import FeatureFlag
 from .run_metadata import RunMetadata
 from .event_message import EventMessage, EventMessageType
+from .message_param import MessageParam
 from .assistant_memory import AssistantMemory, AssistantMemoryCreate, AssistantMemoryUpdate, RelevantMemoriesResponse
 from .completion_request import CompletionRequest
 from .completion_respone import CompletionResponse, ToolCallToolUseBlock
@@ -28,6 +28,9 @@ __all__ = [
     "AssistantMemoryUpdate",
     "RelevantMemoriesResponse",
     "Author",
+    "AuthorRole",
+    "Content",
+    "Metadata",
     "CompletionRequest",
     "CompletionResponse",
     "ConversationContext",
@@ -40,6 +43,7 @@ __all__ = [
     "EventMessageType",
     "FeatureFlag",
     "Message",
+    "MessageChunk",
     "MessageCreate",
     "MessageUpdate",
     "MessageParam",

@@ -51,6 +51,15 @@ async def create_message(
     """
     Create new message.
     """
+    if not obj_in.conversation_id:
+        existing_obj = await crud.conversation.get_by_title(db=db, title="default")
+        if existing_obj:
+            obj_in.conversation_id = existing_obj.id
+        else:
+            conversation = await crud.conversation.create_with_id(
+                db=db, obj_in=schemas.ConversationCreate(title="default")
+            )
+            obj_in.conversation_id = conversation.id
     message = await crud.message.create_with_id(db=db, obj_in=obj_in)
     return message
 

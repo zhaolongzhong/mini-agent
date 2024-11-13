@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 
 from pydantic import Field, BaseModel
 
-from .author import Author
+from .message import Author
 from .run_metadata import RunMetadata
 
 

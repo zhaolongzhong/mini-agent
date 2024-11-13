@@ -49,7 +49,7 @@ class AgentManager:
         self.stop_run_event: asyncio.Event = asyncio.Event()
 
     async def initialize(self, enable_services: Optional[bool] = False):
-        logger.debug("initialize")
+        logger.debug(f"initialize enable_services: {enable_services}, model: {self.mode}")
         if enable_services or self.mode in ["runner", "client"]:
             self.service_manager = await ServiceManager.create(on_message=self.handle_message)
             await self.service_manager.connect()
@@ -100,9 +100,10 @@ class AgentManager:
         if run_metadata:
             self.run_metadata = run_metadata
         self.active_agent = self._agents[active_agent_id]
+        self.active_agent.set_service_manager(self.service_manager)
         # Directly add message to the agent's message history
         if message:
-            user_message = MessageParam(role="user", content=message)
+            user_message = MessageParam(role="user", content=message, model=self.active_agent.config.model)
             await self.active_agent.add_message(user_message)
         logger.debug(f"run - queued message for agent {active_agent_id}: {message}")
 
@@ -151,7 +152,6 @@ class AgentManager:
                 callback=callback,
                 prompt_callback=self.prompt_callback,
                 tool_manager=self.tool_manager,
-                service_manager=self.service_manager,
             )
             if isinstance(response, AgentTransfer):
                 if response.run_metadata:

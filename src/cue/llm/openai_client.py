@@ -234,6 +234,10 @@ class OpenAIClient(LLMRequest):
             if tool_calls:
                 for tool_call in tool_calls:
                     tool_call.id = self.generate_tool_id()
+                    if "." in tool_call.function.name:
+                        logger.error(f"Received tool name that contains dot: {tool_call}")
+                        name = tool_call.function.name.replace(".", "")
+                        tool_call.function.name = name
 
     def generate_tool_id(self) -> str:
         """Generate a short tool call ID for session-scoped uniqueness.

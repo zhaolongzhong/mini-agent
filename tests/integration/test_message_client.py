@@ -57,7 +57,7 @@ async def test_conversation(conversation_client: ConversationClient):
 
 
 @pytest.mark.integration
-class TestMemoryServiceClient:
+class TestMessageClient:
     @pytest.mark.asyncio
     async def test_create_message(self, message_client: MessageClient, test_conversation) -> None:
         """Test creating a single message."""
