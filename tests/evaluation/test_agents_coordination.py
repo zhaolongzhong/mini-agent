@@ -3,6 +3,7 @@ import logging
 import pytest
 
 from cue import Tool, AgentConfig, RunMetadata, AgentManager
+from cue.schemas.feature_flag import FeatureFlag
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class TestClientManager:
             instruction="Your name is agent_a",
             model=default_chat_model,
             tools=[Tool.Coordinate],
-            is_test=True,
+            feature_flag=FeatureFlag(is_test=True),
         )
 
         agent_b_config = AgentConfig(
@@ -29,7 +30,7 @@ class TestClientManager:
             instruction="Your name is agent_b",
             model=default_chat_model,
             tools=[Tool.Edit, Tool.Coordinate],
-            is_test=True,
+            feature_flag=FeatureFlag(is_test=True),
         )
         agent_a = agent_manager.register_agent(agent_a_config)
         agent_manager.register_agent(agent_b_config)

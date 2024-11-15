@@ -18,6 +18,7 @@ from .assistant_client import AssistantClient
 from .websocket_manager import WebSocketManager
 from ..utils.id_generator import generate_id
 from .conversation_client import ConversationClient
+from ..schemas.feature_flag import FeatureFlag
 from ..schemas.event_message import EventMessage
 
 logger = logging.getLogger(__name__)
@@ -28,11 +29,13 @@ class ServiceManager:
 
     def __init__(
         self,
+        feature_flag: FeatureFlag,
         mode: str,
         base_url: str,
         session: aiohttp.ClientSession,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
     ):
+        self.feature_flag = feature_flag
         self.mode = mode
         self.base_url = base_url
         client_id_prefix = "assistant" if self.mode in ["cli", "runner"] else "user"
@@ -69,6 +72,7 @@ class ServiceManager:
     @classmethod
     async def create(
         cls,
+        feature_flag: FeatureFlag,
         mode: Optional[str] = "cli",
         base_url: Optional[str] = None,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
@@ -76,7 +80,7 @@ class ServiceManager:
         settings = get_settings()
         base_url = base_url or settings.API_URL
         session = aiohttp.ClientSession()
-        return cls(mode, base_url, session, on_message)
+        return cls(feature_flag, mode, base_url, session, on_message)
 
     async def close(self) -> None:
         """Close all connections"""
@@ -96,7 +100,9 @@ class ServiceManager:
             logger.error(f"Server availability check failed: {e}")
             return
         await self._ws_manager.connect()
-        await self._create_default_assistant()
+
+        if self.feature_flag.enable_storage:
+            await self._create_default_assistant()
 
     async def disconnect(self) -> None:
         """Close all connections"""

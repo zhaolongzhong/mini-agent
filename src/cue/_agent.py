@@ -40,6 +40,7 @@ class Agent:
         self.context = DynamicContextManager(
             model=self.config.model,
             max_tokens=config.max_context_tokens,
+            feature_flag=self.config.feature_flag,
             summarizer=self.summarizer,
         )
         self.client: LLMClient = LLMClient(self.config)
@@ -76,7 +77,7 @@ class Agent:
 
     async def _update_recent_memories(self) -> Optional[str]:
         """Should be called whenever there is a memory update"""
-        if not self.config.enable_services or Tool.Memory not in self.config.tools:
+        if not self.config.feature_flag.enable_storage or Tool.Memory not in self.config.tools:
             return None
         try:
             memory_tool: MemoryTool = self.tool_manager.tools[Tool.Memory.value]
@@ -111,8 +112,11 @@ class Agent:
             self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
             self.token_stats["tool"] = self.token_counter.count_dict_tokens(self.tool_json)
         self.system_message_param = self.get_system_message()
-        await self.update_context()
-        await self.context.initialize()
+        try:
+            await self.update_context()
+            await self.context.initialize()
+        except Exception as e:
+            logger.error(f"Ran into error when initialize: {e}")
 
         self.summarizer.update_context(self.system_context)
         self.has_initialized = True

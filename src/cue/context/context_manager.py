@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from ..utils import DebugUtils, TokenCounter
 from .message import MessageManager
-from ..schemas import MessageParam, CompletionResponse, ToolResponseWrapper
+from ..schemas import FeatureFlag, MessageParam, CompletionResponse, ToolResponseWrapper
 from .._agent_summarizer import ContentSummarizer
 from ..services.service_manager import ServiceManager
 from ..utils.mesage_params_utils import has_tool_calls, is_tool_result
@@ -25,6 +25,7 @@ class DynamicContextManager:
         self,
         model: str,
         max_tokens: int = 4096,
+        feature_flag: FeatureFlag = FeatureFlag(),
         batch_remove_percentage: float = 0.30,
         summarizer: Optional[ContentSummarizer] = None,
     ):
@@ -39,6 +40,7 @@ class DynamicContextManager:
         """
         self.model = model
         self.max_tokens = max_tokens
+        self.feature_flag = feature_flag
         self.batch_remove_percentage = batch_remove_percentage
         self.messages: list[dict] = []
         self.summaries: list[str] = []
@@ -56,10 +58,11 @@ class DynamicContextManager:
 
     async def initialize(self):
         logger.debug("initialize")
-        messages = await self.message_manager.get_messages_asc(limit=10)
-        if messages:
-            self.clear_messages()
-            await self.add_messages(messages, skip_persistence=True)
+        if self.feature_flag.enable_storage:
+            messages = await self.message_manager.get_messages_asc(limit=10)
+            if messages:
+                self.clear_messages()
+                await self.add_messages(messages, skip_persistence=True)
         logger.debug(f"initial messages: {len(self.messages)}")
 
     def _get_batch_remove_size(self) -> int:
@@ -207,13 +210,14 @@ class DynamicContextManager:
         original_size = len(self.messages)
         for message in new_messages:
             msg_id = None
-            if not skip_persistence:
+            if self.feature_flag.enable_storage and not skip_persistence:
                 if isinstance(message, (CompletionResponse, ToolResponseWrapper, MessageParam)):
-                    persisted_message = await self.message_manager.persist_message(message.to_message_create())
-                    if persisted_message:
-                        msg_id = persisted_message.id
-            else:
-                pass
+                    try:
+                        persisted_message = await self.message_manager.persist_message(message.to_message_create())
+                        if persisted_message:
+                            msg_id = persisted_message.id
+                    except Exception as e:
+                        logger.error(f"Ran into error when persist message: {e}")
             message_dict = self._prepare_message_dict(message, msg_id)
 
             if isinstance(message_dict, list):

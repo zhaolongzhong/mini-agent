@@ -76,17 +76,15 @@ class CLI:
             # Set up primary agent
             self.agent_manager.primary_agent = self.agents[self.primary_agent_config.id]
             self.agent_manager.active_agent = self.agent_manager.primary_agent
-            self.enable_services = self.primary_agent_config.enable_services
 
         # Initialize the agent manager
-        await self.agent_manager.initialize(enable_services=self.enable_services)
+        await self.agent_manager.initialize()
 
         # Trigger bootstrap sequence for primary agent in CLI mode
         if self.mode == "cli" and self.agent_manager.primary_agent:
             bootstrap_metadata = RunMetadata(
                 run_id=generate_run_id(),
                 enable_turn_debug=False,
-                enable_services=self.enable_services,
             )
             # Send bootstrap message to trigger bootstrap sequence
             await self.run_loop(

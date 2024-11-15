@@ -63,10 +63,8 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
         temperature=0.8,
         max_tokens=2000,
         conversation_id="",
-        feature_flag=FeatureFlag(is_cli=True, is_eval=False),
-        enable_services=False,
+        feature_flag=FeatureFlag(is_test=True),
         tools=[Tool.Edit, Tool.Bash],
-        is_test=True,
     )
     manager = AgentManager()
     agent: Agent = await manager.register_agent(agent_config)

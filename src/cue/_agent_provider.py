@@ -3,7 +3,7 @@ import logging
 from typing import Dict, List, Optional
 from pathlib import Path
 
-from .schemas import AgentConfig
+from .schemas import AgentConfig, FeatureFlag
 from .tools._tool import Tool
 from .llm.llm_model import ChatModel
 
@@ -21,7 +21,7 @@ main_agent = AgentConfig(
     max_tokens=5000,
     max_context_tokens=12000,
     tools=[Tool.Edit, Tool.Bash, Tool.Memory, Tool.Coordinate],
-    enable_services=True,
+    feature_flag=FeatureFlag(enable_storage=False),
 )
 
 agent_o = AgentConfig(
@@ -174,7 +174,7 @@ class AgentProvider:
             is_primary=config_dict.get("is_primary", False),
             temperature=config_dict.get("temperature", 0.7),
             max_tokens=config_dict.get("max_tokens", 1000),
-            enable_services=config_dict.get("enable_external_memory", False),
+            feature_flag=FeatureFlag(enable_services=config_dict.get("enable_external_memory", False)),
         )
 
     @staticmethod

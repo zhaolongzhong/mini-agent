@@ -16,6 +16,7 @@ from .schemas import (
 from .services import ServiceManager
 from ._agent_loop import AgentLoop
 from .tools._tool import ToolManager
+from .schemas.feature_flag import FeatureFlag
 from .schemas.event_message import (
     EventMessage,
     EventMessageType,
@@ -48,10 +49,17 @@ class AgentManager:
         self.execute_run_task: Optional[asyncio.Task] = None
         self.stop_run_event: asyncio.Event = asyncio.Event()
 
-    async def initialize(self, enable_services: Optional[bool] = False):
-        logger.debug(f"initialize enable_services: {enable_services}, model: {self.mode}")
-        if enable_services or self.mode in ["runner", "client"]:
-            self.service_manager = await ServiceManager.create(mode=self.mode, on_message=self.handle_message)
+    async def initialize(self):
+        logger.debug(f"initialize mode: {self.mode}")
+        if self.primary_agent:
+            feature_flag = self.primary_agent.config.feature_flag
+        else:
+            feature_flag = FeatureFlag()
+        if self.mode in ["runner", "client"]:
+            feature_flag.enable_services = True
+            self.service_manager = await ServiceManager.create(
+                feature_flag=feature_flag, mode=self.mode, on_message=self.handle_message
+            )
             await self.service_manager.connect()
 
         # Update other agents info once we set primary agent
@@ -78,13 +86,6 @@ class AgentManager:
 
     async def initialize_run(self):
         self.run_metadata = RunMetadata()
-
-        if self.service_manager:
-            try:
-                await self.service_manager.assistants.create_default_assistant()
-            except Exception as e:
-                logger.error(f"Error setting up memory service: {e}")
-
         if not self.tool_manager:
             memory_client = self.service_manager.memories if self.service_manager else None
             self.tool_manager = ToolManager(memory_client)

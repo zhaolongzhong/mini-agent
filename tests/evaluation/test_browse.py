@@ -4,6 +4,7 @@ from typing import List
 import pytest
 
 from cue import Tool, AgentConfig, AsyncCueClient
+from cue.schemas.feature_flag import FeatureFlag
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ def agent_config(default_chat_model) -> AgentConfig:
         is_primary=True,
         model=default_chat_model,
         tools=[Tool.Browse],
-        is_test=True,
+        feature_flag=FeatureFlag(is_test=True),
     )
 
 

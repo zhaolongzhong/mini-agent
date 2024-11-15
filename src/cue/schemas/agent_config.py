@@ -29,4 +29,3 @@ class AgentConfig(BaseModel):
     max_actions: Optional[int] = 10
     enable_services: bool = False
     feature_flag: FeatureFlag = Field(default_factory=FeatureFlag)
-    is_test: bool = False
