@@ -2,7 +2,7 @@ import json
 import asyncio
 import logging
 import platform
-from typing import Any, Callable, Optional, Awaitable
+from typing import Callable, Optional, Awaitable
 
 import aiohttp
 from aiohttp import ClientResponseError, ClientConnectionError
@@ -28,12 +28,15 @@ class ServiceManager:
 
     def __init__(
         self,
+        mode: str,
         base_url: str,
         session: aiohttp.ClientSession,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
     ):
+        self.mode = mode
         self.base_url = base_url
-        self.client_id = generate_id(prefix="ws_")
+        client_id_prefix = "assistant" if self.mode in ["cli", "runner"] else "user"
+        self.client_id = generate_id(prefix=f"ws_{client_id_prefix}_")
         self.on_message = on_message
         self.is_server_available = False
         if platform.system() != "Darwin" and "http://localhost" in self.base_url:
@@ -52,8 +55,7 @@ class ServiceManager:
                 "pong": self._handle_pong,
                 "generic": self._handle_generic,
                 "message": self._handle_message,
-                "message_chunk": self._handle_message_chunk,
-                "prompt": self._handle_message,
+                "user": self._handle_message,
                 "assistant": self._handle_message,
             },
         )
@@ -67,13 +69,14 @@ class ServiceManager:
     @classmethod
     async def create(
         cls,
+        mode: Optional[str] = "cli",
         base_url: Optional[str] = None,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
     ):
         settings = get_settings()
         base_url = base_url or settings.API_URL
         session = aiohttp.ClientSession()
-        return cls(base_url, session, on_message)
+        return cls(mode, base_url, session, on_message)
 
     async def close(self) -> None:
         """Close all connections"""
@@ -109,14 +112,13 @@ class ServiceManager:
         logger.info(f"Client has left: {message.payload.client_id}")
 
     async def _handle_client_connect(self, message: EventMessage) -> None:
-        logger.info(f"Client has connected: {message.payload.client_id}")
+        logger.info(f"Client {message.payload.client_id} has connected")
 
     async def _handle_ping(self, message: EventMessage) -> None:
-        await self._ws_manager.send_message("pong")
-        logger.debug("Responded to ping with pong.")
+        logger.debug(f"Received ping message: {message}")
 
     async def _handle_pong(self, message: EventMessage) -> None:
-        logger.debug("Received pong.")
+        logger.debug(f"Received pong message: {message}.")
 
     async def _handle_generic(self, message: EventMessage) -> None:
         logger.debug(f"Handling generic message: {message}")
@@ -127,10 +129,7 @@ class ServiceManager:
                 await self.on_message(message)
             except Exception as e:
                 # Catch any other errors in on_message handling
-                logger.error(f"Error in on_message handling: {e}. Message content: {json.dumps(message, indent=4)}")
-
-    async def _handle_message_chunk(self, message: dict[str, Any]) -> None:
-        logger.debug(f"Handling message chunk: {message}")
+                logger.error(f"Error in on_message handling: {e}. Message content: {message.model_dump_json(indent=4)}")
 
     async def _check_server_availability(self) -> bool:
         """Check if the server is running by performing an HTTP GET request to the health endpoint."""

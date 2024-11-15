@@ -98,7 +98,6 @@ class Message(MessageBase):
     @computed_field
     @property
     def created_at_iso(self) -> str:
-        """ISO formatted creation timestamp."""
         return self.created_at.isoformat()
 
     @computed_field
@@ -124,7 +123,6 @@ class MessageChunk(BaseModel):
     @computed_field
     @property
     def created_at_iso(self) -> str:
-        """ISO formatted creation timestamp."""
         return self.created_at.isoformat()
 
     @computed_field

@@ -67,8 +67,13 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
 
     async def connect(self) -> None:
         if not self.ws or self.ws.closed:
-            self.ws = await self.session.ws_connect(f"{self.ws_url}/{self.client_id}")
-            logger.info("WebSocket connection established")
+            if "assistant" in self.client_id:
+                user_id = "default_assistant_id"
+            else:
+                user_id = "default_user_id"
+            ws_url_with_params = f"{self.ws_url}/{self.client_id}?user_id={user_id}"
+            self.ws = await self.session.ws_connect(ws_url_with_params)
+            logger.info(f"WebSocket connection established for client {self.client_id}")
 
     async def disconnect(self) -> None:
         if self.ws and not self.ws.closed:

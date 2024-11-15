@@ -1,9 +1,4 @@
-from app.schemas.event_message import (
-    EventMessage,
-    EventMessageType,
-    MessageEventPayload,
-    MessageChunkEventPayload,
-)
+from app.schemas.event_message import EventMessage, EventMessageType
 
 from .message import (
     Message,
@@ -54,5 +49,4 @@ __all__ = [
     "EventMessage",
     "EventMessageType",
     "MessageChunkEventPayload",
-    "MessageEventPayload",
 ]

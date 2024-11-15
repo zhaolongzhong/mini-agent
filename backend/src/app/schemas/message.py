@@ -21,7 +21,7 @@ class Author(BaseModel):
         metadata: Optional provider-specific author metadata
     """
 
-    role: AuthorRole = Field(..., description="Role of the message author", example="user")
+    role: AuthorRole = Field(..., description="Role of the message author")
     name: Optional[str] = Field(None, description="Name of the author")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional author metadata")
 
@@ -98,13 +98,11 @@ class Message(MessageBase):
     @computed_field
     @property
     def created_at_iso(self) -> str:
-        """ISO formatted creation timestamp."""
         return self.created_at.isoformat()
 
     @computed_field
     @property
     def updated_at_iso(self) -> str:
-        """ISO formatted update timestamp."""
         return self.updated_at.isoformat()
 
 
@@ -124,7 +122,6 @@ class MessageChunk(BaseModel):
     @computed_field
     @property
     def created_at_iso(self) -> str:
-        """ISO formatted creation timestamp."""
         return self.created_at.isoformat()
 
     @computed_field

@@ -1,3 +1,4 @@
+import uuid
 import asyncio
 import logging
 from typing import Any, Dict, List, Callable, Optional
@@ -17,9 +18,8 @@ from ._agent_loop import AgentLoop
 from .tools._tool import ToolManager
 from .schemas.event_message import (
     EventMessage,
-    ClientMessage,
     EventMessageType,
-    PromptEventPayload,
+    CompletionMessagePayload,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class AgentManager:
     async def initialize(self, enable_services: Optional[bool] = False):
         logger.debug(f"initialize enable_services: {enable_services}, model: {self.mode}")
         if enable_services or self.mode in ["runner", "client"]:
-            self.service_manager = await ServiceManager.create(on_message=self.handle_message)
+            self.service_manager = await ServiceManager.create(mode=self.mode, on_message=self.handle_message)
             await self.service_manager.connect()
 
         # Update other agents info once we set primary agent
@@ -232,21 +232,38 @@ class AgentManager:
 
         msg = EventMessage(
             type=EventMessageType.ASSISTANT,
-            payload=ClientMessage(role="assistant", content=completion_response.get_text(), name=self.active_agent.id),
+            payload=CompletionMessagePayload(
+                role="assistant",
+                content=completion_response.get_text(),
+                name=self.active_agent.id,
+                recipient="default_user_id",
+                websocket_request_id=str(uuid.uuid4()),
+            ),
+            websocket_request_id=str(uuid.uuid4()),
         )
         await self.service_manager.broadcast(msg.model_dump_json())
 
     async def broadcast_user_message(self, user_input: str) -> None:
         """Broadcast user message through websocket"""
         logger.debug(f"broadcast user message: {user_input}")
-        msg = EventMessage(type=EventMessageType.PROMPT, payload=PromptEventPayload(role="user", content=user_input))
+        websocket_request_id = str(uuid.uuid4())
+        msg = EventMessage(
+            type=EventMessageType.USER,
+            payload=CompletionMessagePayload(
+                role="user",
+                content=user_input,
+                recipient="default_assistant_id",
+                websocket_request_id=websocket_request_id,
+            ),
+            websocket_request_id=websocket_request_id,
+        )
         await self.service_manager.broadcast(msg.model_dump_json())
 
     async def handle_message(self, event: EventMessage) -> None:
         """Receive message from websocket"""
-        logger.debug(f"Handling message: {event.model_dump_json(indent=4)}")
-        if event.type == EventMessageType.PROMPT and event.client_id != self.service_manager.client_id:
-            if isinstance(event.payload, PromptEventPayload):
+        current_client_id = self.service_manager.client_id
+        if event.type == EventMessageType.USER and event.client_id != current_client_id:
+            if isinstance(event.payload, CompletionMessagePayload):
                 user_message = event.payload.content
                 self.console_utils.print_msg("User", user_message)
                 if self.execute_run_task and not self.execute_run_task.done():
@@ -259,11 +276,18 @@ class AgentManager:
                     await self.start_run(
                         self.active_agent.id, user_message, RunMetadata(), callback=self.handle_response
                     )
-        elif event.type == EventMessageType.ASSISTANT and event.client_id != self.service_manager.client_id:
-            if isinstance(event.payload, PromptEventPayload):
+            else:
+                logger.debug(f"Receive unexpected event: {event}")
+        elif event.type == EventMessageType.ASSISTANT and event.client_id != current_client_id:
+            logger.debug(f"handle_message receive assistant message: {event.model_dump_json(indent=4)}")
+            if isinstance(event.payload, CompletionMessagePayload):
                 message = event.payload.content
                 name = event.payload.name if event.payload.name else "Assistant"
                 self.console_utils.print_msg(name, message)
+        else:
+            logger.debug(
+                f"Skip handle_message current_client_id {current_client_id}: {event.model_dump_json(indent=4)}"
+            )
 
     async def handle_response(self, response: CompletionResponse):
         self.console_utils.print_msg(self.active_agent.id, f"{response.get_text()}")

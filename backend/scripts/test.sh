@@ -49,7 +49,7 @@ usage() {
   echo "  $0 -i          # Run integration tests only"
   echo "  $0 -a          # Run both unit and integration tests"
   echo "  $0 -e          # Run evaluation tests"
-  echo "  $0 -t tests/evaluation/test_async_client.py::TestClientManager::test_async_client  # Run a single test, e.g. ./scripts/test.sh -t tests/evaluation/test_basic_tool_use.py"
+  echo "  $0 -t tests/test_main.py::test_health_check  # Run a single test, e.g. ./scripts/test.sh -t tests/test_main.py"
   echo "  $0 -u -e       # Run unit and evaluation tests"
   echo "  $0 -u -p '-s -v -x'  # Run unit tests with debug log, verbose output and exit on first failure"
   exit 1
@@ -111,7 +111,7 @@ run_pytest() {
   echo "Running $test_type tests ..."
   # Use set +e to prevent script from exiting if pytest returns non-zero
   set +e
-  rye run pytest --ignore="backend" $pytest_args $extra_args
+  rye run pytest $pytest_args $extra_args
   local exit_code=$?
   set -e
   
@@ -135,6 +135,7 @@ fi
 
 # Run integration tests if flagged
 if $RUN_INTEGRATION; then
+  rye run alembic upgrade head
   run_pytest "integration" "$PYTEST_ARGS" "-m integration"
 fi
 

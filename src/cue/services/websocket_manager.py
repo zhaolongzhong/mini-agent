@@ -1,3 +1,4 @@
+import json
 import asyncio
 import logging
 from enum import Enum
@@ -182,7 +183,9 @@ class WebSocketManager:
                             event = EventMessage(**message)
                             await self._message_handlers[message_type](event)
                         except Exception as e:
-                            logger.error(f"Error in message handler for type {message_type}: {e}")
+                            logger.error(
+                                f"Error in message handler for type {message_type}: {e}, message: {json.dumps(message, indent=4)}"
+                            )
                     else:
                         logger.warning(f"No handler for message type: {message_type}")
                 else:
@@ -223,10 +226,6 @@ class WebSocketManager:
             self._metrics.last_error = str(e)
             logger.error(f"Failed to reconnect: {e}")
             raise
-
-    def register_handler(self, message_type: str, handler: Callable[[Dict[str, Any]], Awaitable[None]]) -> None:
-        """Register a handler for a specific message type"""
-        self._message_handlers[message_type] = handler
 
     async def send_message(self, message: str) -> None:
         """Queue a message for sending with backpressure handling"""
