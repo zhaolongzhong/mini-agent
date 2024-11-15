@@ -1,19 +1,10 @@
 import os
 import json
 import base64
-from typing import Literal, ClassVar, Optional
-from dataclasses import dataclass
+from typing import Literal, ClassVar
 
-from .base import BaseTool
+from .base import BaseTool, ToolResult
 from ..tools.utils.function_utils import get_definition_by_model
-
-
-@dataclass(frozen=True)
-class ToolResult:
-    output: Optional[str] = None
-    error: Optional[str] = None
-    base64_image: Optional[str] = None
-    system: Optional[str] = None
 
 
 class ReadImageTool(BaseTool):

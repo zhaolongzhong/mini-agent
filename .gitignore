@@ -7,6 +7,7 @@ dist/
 temp/
 
 venv/
+.venv/
 logs/
 .env
 

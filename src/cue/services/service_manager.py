@@ -72,7 +72,7 @@ class ServiceManager:
     @classmethod
     async def create(
         cls,
-        feature_flag: FeatureFlag,
+        feature_flag: Optional[FeatureFlag] = FeatureFlag(),
         mode: Optional[str] = "cli",
         base_url: Optional[str] = None,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,

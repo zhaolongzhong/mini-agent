@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cue-runner"
+version = "0.1.0"
+description = "Runner management tool for Cue"
+requires-python = ">=3.8"
+dependencies = ["typer>=0.9.0", "rich>=13.0.0", "psutil>=5.9.0"]
+
+[project.scripts]
+cue-runner = "cue_runner.cli:cli"
+cue-r = "cue_runner.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cue_runner"]

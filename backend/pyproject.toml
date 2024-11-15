@@ -2,9 +2,7 @@
 name = "cue-backend"
 version = "0.0.1"
 description = "Cue backend"
-authors = [
-    { name = "Zhaolong Zhong", email = "hello@example.com" }
-]
+authors = [{ name = "Cue", email = "hello@example.com" }]
 readme = "README.md"
 requires-python = ">=3.10"
 
@@ -35,11 +33,7 @@ dev-dependencies = [
 ]
 
 [tool.rye.scripts]
-format = { chain = [
-    "format:ruff",
-    "fix:ruff",
-    "format:ruff",
-]}
+format = { chain = ["format:ruff", "fix:ruff", "format:ruff"] }
 "format:ruff" = "ruff format ."
 
 lint = { chain = ["check:ruff"] }
@@ -55,9 +49,7 @@ testpaths = ["tests"]
 addopts = "--tb=short"
 xfail_strict = true
 asyncio_mode = "auto"
-filterwarnings = [
-    "error"
-]
+filterwarnings = ["error"]
 
 [tool.mypy]
 strict = true
@@ -75,8 +67,8 @@ select = [
     "W",  # pycodestyle warnings
     "F",  # pyflakes
     "B",  # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
 ]
 ignore = [
     "E501",  # line too long, handled by black
@@ -85,10 +77,10 @@ ignore = [
     "B006",  # mutable defaults
     "B904",  # Allow raising exceptions without from e, for HTTPException
     "B024",  # Allow an abstract base class has no abstract methods
-    "UP007",  # Ignore use of `X | Y` for type annotations
-    "UP006",  # Ignore use of Dict
-    "UP035",  # Ignore use of Dict or List
-    "UP038",  # Ignore (X, Y)
+    "UP007", # Ignore use of `X | Y` for type annotations
+    "UP006", # Ignore use of Dict
+    "UP035", # Ignore use of Dict or List
+    "UP038", # Ignore (X, Y)
 ]
 
 [tool.ruff.lint.isort]

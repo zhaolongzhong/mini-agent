@@ -1,9 +1,11 @@
+import os
 import sys
 import json
 import asyncio
 import logging
 import argparse
 from typing import Optional
+from pathlib import Path
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,6 +30,7 @@ class CLI:
         self.enable_services = False
         self.enable_debug_turn = args.enable_debug_turn
         self.mode = self.determine_mode(args)
+        self.runner_id = args.runner_id if hasattr(args, "runner_id") else None
 
     def determine_mode(self, args) -> str:
         """
@@ -42,9 +45,34 @@ class CLI:
         if args.client:
             return "client"
         elif args.runner:
+            # Log runner mode with ID if present
+            if args.runner_id:
+                self.logger.info(f"Running in runner mode with ID: {args.runner_id}")
+            else:
+                self.logger.info("Running in runner mode with default ID")
             return "runner"
         else:
             return "cli"
+
+    def setup_runner_environment(self):
+        """Set up environment variables for runner mode"""
+        if self.runner_id:
+            os.environ["CUE_RUNNER_ID"] = self.runner_id
+
+            # Set up runner space paths
+            runner_space = Path(f"/tmp/cue_runners/{self.runner_id}")
+            runner_space.mkdir(parents=True, exist_ok=True)
+
+            # Set control and service file paths
+            control_file = runner_space / "control.json"
+            service_file = runner_space / "service.json"
+
+            os.environ["CUE_CONTROL_FILE"] = str(control_file)
+            os.environ["CUE_SERVICE_FILE"] = str(service_file)
+
+            self.logger.debug(f"Set runner environment - ID: {self.runner_id}")
+            self.logger.debug(f"Control file: {control_file}")
+            self.logger.debug(f"Service file: {service_file}")
 
     async def _config_agents(self):
         """Configure all agents."""
@@ -59,8 +87,9 @@ class CLI:
         # Get the current running loop
         self.loop = asyncio.get_running_loop()
 
-        # Create executor
-        self.executor = ThreadPoolExecutor(thread_name_prefix="cli_executor")
+        # Create executor only if needed (not in runner mode)
+        if self.mode != "runner":
+            self.executor = ThreadPoolExecutor(thread_name_prefix="cli_executor")
 
         # Initialize agent manager
         self.agent_manager = AgentManager(prompt_callback=self.handle_prompt, loop=self.loop, mode=self.mode)
@@ -125,6 +154,18 @@ class CLI:
                 enable_turn_debug=self.enable_debug_turn,
                 enable_services=self.enable_services,
             )
+
+            if self.mode == "runner":
+                # In runner mode, just keep the agent alive and process websocket messages
+                self.logger.info("Running in runner mode - waiting for websocket messages...")
+                try:
+                    # Keep the runner alive until interrupted
+                    while True:
+                        await asyncio.sleep(1)
+                except asyncio.CancelledError:
+                    self.logger.info("Runner received cancellation signal")
+                    raise
+                return
 
             while True:
                 try:
@@ -217,7 +258,8 @@ class CLI:
         self.logger.info("Cleaning up the agent manager...")
         try:
             await self.agent_manager.clean_up()
-            self.executor.shutdown(wait=True)
+            if hasattr(self, "executor"):
+                self.executor.shutdown(wait=True)
             self.logger.debug("Cleanup complete.")
         except Exception as e:
             self.logger.error(f"Error during cleanup: {e}", exc_info=True)
@@ -238,6 +280,7 @@ def _parse_args():
         action="store_true",
         help="Run in runner mode, communicating via websocket without local interface.",
     )
+    parser.add_argument("--runner-id", type=str, metavar="ID", help="Specify runner ID for the runner mode")
     parser.add_argument(
         "--log-level",
         type=str,

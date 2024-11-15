@@ -6,9 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "cue"
 version = "0.1.0"
 description = "A description of package."
-authors = [
-    { name = "Zhaolong Zhong", email = "hello@example.com" }
-]
+authors = [{ name = "Cue", email = "hello@example.com" }]
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
@@ -42,6 +40,7 @@ dependencies = [
     "aiohttp==3.10.5",
     "websockets>=13.1",
     "tenacity>=9.0.0",
+    "psutil>=6.1.0",
 ]
 
 [project.scripts]
@@ -58,11 +57,7 @@ dev-dependencies = [
 ]
 
 [tool.rye.scripts]
-format = { chain = [
-  "format:ruff",
-  "fix:ruff",
-  "format:ruff",
-]}
+format = { chain = ["format:ruff", "fix:ruff", "format:ruff"] }
 "format:ruff" = "ruff format ."
 
 lint = { chain = ["check:ruff"] }
@@ -78,9 +73,7 @@ testpaths = ["tests"]
 addopts = "--tb=short"
 xfail_strict = true
 asyncio_mode = "auto"
-filterwarnings = [
-    "error"
-]
+filterwarnings = ["error"]
 
 [tool.mypy]
 strict = true
@@ -98,8 +91,8 @@ select = [
     "W",  # pycodestyle warnings
     "F",  # pyflakes
     "B",  # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
 ]
 ignore = [
     "E501",  # line too long, handled by black
@@ -108,10 +101,10 @@ ignore = [
     "B006",  # mutable defaults
     "B904",  # Allow raising exceptions without from e, for HTTPException
     "B024",  # Allow an abstract base class has no abstract methods
-    "UP007",  # Ignore use of `X | Y` for type annotations
-    "UP006",  # Ignore use of Dict
-    "UP035",  # Ignore use of Dict or List
-    "UP038",  # Ignore (X, Y)
+    "UP007", # Ignore use of `X | Y` for type annotations
+    "UP006", # Ignore use of Dict
+    "UP035", # Ignore use of Dict or List
+    "UP038", # Ignore (X, Y)
 ]
 
 

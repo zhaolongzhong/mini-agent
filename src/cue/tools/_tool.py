@@ -8,6 +8,7 @@ from .drive import GoogleDriveTool
 from .email import EmailTool
 from .browse import BrowseTool
 from .memory import MemoryTool
+from .restart import RestartTool
 from ..services import MemoryClient
 from .bash_tool import BashTool
 from .coordinate import CoordinateTool
@@ -29,6 +30,7 @@ class Tool(Enum):
     Image = ReadImageTool.name
     Memory = MemoryTool.name
     Coordinate = CoordinateTool.name
+    Restart = RestartTool.name
 
 
 class ToolManager:
@@ -44,6 +46,7 @@ class ToolManager:
             Tool.Image.value: ReadImageTool(),
             Tool.Memory.value: MemoryTool(memory_service),
             Tool.Coordinate.value: CoordinateTool(),
+            Tool.Restart.value: RestartTool(),
         }
         self._definition_cache: Dict[str, dict] = {}
 

@@ -19,7 +19,7 @@ Cue is designed to explore the potential of multi-agent systems powered by Large
 ### Step 1: Clone repository
 
 ```
-git clone git@github.com:zhaolongzhong/mini-agent.git
+git clone git@github.com:zhaolongzhong/cue.git
 ```
 
 ### Step 2: Setup the Environment
