@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Dict, Optional, Protocol
 from typing_extensions import runtime_checkable
@@ -25,6 +26,14 @@ class WebSocketTransport(Protocol):
     async def disconnect(self) -> None: ...
     async def send(self, message: Dict[str, Any]) -> None: ...
     async def receive(self) -> Dict[str, Any]: ...
+
+
+class ResourceClient:
+    """Base class for resource-specific operations"""
+
+    def __init__(self, http: HTTPTransport, ws: Optional[WebSocketTransport] = None):
+        self._http = http
+        self._ws = ws
 
 
 class AioHTTPTransport(HTTPTransport):
@@ -56,43 +65,112 @@ class AioHTTPTransport(HTTPTransport):
             raise ConnectionError(f"Request failed: {str(e)}")
 
 
-class AioHTTPWebSocketTransport(WebSocketTransport):
-    """AIOHTTP implementation of WebSocket transport"""
+class WebSocketConnectionError(Exception):
+    """Custom exception for WebSocket connection errors"""
 
-    def __init__(self, ws_url: str, client_id: str, session: Optional[aiohttp.ClientSession] = None):
+    pass
+
+
+class AioHTTPWebSocketTransport(WebSocketTransport):
+    """Enhanced AIOHTTP implementation of WebSocket transport with retry logic and better error handling"""
+
+    def __init__(
+        self,
+        ws_url: str,
+        client_id: str,
+        access_token: str,
+        assistant_id: Optional[str] = None,
+        session: Optional[aiohttp.ClientSession] = None,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ):
         self.ws_url = ws_url
-        self.session = session
+        self.session = session or aiohttp.ClientSession()
         self.ws: Optional[aiohttp.ClientWebSocketResponse] = None
         self.client_id = client_id
+        self.access_token = access_token
+        self.assistant_id = assistant_id
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self._connected = False
 
     async def connect(self) -> None:
-        if not self.ws or self.ws.closed:
-            if "assistant" in self.client_id:
-                user_id = "default_assistant_id"
-            else:
-                user_id = "default_user_id"
-            ws_url_with_params = f"{self.ws_url}/{self.client_id}?user_id={user_id}"
-            self.ws = await self.session.ws_connect(ws_url_with_params)
-            logger.info(f"WebSocket connection established for client {self.client_id}")
+        """Establish WebSocket connection with retry logic and proper error handling"""
+        if self._connected and self.ws and not self.ws.closed:
+            return
+
+        for attempt in range(self.max_retries):
+            try:
+                headers = {
+                    "Authorization": f"Bearer {self.access_token}",
+                    "Connection": "upgrade",
+                    "Upgrade": "websocket",
+                    "Sec-WebSocket-Version": "13",
+                }
+
+                ws_url_with_params = f"{self.ws_url}/{self.client_id}"
+                if self.assistant_id:
+                    ws_url_with_params += f"?assistant_id={self.assistant_id}"
+                logger.debug(
+                    f"Attempting WebSocket connection to {ws_url_with_params} (attempt {attempt + 1}/{self.max_retries})"
+                )
+
+                self.ws = await self.session.ws_connect(
+                    ws_url_with_params, headers=headers, heartbeat=30.0, timeout=30.0
+                )
+
+                self._connected = True
+                logger.info(f"WebSocket connection established for client {self.client_id}")
+                return
+
+            except aiohttp.ClientResponseError as e:
+                if e.status == 401:
+                    logger.error("Authentication failed: Invalid or expired access token")
+                    raise WebSocketConnectionError("Authentication failed: Please check your access token")
+                logger.error(f"HTTP error during WebSocket connection: {e.status} - {e.message}")
+
+            except aiohttp.WSServerHandshakeError as e:
+                logger.error(f"WebSocket handshake failed: {str(e)}")
+                if attempt == self.max_retries - 1:
+                    raise WebSocketConnectionError(f"WebSocket handshake failed after {self.max_retries} attempts")
+
+            except aiohttp.ClientError as e:
+                logger.error(f"Connection error: {str(e)}")
+                if attempt == self.max_retries - 1:
+                    raise WebSocketConnectionError(f"Failed to establish WebSocket connection: {str(e)}")
+
+            except Exception as e:
+                logger.error(f"Unexpected error during WebSocket connection: {str(e)}")
+                raise WebSocketConnectionError(f"Unexpected error: {str(e)}")
+
+            await asyncio.sleep(self.retry_delay * (attempt + 1))
 
     async def disconnect(self) -> None:
+        """Safely close the WebSocket connection"""
         if self.ws and not self.ws.closed:
-            await self.ws.close()
+            try:
+                await self.ws.close()
+                self._connected = False
+                logger.info(f"WebSocket connection closed for client {self.client_id}")
+            except Exception as e:
+                logger.error(f"Error during WebSocket disconnection: {str(e)}")
 
     async def send(self, text: str) -> None:
-        if not self.ws or self.ws.closed:
-            await self.connect()
-        await self.ws.send_str(text)
+        """Send message with connection check and error handling"""
+        try:
+            if not self._connected or not self.ws or self.ws.closed:
+                await self.connect()
+            await self.ws.send_str(text)
+        except Exception as e:
+            logger.error(f"Error sending message: {str(e)}")
+            raise WebSocketConnectionError(f"Failed to send message: {str(e)}")
 
     async def receive(self) -> Dict[str, Any]:
-        if not self.ws or self.ws.closed:
-            await self.connect()
-        return await self.ws.receive_json()
-
-
-class ResourceClient:
-    """Base class for resource-specific operations"""
-
-    def __init__(self, http: HTTPTransport, ws: Optional[WebSocketTransport] = None):
-        self._http = http
-        self._ws = ws
+        """Receive message with connection check and error handling"""
+        try:
+            if not self._connected or not self.ws or self.ws.closed:
+                await self.connect()
+            return await self.ws.receive_json()
+        except Exception as e:
+            logger.error(f"Error receiving message: {str(e)}")
+            raise WebSocketConnectionError(f"Failed to receive message: {str(e)}")

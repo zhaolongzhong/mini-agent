@@ -20,6 +20,9 @@ dependencies = [
     "pydantic-settings>=2.4.0",
     "numpy>=2.1.0",
     "openai==1.52.0",
+    "bcrypt==4.0.1",
+    "passlib[bcrypt]>=1.7.4",
+    "python-jose[cryptography]>=3.3.0",
 ]
 
 [tool.rye]

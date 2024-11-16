@@ -19,8 +19,8 @@ from .tools._tool import ToolManager
 from .schemas.feature_flag import FeatureFlag
 from .schemas.event_message import (
     EventMessage,
+    MessagePayload,
     EventMessageType,
-    CompletionMessagePayload,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class AgentManager:
             feature_flag = self.primary_agent.config.feature_flag
         else:
             feature_flag = FeatureFlag()
-        if self.mode in ["runner", "client"]:
+        if self.mode in ["cli", "runner", "client"]:
             feature_flag.enable_services = True
             self.service_manager = await ServiceManager.create(
                 feature_flag=feature_flag, mode=self.mode, on_message=self.handle_message
@@ -233,10 +233,9 @@ class AgentManager:
 
         msg = EventMessage(
             type=EventMessageType.ASSISTANT,
-            payload=CompletionMessagePayload(
+            payload=MessagePayload(
                 role="assistant",
-                content=completion_response.get_text(),
-                name=self.active_agent.id,
+                message=completion_response.get_text(),
                 recipient="default_user_id",
                 websocket_request_id=str(uuid.uuid4()),
             ),
@@ -250,9 +249,9 @@ class AgentManager:
         websocket_request_id = str(uuid.uuid4())
         msg = EventMessage(
             type=EventMessageType.USER,
-            payload=CompletionMessagePayload(
+            payload=MessagePayload(
                 role="user",
-                content=user_input,
+                message=user_input,
                 recipient="default_assistant_id",
                 websocket_request_id=websocket_request_id,
             ),
@@ -264,9 +263,9 @@ class AgentManager:
         """Receive message from websocket"""
         current_client_id = self.service_manager.client_id
         if event.type == EventMessageType.USER and event.client_id != current_client_id:
-            if isinstance(event.payload, CompletionMessagePayload):
-                user_message = event.payload.content
-                self.console_utils.print_msg("User", user_message)
+            if isinstance(event.payload, MessagePayload):
+                user_message = event.payload.message
+                self.console_utils.print_msg(user_message, "user")
                 if self.execute_run_task and not self.execute_run_task.done():
                     # Inject the message dynamically
                     await self.inject_user_message(user_message)
@@ -281,17 +280,16 @@ class AgentManager:
                 logger.debug(f"Receive unexpected event: {event}")
         elif event.type == EventMessageType.ASSISTANT and event.client_id != current_client_id:
             logger.debug(f"handle_message receive assistant message: {event.model_dump_json(indent=4)}")
-            if isinstance(event.payload, CompletionMessagePayload):
-                message = event.payload.content
-                name = event.payload.name if event.payload.name else "Assistant"
-                self.console_utils.print_msg(name, message)
+            if isinstance(event.payload, MessagePayload):
+                message = event.payload.message
+                self.console_utils.print_msg(message)
         else:
             logger.debug(
                 f"Skip handle_message current_client_id {current_client_id}: {event.model_dump_json(indent=4)}"
             )
 
     async def handle_response(self, response: CompletionResponse):
-        self.console_utils.print_msg(self.active_agent.id, f"{response.get_text()}")
+        self.console_utils.print_msg(f"{response.get_text()}")
         await self.broadcast_response(response)
 
     async def inject_user_message(self, user_input: str) -> None:

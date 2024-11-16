@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Optional
 
 from fastapi import (
     Depends,
@@ -9,6 +10,7 @@ from fastapi import (
 )
 
 from .. import deps
+from ...core.config import get_settings
 from ...websocket_manager import ConnectionManager
 from ...schemas.event_message import (
     EventMessage,
@@ -27,23 +29,33 @@ async def websocket_endpoint(
     client_id: str,
     connection_manager: ConnectionManager = Depends(deps.get_connection_manager),
 ):
-    user_id = websocket.query_params.get("user_id")
+    user_id, assistant_id = await deps.get_current_user_and_assistant(websocket, get_settings())
     if not user_id:
-        user_id = client_id
+        await websocket.close(code=4001)
+        return
+    if not assistant_id:
+        assistant_id = websocket.query_params.get("assistant_id", "").strip()
 
     await websocket.accept()
-    session_id = await connection_manager.connect(user_id, websocket)
 
-    # Send back connect confirmation
-    event_message = EventMessage(
-        type=EventMessageType.CLIENT_CONNECT,
-        client_id=client_id,
-        payload=ClientEventPayload(client_id=client_id, session_id=session_id, message="Connected successfully"),
-    )
-    event_text = event_message.model_dump_json()
-    await connection_manager.send_personal_message(event_text, session_id)
+    session_id = None
 
     try:
+        session_id = await connection_manager.connect(
+            client_id=client_id,
+            user_id=user_id,
+            participant_id=assistant_id if assistant_id else user_id,
+            websocket=websocket,
+        )
+
+        notification_recipient_ids = await connection_manager.get_participants(user_id)
+        if session_id:
+            await connection_manager.broadcast_connection_event(
+                client_id=client_id,
+                sender_id=assistant_id if assistant_id else user_id,
+                recipients=list(notification_recipient_ids),
+                is_connect=True,
+            )
         while True:
             data = await websocket.receive_text()
             try:
@@ -54,7 +66,12 @@ async def websocket_endpoint(
                 event_message = EventMessage(
                     **message_data,
                 )
-                event_message.client_id = client_id
+                event_message = event_message.model_copy(
+                    update={
+                        "client_id": client_id,
+                        "payload": event_message.payload.model_copy(update={"user_id": user_id}),
+                    }
+                )
 
                 if event_type in (EventMessageType.PING, EventMessageType.PONG):
                     response = EventMessage(
@@ -64,36 +81,23 @@ async def websocket_endpoint(
                     )
                     await connection_manager.send_personal_message(response.model_dump_json(), session_id)
                 elif event_type in (EventMessageType.USER, EventMessageType.ASSISTANT):
-                    event_message.client_id = client_id
-                    recipient_id = event_message.payload.recipient
-                    recipient_sessions = await connection_manager.get_user_sessions(recipient_id)
-                    if not recipient_sessions:
+                    success, reason = await connection_manager.send_message(message=event_message)
+                    if not success:
+                        logger.warning(f"Could not deliver message. {reason}")
                         # Optionally, send a message back to the sender indicating the recipient is offline
                         offline_message = EventMessage(
                             client_id=client_id,
                             type=EventMessageType.GENERIC,
                             payload=ClientEventPayload(
                                 client_id=client_id,
-                                session_id=session_id,
-                                message=f"User '{recipient_id}' is offline.",
+                                message=reason,
                             ),
                         )
                         await connection_manager.send_personal_message(offline_message.model_dump_json(), session_id)
-                        logger.warning(f"User '{recipient_id}' is offline. Could not deliver message.")
                         continue
 
-                    # Send the message to all active sessions of the recipient
-                    event_message.payload.sender = user_id
-                    event_text = event_message.model_dump_json()
-                    for recipient_session_id in recipient_sessions:
-                        await connection_manager.send_personal_message(
-                            message=event_text, session_id=recipient_session_id
-                        )
-
                 else:
-                    event_message = EventMessage(
-                        **message_data,
-                    )
+                    await connection_manager.send_message(message=event_message)
 
             except json.JSONDecodeError:
                 error_message = json.dumps({"system": True, "message": "Invalid message format. Please send JSON."})
@@ -106,9 +110,38 @@ async def websocket_endpoint(
                 logger.error(f"Error processing message from '{user_id}': {e}")
 
     except WebSocketDisconnect as e:
-        logger.info(f"WebSocket disconnected for user '{user_id}' (code: {e.code}, reason: {e.reason})")
-        await connection_manager.disconnect(session_id)
-
+        logger.info(
+            f"WebSocket disconnected for user '{user_id}' (code: {e.code}, reason: {e.reason}), session_id: {session_id}"
+        )
+        await handle_disconnect(
+            connection_manager=connection_manager,
+            client_id=client_id,
+            session_id=session_id,
+            user_id=user_id,
+            assistant_id=assistant_id,
+        )
     except Exception as e:
         logger.error(f"Unexpected error with WebSocket for user '{user_id}': {e}")
-        await connection_manager.disconnect(session_id)
+        await handle_disconnect(
+            connection_manager=connection_manager,
+            client_id=client_id,
+            session_id=session_id,
+            user_id=user_id,
+            assistant_id=assistant_id,
+        )
+
+
+async def handle_disconnect(
+    connection_manager: ConnectionManager,
+    client_id: str,
+    session_id: str,
+    user_id: str,
+    assistant_id: Optional[str] = None,
+) -> None:
+    notification_recipient_ids = await connection_manager.disconnect(session_id=session_id)
+    await connection_manager.broadcast_connection_event(
+        client_id=client_id,
+        sender_id=assistant_id if assistant_id else user_id,
+        recipients=notification_recipient_ids,
+        is_connect=False,
+    )

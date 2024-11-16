@@ -16,7 +16,6 @@ from .memory_client import MemoryClient
 from .message_client import MessageClient
 from .assistant_client import AssistantClient
 from .websocket_manager import WebSocketManager
-from ..utils.id_generator import generate_id
 from .conversation_client import ConversationClient
 from ..schemas.feature_flag import FeatureFlag
 from ..schemas.event_message import EventMessage
@@ -38,21 +37,29 @@ class ServiceManager:
         self.feature_flag = feature_flag
         self.mode = mode
         self.base_url = base_url
-        client_id_prefix = "assistant" if self.mode in ["cli", "runner"] else "user"
-        self.client_id = generate_id(prefix=f"ws_{client_id_prefix}_")
-        self.on_message = on_message
+        client_id_prefix = self.mode
+        self.access_token = get_settings().ACCESS_TOKEN
+        self.assistant_id = "" if self.mode == "client" else "default_assistant_id"
+        self.client_id = f"cl_{client_id_prefix}_default_client_id"
         self.is_server_available = False
         if platform.system() != "Darwin" and "http://localhost" in self.base_url:
             self.base_url = self.base_url.replace("http://localhost", "http://host.docker.internal")
-        # Set up transports
         self._session = session
+        self.on_message = on_message
+
         self._http = AioHTTPTransport(self.base_url, self._session)
-        self._ws = AioHTTPWebSocketTransport(self.base_url.replace("http", "ws") + "/ws", self.client_id, self._session)
+        self._ws = AioHTTPWebSocketTransport(
+            ws_url=self.base_url.replace("http", "ws") + "/ws",
+            client_id=self.client_id,
+            access_token=self.access_token,
+            assistant_id=self.assistant_id,
+            session=self._session,
+        )
 
         self._ws_manager = WebSocketManager(
             ws_transport=self._ws,
             message_handlers={
-                "client_leave": self._handle_client_leave,
+                "client_disconnect": self._handle_client_connect,
                 "client_connect": self._handle_client_connect,
                 "ping": self._handle_ping,
                 "pong": self._handle_pong,
@@ -114,11 +121,8 @@ class ServiceManager:
             return
         await self._ws_manager.send_message(message)
 
-    async def _handle_client_leave(self, message: EventMessage) -> None:
-        logger.info(f"Client has left: {message.payload.client_id}")
-
     async def _handle_client_connect(self, message: EventMessage) -> None:
-        logger.info(f"Client {message.payload.client_id} has connected")
+        logger.info(f"Client {message.payload.client_id} event: {message}")
 
     async def _handle_ping(self, message: EventMessage) -> None:
         logger.debug(f"Received ping message: {message}")

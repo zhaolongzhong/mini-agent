@@ -40,7 +40,7 @@ class PromptManager:
         with self.lock:
             if not self.prompt_active:
                 text = Text()
-                text.append("[User]: ", style="user")
+                text.append("$ >> ", style="user")
                 self.console.print(text, end="")
                 self.prompt_active = True
                 # Debugging Statement (Optional)
@@ -76,11 +76,11 @@ def custom_print(*args, **kwargs):
     reset_prompt()
 
     # Determine if the print call is meant to print the prompt itself
-    if args == ("[User]: ",) or args == ("[User]: :", ""):
+    if args == ("$ >> ",) or args == ("$ >> ", ""):
         return
 
     # Print the actual message
-    if args and args[0] != "[User]: ":
+    if args and args[0] != "$ >> ":
         original_print(*args, **kwargs)
 
     # Print the prompt after the message if the print call ends with a newline
@@ -99,7 +99,7 @@ class ConsoleUtils:
         self.console = console
         self.prompt_manager = prompt_manager
 
-    def print_msg(self, agent_id: str, message: str) -> None:
+    def print_msg(self, message: str, role: str = "assistant") -> None:
         """Print a standard message from an agent."""
         self.prompt_manager.reset_prompt()
         # Clear the current line
@@ -107,8 +107,8 @@ class ConsoleUtils:
         sys.stdout.flush()
         # Create and print the styled message
         text = Text()
-        text.append(f"[{agent_id}]: ", style="assistant_bold")
-        text.append(str(message), style="assistant")
+        text.append("$ >> ", style="assistant_bold" if role == "assistant" else "user")
+        text.append(str(message), style="assistant" if role == "assistant" else "user")
         self.console.print(text)
         # Print the prompt after the message
         self.prompt_manager.print_prompt()
@@ -122,7 +122,7 @@ class ConsoleUtils:
         # Create and print the styled error message
         text = Text()
         if not agent_id:
-            agent_id = "system"
+            agent_id = "$ >> "
         text.append(f"[{agent_id}]: ", style="assistant")
         text.append(str(message), style="error")
         self.console.print(text)

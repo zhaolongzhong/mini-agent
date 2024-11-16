@@ -1,60 +1,53 @@
 from enum import Enum
 from typing import Union, Optional
 
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, ConfigDict
 
 
 class EventMessageType(str, Enum):
     GENERIC = "generic"
     USER = "user"
     ASSISTANT = "assistant"
-    MESSAGE_CHUNK = "message_chunk"
     CLIENT_CONNECT = "client_connect"
-    CLIENT_LEAVE = "client_leave"
+    CLIENT_DISCONNECT = "client_disconnect"
     PING = "ping"
     PONG = "pong"
     ERROR = "error"
 
 
-class GenericMessagePayload(BaseModel):
-    message: str
-    sender: Optional[str] = None
-    recipient: str
-    websocket_request_id: Optional[str] = None
+class MessagePayloadBase(BaseModel):
+    message: Optional[str] = Field(None, description="Message content")
+    sender: Optional[str] = Field(None, description="Sender identifier")
+    recipient: Optional[str] = Field(None, description="Recipient identifier")
+    websocket_request_id: Optional[str] = Field(None, description="Request tracking ID")
+
+    model_config = ConfigDict(frozen=True)
 
 
-class CompletionMessagePayload(BaseModel):
-    """
-    Represents a client message with optional JSON data.
-    """
-
-    content: Optional[str] = Field(None, description="Content of the message.")
-    role: Optional[str] = Field(None, description="Role of the sender.")
-    name: Optional[str] = Field(
-        None,
-        description="Name of author of the message.",
-    )
-    payload: Optional[dict] = Field(None, description="Original JSON data used to create this message.")
-    sender: Optional[str] = None
-    recipient: str
-    websocket_request_id: Optional[str] = None
+class GenericMessagePayload(MessagePayloadBase):
+    user_id: Optional[str] = Field(None, description="User identifier")
 
 
-class ClientEventPayload(BaseModel):
+class MessagePayload(MessagePayloadBase):
+    # content: Optional[str] = None
+    user_id: Optional[str] = None
+    payload: Optional[dict] = None
+    role: str = "user"
+
+
+class ClientEventPayload(MessagePayloadBase):
     client_id: str
-    session_id: str
-    message: Optional[str] = None
+    user_id: Optional[str] = None
 
 
-class PingPongEventPayload(BaseModel):
+class PingPongEventPayload(MessagePayloadBase):
     type: str
-    recipient: Optional[str] = None
 
 
 EventPayload = Union[
     ClientEventPayload,
     PingPongEventPayload,
-    CompletionMessagePayload,
+    MessagePayload,
     GenericMessagePayload,
 ]
 
