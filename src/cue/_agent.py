@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from .llm import LLMClient
 from .tools import Tool, MemoryTool, ToolManager
 from .utils import DebugUtils, TokenCounter, record_usage, record_usage_details
-from .context import DynamicContextManager, ProjectContextManager
+from .context import SystemContextManager, DynamicContextManager, ProjectContextManager
 from .schemas import (
     Author,
     AgentConfig,
@@ -63,6 +63,7 @@ class Agent:
             "actual_usage": {},
         }
         self.metrics = {"token_stats": self.token_stats}
+        self.system_context_manager = SystemContextManager(metrics=self.metrics, token_stats=self.token_stats)
         self.service_manager: Optional[ServiceManager] = None
         self.system_context: Optional[str] = None  # memories and project context
         self.system_message_param: Optional[str] = None
@@ -152,68 +153,17 @@ class Agent:
 
     async def update_context(self) -> None:
         logger.debug("update_context ...")
+        self.system_context_manager.update_base_context()
         await self._update_recent_memories()
         self.project_context_manager.update_context()
 
-    def update_stats(self, key: str, current_value: str, context_key: str) -> tuple[str, int]:
-        """
-        Common method to update metrics and token stats for a given context component.
-        """
-        if not current_value:
-            return "", 0
-
-        # Update metrics stats
-        local_stats = self.metrics.get(key, {"prev": "", "curr": ""})
-        if local_stats.get("curr") != current_value:
-            local_stats["prev"] = local_stats.get("curr", "")
-            local_stats["curr"] = current_value
-            local_stats["updated"] = True
-        else:
-            # it's same value in this turn
-            local_stats["prev"] = local_stats.get("curr")
-            local_stats["updated"] = False
-
-        self.metrics[key] = local_stats
-
-        # Count tokens
-        tokens = self.token_counter.count_token(current_value)
-        self.token_stats[context_key] = tokens
-
-        # Log if needed
-        logger.debug(f"{key}: {json.dumps(current_value, indent=4)}")
-
-        return current_value, tokens
-
     def build_system_context(self) -> str:
-        """Build the system context with stats tracking."""
-        new_system_context = ""
-
-        # Process project context
-        project_value, _ = self.update_stats("project", self.project_context_manager.project_context, "project")
-        new_system_context += project_value if project_value else ""
-
-        # Process recent memories
-        memories_value, _ = self.update_stats("memories", self.memory_manager.recent_memories, "memories")
-        new_system_context += memories_value if memories_value else ""
-
-        # Process message summaries
-        summaries_value, _ = self.update_stats("summaries", self.context.get_summaries(), "summaries")
-        new_system_context += summaries_value if summaries_value else ""
-
-        # Update system context if changed
-        if self.system_context != new_system_context:
-            self.system_context = new_system_context
-            self.token_stats["context_updated"] = True
-            self.metrics["context_updated"] = True
-            logger.debug(
-                f"System context updated, metrics: {json.dumps(self.metrics, indent=4)}, \n{json.dumps({'old': self.system_context, 'new': new_system_context})}"
-            )
-
-        else:
-            self.metrics["context_updated"] = False
-            self.token_stats["context_updated"] = False
-
-        return self.system_context
+        """Build short time static system context"""
+        return self.system_context_manager.build_system_context(
+            project_context=self.project_context_manager.project_context,
+            memories=self.memory_manager.recent_memories,
+            summaries=self.context.get_summaries(),
+        )
 
     async def build_message_params(self) -> list[dict]:
         """

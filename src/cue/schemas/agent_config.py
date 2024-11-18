@@ -26,6 +26,5 @@ class AgentConfig(BaseModel):
     tools: Optional[list[Any]] = []  # callable or tool enum
     parallel_tool_calls: bool = True
     conversation_id: Optional[str] = None
-    max_actions: Optional[int] = 10
     enable_services: bool = False
     feature_flag: FeatureFlag = Field(default_factory=FeatureFlag)

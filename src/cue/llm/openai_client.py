@@ -60,12 +60,20 @@ class OpenAIClient(LLMRequest):
                 system_prompt = (
                     f"{SYSTEM_PROMPT}{' ' + request.system_prompt_suffix if request.system_prompt_suffix else ''}"
                 )
+
+                system_context_tokens = 0
+                if request.system_context:
+                    system_context = {"role": "assistant", "content": request.system_context.strip()}
+                    system_context_tokens = TokenCounter.count_token(str(system_context))
+                    messages.insert(0, system_context)
+
                 system_message = {"role": "system", "content": system_prompt}
                 system_message_tokens = TokenCounter.count_token(str(system_message))
                 tool_tokens = TokenCounter.count_token(str(request.tool_json))
                 message_tokens = TokenCounter.count_token(str(messages))
                 input_tokens = {
                     "system_tokens": system_message_tokens,
+                    "system_context_tokens": system_context_tokens,
                     "tool_tokens": tool_tokens,
                     "message_tokens": message_tokens,
                 }
@@ -129,6 +137,8 @@ class OpenAIClient(LLMRequest):
             messages = [msg for msg in request.messages if msg["role"] != "system"]
             system_message_content = " ".join([msg["content"] for msg in messages if msg["role"] == "system"])
             system_message_content = system_message_content.strip()
+            if request.system_context:
+                system_message_content += request.system_context
 
             system_prompt = O1_MODEL_SYSTEM_PROMPT_BASE.format(
                 json_format=JSON_FORMAT,

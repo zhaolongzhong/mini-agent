@@ -1,0 +1,89 @@
+import json
+import logging
+from datetime import datetime
+from typing_extensions import Optional
+
+from cue.utils.token_counter import TokenCounter
+
+logger = logging.getLogger(__name__)
+
+
+class SystemContextManager:
+    def __init__(self, metrics: dict, token_stats: dict):
+        self.metrics = metrics
+        self.token_stats = token_stats
+        self.token_counter = TokenCounter()
+        self.system_context_base: Optional[str] = None
+        self.system_context = ""
+
+    def update_base_context(self) -> None:
+        self.system_context_base = self._get_time_context()
+
+    def _get_time_context(self) -> str:
+        return f"""
+        * Time Awareness:
+        - Recent Time: {datetime.today().strftime('%A, %B %-d, %Y %I:%M %p %Z')}
+        - Note: This timestamp is for general context and system self-awareness only
+        - Limitations: May have delay due to context caching
+        - For precise time: Use bash tool with 'date' command or other available tool
+        """
+
+    def build_system_context(self, project_context: str, memories: str, summaries: str) -> str:
+        """Build the system context."""
+        new_system_context = self.system_context_base
+
+        # Process project context
+        project_value, _ = self.update_stats("project", project_context, "project")
+        new_system_context += project_value if project_value else ""
+
+        # Process recent memories
+        memories_value, _ = self.update_stats("memories", memories, "memories")
+        new_system_context += memories_value if memories_value else ""
+
+        # Process message summaries
+        summaries_value, _ = self.update_stats("summaries", summaries, "summaries")
+        new_system_context += summaries_value if summaries_value else ""
+
+        # Update system context if changed
+        if self.system_context != new_system_context:
+            self.system_context = new_system_context
+            self.token_stats["context_updated"] = True
+            self.metrics["context_updated"] = True
+            logger.debug(
+                f"System context updated, metrics: {json.dumps(self.metrics, indent=4)}, \n{json.dumps({'old': self.system_context, 'new': new_system_context})}"
+            )
+
+        else:
+            self.metrics["context_updated"] = False
+            self.token_stats["context_updated"] = False
+
+        return self.system_context
+
+    def update_stats(self, key: str, current_value: str, context_key: str) -> tuple[str, int]:
+        """
+        Common method to update metrics and token stats for a given context component.
+        """
+        if not current_value:
+            return "", 0
+
+        # Update metrics stats
+        local_stats = self.metrics.get(key, {"prev": "", "curr": ""})
+        if local_stats.get("curr") != current_value:
+            local_stats["prev"] = local_stats.get("curr", "")
+            local_stats["curr"] = current_value
+            local_stats["updated"] = True
+        else:
+            # it's same value in this turn
+            local_stats["prev"] = local_stats.get("curr")
+            local_stats["updated"] = False
+
+        self.metrics[key] = local_stats
+
+        # Count tokens
+        tokens = self.token_counter.count_token(current_value)
+        self.token_stats[context_key] = tokens
+
+        # Log if needed
+        logger.debug(f"{key}: {json.dumps(current_value, indent=4)}")
+
+        return current_value, tokens
