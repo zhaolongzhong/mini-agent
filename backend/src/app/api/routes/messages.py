@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/", response_model=list[schemas.Message])
+@router.get("", response_model=list[schemas.Message])
 async def read_messages(
     db: AsyncSession = Depends(deps.get_async_db),
     skip: int = 0,
@@ -25,24 +25,7 @@ async def read_messages(
     return messages
 
 
-@router.get("/conversation/{conversation_id}/messages", response_model=list[schemas.Message])
-async def get_messages_by_conversation_id(
-    *,
-    db: AsyncSession = Depends(deps.get_async_db),
-    conversation_id: str,
-    skip: int = 0,
-    limit: int = 100,
-) -> Any:
-    """
-    Get messages by conversation id.
-    """
-    messages = await crud.message.get_multi_by_conversation_id_desc(
-        db=db, conversation_id=conversation_id, skip=skip, limit=limit
-    )
-    return messages or []
-
-
-@router.post("/", response_model=schemas.Message)
+@router.post("", response_model=schemas.Message)
 async def create_message(
     *,
     db: AsyncSession = Depends(deps.get_async_db),

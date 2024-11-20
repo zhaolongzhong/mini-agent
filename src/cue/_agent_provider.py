@@ -3,6 +3,7 @@ import logging
 from typing import Dict, List, Optional
 from pathlib import Path
 
+from .config import get_settings
 from .schemas import AgentConfig, FeatureFlag
 from .tools._tool import Tool
 from .llm.llm_model import ChatModel
@@ -22,6 +23,7 @@ main_agent = AgentConfig(
     max_context_tokens=12000,
     tools=[Tool.Edit, Tool.Bash, Tool.Memory, Tool.Coordinate],
     feature_flag=FeatureFlag(enable_services=True, enable_storage=True),
+    api_key=get_settings().OPENAI_API_KEY,
 )
 
 agent_o = AgentConfig(
@@ -30,14 +32,16 @@ agent_o = AgentConfig(
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
     model=ChatModel.O1_MINI.id,
     tools=[Tool.Edit],
+    api_key=get_settings().OPENAI_API_KEY,
 )
 
 agent_claude = AgentConfig(
     id="agent_claude",
     description="Is very good at coding and also provide detail reasoning on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
-    model=ChatModel.GPT_4O.id,
+    model=ChatModel.CLAUDE_3_5_SONNET_20241022.id,
     tools=[Tool.Edit],
+    api_key=get_settings().ANTHROPIC_API_KEY,
 )
 
 system_operator = AgentConfig(

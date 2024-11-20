@@ -174,10 +174,11 @@ class MemoryTool(BaseTool):
     async def delete(self, memory_id: str) -> ToolResult:
         """Delete one or more memories. Can accept either a single memory ID or a list of memory IDs."""
         try:
-            memory_ids = ParameterValidator.safe_string_list(memory_id, ",")
-            if not memory_ids:
+            result = ParameterValidator.safe_string_list(memory_id, ",")
+            if not result.is_valid:
                 raise ToolError("No memory IDs provided for deletion")
 
+            memory_ids = result.value
             result = await self.memory_client.delete_memories(memory_ids=memory_ids)
 
             # Format the response message based on the result

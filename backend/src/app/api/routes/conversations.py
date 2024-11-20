@@ -29,7 +29,7 @@ async def get_messages_by_conversation_id(
     return messages or []
 
 
-@router.get("/", response_model=list[schemas.Conversation])
+@router.get("", response_model=list[schemas.Conversation])
 async def read_conversations(
     db: AsyncSession = Depends(deps.get_async_db),
     skip: int = 0,
@@ -42,7 +42,7 @@ async def read_conversations(
     return conversations
 
 
-@router.post("/", response_model=schemas.Conversation)
+@router.post("", response_model=schemas.Conversation)
 async def create_conversation(
     *,
     db: AsyncSession = Depends(deps.get_async_db),

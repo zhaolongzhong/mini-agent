@@ -14,11 +14,13 @@ class MessageClient(ResourceClient):
         super().__init__(http, ws)
         self._default_conversation_id: Optional[str] = None
 
-    def set_default_conversation_id(self, assistant_id):
-        self._default_conversation_id = assistant_id
+    def set_default_conversation_id(self, conversation_id):
+        self._default_conversation_id = conversation_id
 
     async def create(self, message: MessageCreate) -> Message:
-        response = await self._http.request("POST", "/messages/", data=message.model_dump())
+        if message.conversation_id is None and self._default_conversation_id:
+            message.conversation_id = self._default_conversation_id
+        response = await self._http.request("POST", "/messages", data=message.model_dump())
         return Message(**response)
 
     async def get(self, message_id: str) -> Message:
@@ -33,7 +35,7 @@ class MessageClient(ResourceClient):
         if not conversation_id:
             raise Exception("No conversation id provided")
         response = await self._http.request(
-            "GET", f"/messages/conversation/{conversation_id}/messages", params={"skip": skip, "limit": limit}
+            "GET", f"/conversations/{conversation_id}/messages", params={"skip": skip, "limit": limit}
         )
         return [Message(**msg) for msg in response]
 

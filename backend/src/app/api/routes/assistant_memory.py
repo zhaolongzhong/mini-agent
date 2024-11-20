@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Annotated
+from typing import List, Union, Optional, Annotated
 
 from fastapi import Path, Query, Depends, APIRouter, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,19 +49,30 @@ async def read_assistant_memory(
     return assistant_memory
 
 
-@memory_router.get("", response_model=List[schemas.AssistantMemory])
+@memory_router.get("", response_model=Union[List[schemas.AssistantMemory] | schemas.RelevantMemoriesResponse])
 async def list_assistant_memories(
     *,
     assistant_id: Annotated[str, Path(...)],
     db: AsyncSession = Depends(deps.get_async_db),
+    embedding_manager: EmbeddingManager = Depends(deps.get_embedding_manager),
+    query: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
 ):
     """Retrieve assistant memories."""
-    assistant_memories = await crud.assistant_memory.get_multi_by_assistant(
-        db=db, assistant_id=assistant_id, skip=skip, limit=limit
-    )
-    return assistant_memories
+    if query:
+        # Search by query using the embedding manager
+        memories_with_similarity_scores = await embedding_manager.retrieve_relevant_memories(
+            db=db, assistant_id=assistant_id, query=query, limit=limit
+        )
+        if not memories_with_similarity_scores:
+            raise HTTPException(status_code=404, detail="No matching assistant memories found")
+        return memories_with_similarity_scores
+    else:
+        assistant_memories = await crud.assistant_memory.get_multi_by_assistant(
+            db=db, assistant_id=assistant_id, skip=skip, limit=limit
+        )
+        return assistant_memories
 
 
 @memory_router.put("/{memory_id}", response_model=schemas.AssistantMemory)
@@ -80,7 +91,7 @@ async def update_assistant_memory(
     return assistant_memory
 
 
-@memory_router.delete("/")
+@memory_router.delete("")
 async def delete_assistant_memories(
     *,
     assistant_id: Annotated[str, Path(...)],
@@ -135,26 +146,10 @@ async def delete_assistant_memory(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
-@memory_router.post("/search")
-async def search_memories(
-    *,
-    assistant_id: Annotated[str, Path(...)],
-    query: str = Query(...),
-    db: AsyncSession = Depends(deps.get_async_db),
-    embedding_manager: EmbeddingManager = Depends(deps.get_embedding_manager),
-    limit: int = Query(5, ge=1, le=20),
-):
-    """Search memories by query using embeddings."""
-    memories = await embedding_manager.retrieve_relevant_memories(
-        db=db, assistant_id=assistant_id, query=query, limit=limit
-    )
-    return memories
-
-
 async def validate_assistant(
     assistant_id: Annotated[str, Path(...)],
 ) -> str:
-    if not assistant_id.startswith("ast_"):
+    if not assistant_id:
         raise HTTPException(status_code=404, detail="Assistant not found")
     return assistant_id
 

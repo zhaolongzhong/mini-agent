@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     POSTGRES_PORT: Optional[int] = "5432"
     DATABASE_URI: Optional[str] = None
     ACCESS_TOKEN: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
 
     @field_validator("DATABASE_URI", mode="before")
     def assemble_db_connection(cls, v: Optional[str], info: ValidationInfo) -> Any:
@@ -35,7 +37,7 @@ class Settings(BaseSettings):
         )
 
     model_config = SettingsConfigDict(
-        env_file=str(Path(__file__).parent.parent.parent / ".env"),  # src/cue/.env
+        env_file=str(Path(__file__).parent.parent.parent / ".env"),
         env_file_encoding="utf-8",
         from_attributes=True,
         extra="ignore",

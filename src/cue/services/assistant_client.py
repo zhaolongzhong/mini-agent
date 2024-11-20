@@ -18,7 +18,7 @@ class AssistantClient(ResourceClient):
         self._default_assistant_id: Optional[str] = None
 
     async def create(self, assistant: AssistantCreate) -> Assistant:
-        response = await self._http.request("POST", "/assistants/", data=assistant.model_dump())
+        response = await self._http.request("POST", "/assistants", data=assistant.model_dump())
         if not response:
             return
         return Assistant(**response)
@@ -28,7 +28,7 @@ class AssistantClient(ResourceClient):
         return Assistant(**response)
 
     async def list(self, skip: int = 0, limit: int = 100) -> List[Assistant]:
-        response = await self._http.request("GET", f"/assistants/?skip={skip}&limit={limit}")
+        response = await self._http.request("GET", f"/assistants?skip={skip}&limit={limit}")
         return [Assistant(**asst) for asst in response]
 
     async def delete(self, assistant_id: str) -> None:

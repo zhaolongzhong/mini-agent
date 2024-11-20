@@ -72,7 +72,7 @@ class MemoryClient(ResourceClient):
         """Bulk delete multiple memories for an assistant."""
         assistant_id = await self.get_safe_assistant_id(assistant_id)
         response = await self._http.request(
-            "DELETE", f"/assistants/{assistant_id}/memories/", data={"memory_ids": memory_ids}
+            "DELETE", f"/assistants/{assistant_id}/memories", data={"memory_ids": memory_ids}
         )
         return response
 
@@ -92,7 +92,7 @@ class MemoryClient(ResourceClient):
         self.memories_adapter = TypeAdapter(RelevantMemoriesResponse)
         try:
             response = await self._http.request(
-                method="POST", endpoint=f"/assistants/{assistant_id}/memories/search", params=params
+                method="GET", endpoint=f"/assistants/{assistant_id}/memories", params=params
             )
 
             return self.memories_adapter.validate_python(response)

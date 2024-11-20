@@ -23,7 +23,7 @@ anyio==4.6.2.post1
     # via anthropic
     # via httpx
     # via openai
-async-timeout==4.0.3
+async-timeout==5.0.1
     # via aiohttp
     # via asyncpg
 asyncpg==0.29.0
@@ -60,7 +60,7 @@ filelock==3.16.1
 frozenlist==1.5.0
     # via aiohttp
     # via aiosignal
-google-api-core==2.22.0
+google-api-core==2.23.0
     # via google-api-python-client
 google-api-python-client==2.137.0
     # via cue
@@ -74,13 +74,13 @@ google-auth-httplib2==0.2.0
     # via google-api-python-client
 google-auth-oauthlib==1.2.1
     # via cue
-googleapis-common-protos==1.65.0
+googleapis-common-protos==1.66.0
     # via google-api-core
 greenlet==3.1.1
     # via cue
 h11==0.14.0
     # via httpcore
-httpcore==1.0.6
+httpcore==1.0.7
     # via httpx
 httplib2==0.22.0
     # via google-api-python-client
@@ -93,7 +93,7 @@ idna==3.10
     # via httpx
     # via requests
     # via yarl
-jiter==0.7.0
+jiter==0.7.1
     # via anthropic
     # via openai
 lxml==4.9.4
@@ -194,7 +194,7 @@ urllib3==2.2.3
     # via blobfile
     # via docker
     # via requests
-websockets==14.0
+websockets==14.1
     # via cue
-yarl==1.17.1
+yarl==1.17.2
     # via aiohttp

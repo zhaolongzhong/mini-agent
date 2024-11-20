@@ -228,8 +228,7 @@ class ServiceManager:
             raise
 
     async def _create_default_assistant(self):
-        if "localhost" in self.base_url:
-            assistant_id = await self.assistants.create_default_assistant()
-            self.memories.set_default_assistant_id(assistant_id)
-            conversation_id = await self.conversations.create_default_conversation()
-            self.messages.set_default_conversation_id(conversation_id)
+        assistant_id = await self.assistants.create_default_assistant()
+        self.memories.set_default_assistant_id(assistant_id)
+        conversation_id = await self.conversations.create_default_conversation()
+        self.messages.set_default_conversation_id(conversation_id)

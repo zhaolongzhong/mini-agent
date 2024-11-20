@@ -5,6 +5,7 @@ from typing_extensions import runtime_checkable
 
 import aiohttp
 from httpx import HTTPError
+from aiohttp.client_ws import ClientWSTimeout
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
                 )
 
                 self.ws = await self.session.ws_connect(
-                    ws_url_with_params, headers=headers, heartbeat=30.0, timeout=30.0
+                    ws_url_with_params, headers=headers, heartbeat=30.0, timeout=ClientWSTimeout(ws_close=30.0)
                 )
 
                 self._connected = True

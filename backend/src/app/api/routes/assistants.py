@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/assistants/", response_model=list[schemas.Assistant])
+@router.get("", response_model=list[schemas.Assistant])
 async def read_assistants(
     db: AsyncSession = Depends(deps.get_async_db),
     skip: int = 0,
@@ -25,7 +25,7 @@ async def read_assistants(
     return assistants
 
 
-@router.post("/", response_model=schemas.Assistant)
+@router.post("", response_model=schemas.Assistant)
 async def create_assistant(
     *,
     db: AsyncSession = Depends(deps.get_async_db),

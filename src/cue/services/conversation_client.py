@@ -24,7 +24,7 @@ class ConversationClient(ResourceClient):
         metadata: Optional[dict] = None,
     ) -> Conversation:
         data = ConversationCreate(title=title, metadata=metadata or {}).model_dump()
-        response = await self._http.request("POST", "/conversations/", data=data)
+        response = await self._http.request("POST", "/conversations", data=data)
         return Conversation(**response)
 
     async def get(self, conversation_id: str) -> Conversation:
@@ -32,7 +32,7 @@ class ConversationClient(ResourceClient):
         return Conversation(**response)
 
     async def list(self, skip: int = 0, limit: int = 50) -> List[Conversation]:
-        response = await self._http.request("GET", f"/conversations/?skip={skip}&limit={limit}")
+        response = await self._http.request("GET", f"/conversations?skip={skip}&limit={limit}")
         return [Conversation(**conv) for conv in response]
 
     async def update(self, conversation_id: str, update_data: ConversationUpdate) -> Conversation:
