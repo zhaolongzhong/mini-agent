@@ -20,6 +20,7 @@ class MessagePayloadBase(BaseModel):
     sender: Optional[str] = Field(None, description="Sender identifier")
     recipient: Optional[str] = Field(None, description="Recipient identifier")
     websocket_request_id: Optional[str] = Field(None, description="Request tracking ID")
+    metadata: Optional[dict] = Field(None, description="Metadata related to the message")
 
     model_config = ConfigDict(frozen=True)
 
@@ -29,10 +30,8 @@ class GenericMessagePayload(MessagePayloadBase):
 
 
 class MessagePayload(MessagePayloadBase):
-    # content: Optional[str] = None
     user_id: Optional[str] = None
     payload: Optional[dict] = None
-    role: str = "user"
 
 
 class ClientEventPayload(MessagePayloadBase):

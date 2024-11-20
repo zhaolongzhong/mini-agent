@@ -5,7 +5,7 @@ from typing import Any, Dict, Callable, Optional
 from websockets.exceptions import WebSocketException
 
 from src.app.core.config import get_settings
-from src.app.core.security import create_access_token, create_assistant_token
+from src.app.core.security import create_access_token
 from src.app.schemas.event_message import (
     EventMessage,
     EventMessageType,
@@ -44,12 +44,7 @@ class ClientWrapper:
 
     def login(self) -> str:
         """Generate new access token"""
-        if self.assistant_id:
-            self.access_token = create_assistant_token(
-                settings=get_settings(), user_id=self.user_id, assistant_id=self.assistant_id
-            )
-        else:
-            self.access_token = create_access_token(settings=get_settings(), subject=self.user_id)
+        self.access_token = create_access_token(settings=get_settings(), subject=self.user_id)
         return self.access_token
 
     def connect(self) -> None:
@@ -61,6 +56,8 @@ class ClientWrapper:
             self.login()
 
         url = f"/api/v1/ws/{self.client_id}"
+        if self.assistant_id:
+            url += f"?runner_id={self.assistant_id}"
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
         try:

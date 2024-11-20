@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from rich.text import Text
 
-from ..utils import DebugUtils, console_utils, generate_run_id
+from ..utils import DebugUtils, console_utils
 from ..config import get_settings
 from ..schemas import RunMetadata, CompletionResponse
 from ..utils.logs import setup_logging
@@ -30,7 +30,8 @@ class CLI:
         self.enable_services = False
         self.enable_debug_turn = args.enable_debug_turn
         self.mode = self.determine_mode(args)
-        self.runner_id = args.runner_id if hasattr(args, "runner_id") else None
+        self.runner_id = args.runner_id if hasattr(args, "runner_id") else "default"
+        self.run_metadata: Optional[RunMetadata] = None
 
     def determine_mode(self, args) -> str:
         """
@@ -87,14 +88,21 @@ class CLI:
         # Get the current running loop
         self.loop = asyncio.get_running_loop()
 
+        self.run_metadata = RunMetadata(
+            runner_name=self.runner_id,
+            mode=self.mode,
+            enable_turn_debug=self.enable_debug_turn,
+            enable_services=self.enable_services,
+        )
+
         # Create executor only if needed (not in runner mode)
-        if self.mode != "runner":
+        if self.run_metadata.mode != "runner":
             self.executor = ThreadPoolExecutor(thread_name_prefix="cli_executor")
 
         # Initialize agent manager
-        self.agent_manager = AgentManager(prompt_callback=self.handle_prompt, loop=self.loop, mode=self.mode)
+        self.agent_manager = AgentManager(prompt_callback=self.handle_prompt, loop=self.loop)
 
-        if self.mode != "client":
+        if self.run_metadata.mode != "client":
             # Initialize other components
             self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
             self.primary_agent_config = self.agent_provider.get_primary_agent()
@@ -107,12 +115,11 @@ class CLI:
             self.agent_manager.active_agent = self.agent_manager.primary_agent
 
         # Initialize the agent manager
-        await self.agent_manager.initialize()
+        await self.agent_manager.initialize(self.run_metadata)
 
         # Trigger bootstrap sequence for primary agent in CLI mode
         # if self.mode == "cli" and self.agent_manager.primary_agent:
         #     bootstrap_metadata = RunMetadata(
-        #         run_id=generate_run_id(),
         #         enable_turn_debug=False,
         #     )
         #     # Send bootstrap message to trigger bootstrap sequence
@@ -149,13 +156,7 @@ class CLI:
 
             self.logger.debug("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
 
-            run_metadata = RunMetadata(
-                run_id=generate_run_id(),
-                enable_turn_debug=self.enable_debug_turn,
-                enable_services=self.enable_services,
-            )
-
-            if self.mode == "runner":
+            if self.run_metadata.mode == "runner":
                 # In runner mode, just keep the agent alive and process websocket messages
                 self.logger.info("Running in runner mode - waiting for websocket messages...")
                 try:
@@ -217,16 +218,16 @@ class CLI:
 
                     # Process user input
                     self.logger.debug(f"Processing user input: {user_input}")
-                    run_metadata.user_messages.append(f"{user_input}")
+                    self.run_metadata.user_messages.append(f"{user_input}")
                     DebugUtils.log_chat({"user": user_input})
 
-                    if self.mode == "client":
+                    if self.run_metadata.mode == "client":
                         await self.send_message(user_input)
                     else:
                         if not self.agent_manager.active_agent:
                             raise Exception("No active agent found")
                         active_agent_id = self.agent_manager.active_agent.id
-                        await self.run_loop(active_agent_id, user_input, run_metadata)
+                        await self.run_loop(active_agent_id, user_input, self.run_metadata)
 
                 except asyncio.CancelledError:
                     raise

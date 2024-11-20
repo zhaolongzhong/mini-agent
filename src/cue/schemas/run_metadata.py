@@ -1,12 +1,15 @@
-from typing import List
+from uuid import uuid4
+from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import Field, BaseModel
 
 
 class RunMetadata(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))  # unique id for identify runner
+    runner_name: Optional[str] = "default"
+    mode: Optional[str] = "cli"
     last_user_message: str = ""
     user_messages: List[str] = []
-    run_id: str = ""
     max_turns: int = 30  # maximum turns per run
     current_turn: int = 0
     enable_turn_debug: bool = False  # enable debug for each turn

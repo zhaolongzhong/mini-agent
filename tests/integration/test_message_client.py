@@ -6,8 +6,8 @@ from datetime import datetime
 import pytest
 import pytest_asyncio
 
+from cue.schemas import Author, Content, RunMetadata, MessageCreate
 from cue.services import MessageClient, ServiceManager, AssistantClient, ConversationClient
-from cue.schemas.message import Author, Content, MessageCreate
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 @pytest_asyncio.fixture
 async def service_manager() -> AsyncGenerator[ServiceManager, None]:
     """Fixture to create and manage the ServiceManager instance."""
-    service_manager = await ServiceManager.create()
+    service_manager = await ServiceManager.create(run_metadata=RunMetadata())
     await service_manager.connect()
     try:
         yield service_manager

@@ -1,4 +1,3 @@
-import uuid
 import asyncio
 import logging
 from typing import Any, Dict, List, Callable, Optional
@@ -31,13 +30,11 @@ class AgentManager:
         self,
         prompt_callback=None,
         loop: Optional[asyncio.AbstractEventLoop] = None,
-        mode: str = "cli",
     ):
         logger.info("AgentManager initialized")
         self.prompt_callback = prompt_callback
         self.loop = loop or asyncio.get_event_loop()
         self.agent_loop = AgentLoop()
-        self.mode = mode
         self._agents: Dict[str, Agent] = {}
         self.active_agent: Optional[Agent] = None
         self.primary_agent: Optional[Agent] = None
@@ -49,16 +46,19 @@ class AgentManager:
         self.execute_run_task: Optional[asyncio.Task] = None
         self.stop_run_event: asyncio.Event = asyncio.Event()
 
-    async def initialize(self):
-        logger.debug(f"initialize mode: {self.mode}")
+    async def initialize(self, run_metadata: Optional[RunMetadata] = RunMetadata()):
+        logger.debug(f"initialize mode: {run_metadata.mode}")
+        self.run_metadata = run_metadata
         if self.primary_agent:
             feature_flag = self.primary_agent.config.feature_flag
         else:
             feature_flag = FeatureFlag()
-        if self.mode in ["cli", "runner", "client"]:
-            feature_flag.enable_services = True
+
+        if feature_flag.enable_services or run_metadata.mode in "client":
             self.service_manager = await ServiceManager.create(
-                feature_flag=feature_flag, mode=self.mode, on_message=self.handle_message
+                run_metadata=self.run_metadata,
+                feature_flag=feature_flag,
+                on_message=self.handle_message,
             )
             await self.service_manager.connect()
 
@@ -85,7 +85,6 @@ class AgentManager:
         logger.info("All agents cleaned up and removed.")
 
     async def initialize_run(self):
-        self.run_metadata = RunMetadata()
         if not self.tool_manager:
             memory_client = self.service_manager.memories if self.service_manager else None
             self.tool_manager = ToolManager(memory_client)
@@ -94,7 +93,7 @@ class AgentManager:
         self,
         active_agent_id: str,
         message: str,
-        run_metadata: RunMetadata = RunMetadata(),
+        run_metadata: RunMetadata,
         callback: Optional[Callable[[CompletionResponse], Any]] = None,
     ) -> Optional[CompletionResponse]:
         """Queue a message for processing with optional callback."""
@@ -111,7 +110,7 @@ class AgentManager:
         # Start execute_run if not already running
         if not callback:
             callback = self.handle_response
-        if self.mode == "runner":
+        if self.run_metadata.mode == "runner":
             # in runner mode, it should be called once
             if not self.execute_run_task or self.execute_run_task.done():
                 self.execute_run_task = asyncio.create_task(self._execute_run(callback))
@@ -230,34 +229,14 @@ class AgentManager:
         logger.debug("broadcast assistant message")
         if not self.service_manager:
             return
-
-        msg = EventMessage(
-            type=EventMessageType.ASSISTANT,
-            payload=MessagePayload(
-                role="assistant",
-                message=completion_response.get_text(),
-                recipient="default_user_id",
-                websocket_request_id=str(uuid.uuid4()),
-            ),
-            websocket_request_id=str(uuid.uuid4()),
-        )
-        await self.service_manager.broadcast(msg.model_dump_json())
+        await self.service_manager.send_message_to_user(completion_response)
 
     async def broadcast_user_message(self, user_input: str) -> None:
         """Broadcast user message through websocket"""
+        if not self.service_manager:
+            logger.debug("services is not enabled")
         logger.debug(f"broadcast user message: {user_input}")
-        websocket_request_id = str(uuid.uuid4())
-        msg = EventMessage(
-            type=EventMessageType.USER,
-            payload=MessagePayload(
-                role="user",
-                message=user_input,
-                recipient="default_assistant_id",
-                websocket_request_id=websocket_request_id,
-            ),
-            websocket_request_id=websocket_request_id,
-        )
-        await self.service_manager.broadcast(msg.model_dump_json())
+        await self.service_manager.send_message_to_assistant(user_input)
 
     async def handle_message(self, event: EventMessage) -> None:
         """Receive message from websocket"""
@@ -273,8 +252,9 @@ class AgentManager:
                 else:
                     # Start a new run
                     logger.debug("handle_message - User message queued for processing.")
+                    self.run_metadata.user_messages.append(user_message)
                     await self.start_run(
-                        self.active_agent.id, user_message, RunMetadata(), callback=self.handle_response
+                        self.active_agent.id, user_message, self.run_metadata, callback=self.handle_response
                     )
             else:
                 logger.debug(f"Receive unexpected event: {event}")

@@ -7,7 +7,7 @@ def generate_id(prefix: str = "", length: int = 21) -> str:
     return f"{prefix}{uuid.uuid4().hex[:length]}"
 
 
-def generate_run_id(include_timestamp: bool = True) -> str:
+def generate_run_id(include_timestamp: bool = False) -> str:
     """
     Generate a run ID with optional timestamp.
 

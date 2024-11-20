@@ -3,7 +3,6 @@ import logging
 import pytest
 
 from cue import Tool, AgentConfig, RunMetadata, AgentManager
-from cue.schemas.feature_flag import FeatureFlag
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,6 @@ class TestClientManager:
             instruction="Your name is agent_a",
             model=default_chat_model,
             tools=[Tool.Coordinate],
-            feature_flag=FeatureFlag(is_test=True),
         )
 
         agent_b_config = AgentConfig(
@@ -30,17 +28,16 @@ class TestClientManager:
             instruction="Your name is agent_b",
             model=default_chat_model,
             tools=[Tool.Edit, Tool.Coordinate],
-            feature_flag=FeatureFlag(is_test=True),
         )
         agent_a = agent_manager.register_agent(agent_a_config)
         agent_manager.register_agent(agent_b_config)
-        await agent_manager.initialize()
+        await agent_manager.initialize(run_metadata=RunMetadata(max_turns=10))
 
         try:
             file_name = "fibo.py"
             file_path = tmp_path / file_name
             instruction = f"Can you create a fibonacci function named fibonacci at {file_path}?"
-            response = await agent_manager.start_run(agent_a.id, instruction, run_metadata=RunMetadata(max_turns=10))
+            response = await agent_manager.start_run(agent_a.id, instruction)
             logger.debug(f"Response: {response}")
             assert response is not None, "Expected a non-None response."
             assert file_path.exists(), f"Expected file '{file_path}' to be created."

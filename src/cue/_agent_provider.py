@@ -21,7 +21,7 @@ main_agent = AgentConfig(
     max_tokens=5000,
     max_context_tokens=12000,
     tools=[Tool.Edit, Tool.Bash, Tool.Memory, Tool.Coordinate],
-    feature_flag=FeatureFlag(enable_storage=False),
+    feature_flag=FeatureFlag(enable_services=True, enable_storage=True),
 )
 
 agent_o = AgentConfig(

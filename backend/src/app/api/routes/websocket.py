@@ -29,12 +29,11 @@ async def websocket_endpoint(
     client_id: str,
     connection_manager: ConnectionManager = Depends(deps.get_connection_manager),
 ):
-    user_id, assistant_id = await deps.get_current_user_and_assistant(websocket, get_settings())
+    user_id = await deps.authenticate_websocket_user(websocket, get_settings())
     if not user_id:
         await websocket.close(code=4001)
         return
-    if not assistant_id:
-        assistant_id = websocket.query_params.get("assistant_id", "").strip()
+    runner_id = websocket.query_params.get("runner_id", "").strip()
 
     await websocket.accept()
 
@@ -44,7 +43,7 @@ async def websocket_endpoint(
         session_id = await connection_manager.connect(
             client_id=client_id,
             user_id=user_id,
-            participant_id=assistant_id if assistant_id else user_id,
+            participant_id=runner_id if runner_id else user_id,
             websocket=websocket,
         )
 
@@ -52,7 +51,7 @@ async def websocket_endpoint(
         if session_id:
             await connection_manager.broadcast_connection_event(
                 client_id=client_id,
-                sender_id=assistant_id if assistant_id else user_id,
+                sender_id=runner_id if runner_id else user_id,
                 recipients=list(notification_recipient_ids),
                 is_connect=True,
             )
@@ -66,10 +65,13 @@ async def websocket_endpoint(
                 event_message = EventMessage(
                     **message_data,
                 )
+                recipient = event_message.payload.recipient if event_message.payload.recipient else user_id
                 event_message = event_message.model_copy(
                     update={
                         "client_id": client_id,
-                        "payload": event_message.payload.model_copy(update={"user_id": user_id}),
+                        "payload": event_message.payload.model_copy(
+                            update={"user_id": user_id, "recipient": recipient}
+                        ),
                     }
                 )
 
@@ -81,19 +83,28 @@ async def websocket_endpoint(
                     )
                     await connection_manager.send_personal_message(response.model_dump_json(), session_id)
                 elif event_type in (EventMessageType.USER, EventMessageType.ASSISTANT):
-                    success, reason = await connection_manager.send_message(message=event_message)
+                    results = await connection_manager.send_message(message=event_message)
+                    success = True
+                    msg = ""
+                    for status, error in results:
+                        if not status:
+                            success = False
+                            msg += error
+
                     if not success:
-                        logger.warning(f"Could not deliver message. {reason}")
-                        # Optionally, send a message back to the sender indicating the recipient is offline
+                        logger.warning(f"Could not deliver message. {msg}")
                         offline_message = EventMessage(
                             client_id=client_id,
                             type=EventMessageType.GENERIC,
                             payload=ClientEventPayload(
                                 client_id=client_id,
-                                message=reason,
+                                message=msg,
                             ),
                         )
-                        await connection_manager.send_personal_message(offline_message.model_dump_json(), session_id)
+                        await connection_manager.send_personal_message(
+                            offline_message.model_dump_json(),
+                            session_id,
+                        )
                         continue
 
                 else:
@@ -118,7 +129,7 @@ async def websocket_endpoint(
             client_id=client_id,
             session_id=session_id,
             user_id=user_id,
-            assistant_id=assistant_id,
+            runner_id=runner_id,
         )
     except Exception as e:
         logger.error(f"Unexpected error with WebSocket for user '{user_id}': {e}")
@@ -127,7 +138,7 @@ async def websocket_endpoint(
             client_id=client_id,
             session_id=session_id,
             user_id=user_id,
-            assistant_id=assistant_id,
+            runner_id=runner_id,
         )
 
 
@@ -136,12 +147,12 @@ async def handle_disconnect(
     client_id: str,
     session_id: str,
     user_id: str,
-    assistant_id: Optional[str] = None,
+    runner_id: Optional[str] = None,
 ) -> None:
     notification_recipient_ids = await connection_manager.disconnect(session_id=session_id)
     await connection_manager.broadcast_connection_event(
         client_id=client_id,
-        sender_id=assistant_id if assistant_id else user_id,
+        sender_id=runner_id if runner_id else user_id,
         recipients=notification_recipient_ids,
         is_connect=False,
     )

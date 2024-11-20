@@ -39,11 +39,16 @@ class ResourceClient:
 class AioHTTPTransport(HTTPTransport):
     """AIOHTTP implementation of HTTP transport"""
 
-    def __init__(self, base_url: str, session: Optional[aiohttp.ClientSession] = None):
+    def __init__(self, base_url: str, access_token: str, session: Optional[aiohttp.ClientSession] = None):
         self.base_url = base_url
+        self.access_token = access_token
         self.is_server_available = False
+        self.headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.access_token}",
+        }
         self.session = session or aiohttp.ClientSession(
-            headers={"accept": "application/json", "Content-Type": "application/json"},
             timeout=aiohttp.ClientTimeout(total=30),
         )
 
@@ -54,7 +59,9 @@ class AioHTTPTransport(HTTPTransport):
             return
         url = f"{self.base_url}{endpoint}"
         try:
-            async with getattr(self.session, method.lower())(url, json=data, params=params) as response:
+            async with getattr(self.session, method.lower())(
+                url, json=data, params=params, headers=self.headers
+            ) as response:
                 if response.status >= 400:
                     error_data = await response.json()
                     logger.error(f"HTTP {response.status}: {error_data}")
@@ -79,7 +86,7 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
         ws_url: str,
         client_id: str,
         access_token: str,
-        assistant_id: Optional[str] = None,
+        runner_id: Optional[str] = None,
         session: Optional[aiohttp.ClientSession] = None,
         max_retries: int = 3,
         retry_delay: float = 1.0,
@@ -89,7 +96,7 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
         self.ws: Optional[aiohttp.ClientWebSocketResponse] = None
         self.client_id = client_id
         self.access_token = access_token
-        self.assistant_id = assistant_id
+        self.runner_id = runner_id
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self._connected = False
@@ -109,8 +116,8 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
                 }
 
                 ws_url_with_params = f"{self.ws_url}/{self.client_id}"
-                if self.assistant_id:
-                    ws_url_with_params += f"?assistant_id={self.assistant_id}"
+                if self.runner_id:
+                    ws_url_with_params += f"?runner_id={self.runner_id}"
                 logger.debug(
                     f"Attempting WebSocket connection to {ws_url_with_params} (attempt {attempt + 1}/{self.max_retries})"
                 )

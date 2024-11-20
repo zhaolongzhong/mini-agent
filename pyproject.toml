@@ -37,7 +37,7 @@ dependencies = [
     "pypdf==4.3.1",
     "docker>=7.1",
     "tqdm>=4.66.5",
-    "aiohttp==3.10.5",
+    "aiohttp==3.11.6",
     "websockets>=13.1",
     "tenacity>=9.0.0",
     "psutil>=6.1.0",

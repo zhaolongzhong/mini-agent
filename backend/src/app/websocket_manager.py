@@ -253,9 +253,11 @@ class ConnectionManager:
     async def can_message(self, sender_id: str, recipient_id: str) -> bool:
         """Check if sender can message recipient based on their relationship."""
         async with self.lock:
+            if "all" in recipient_id:
+                return True
             return recipient_id in self.relationships.get(sender_id, set())
 
-    async def send_message(self, message: EventMessage) -> tuple[bool, Optional[str]]:
+    async def send_message(self, message: EventMessage) -> list[tuple[bool, Optional[str]]]:
         """Send message if allowed by relationship."""
         payload = message.payload
         sender_user_id = payload.user_id
@@ -263,9 +265,18 @@ class ConnectionManager:
         if not await self.can_message(sender_user_id, recipient):
             msg = f"Message blocked: '{sender_user_id}' cannot message '{recipient}'"
             logger.warning(msg)
-            return False, msg
+            return [(False, msg)]
 
-        return await self.broadcast_message(message=message.model_dump_json(), user_id=recipient)
+        results = []
+        if "all" in recipient:
+            recipients = self.relationships.get(sender_user_id, set())
+            for recipient in recipients:
+                status, msg = await self.broadcast_message(message=message.model_dump_json(), user_id=recipient)
+                results.append((status, msg))
+        else:
+            status, msg = await self.broadcast_message(message=message.model_dump_json(), user_id=recipient)
+            results.append((status, msg))
+        return results
 
     async def broadcast_connection_event(
         self, client_id: str, sender_id: str, recipients: Optional[list[str]] = None, is_connect: bool = True
@@ -282,7 +293,7 @@ class ConnectionManager:
         if not recipients:
             return
         event_type = EventMessageType.CLIENT_CONNECT if is_connect else EventMessageType.CLIENT_DISCONNECT
-        action_word = "connected" if is_connect else "disconnected"
+        action_state = "connected" if is_connect else "disconnected"
 
         event_message = EventMessage(
             type=event_type,
@@ -290,7 +301,7 @@ class ConnectionManager:
             payload=ClientEventPayload(
                 client_id=client_id,
                 sender=sender_id,
-                message=f"Participant '{sender_id}' {action_word} successfully: active_connections: {self.connections}, active_users: {self.user_sessions}, relationship: {self.relationships} ",
+                message=f"Participant '{sender_id}' {action_state} successfully: active_connections: {self.connections}, active_users: {self.user_sessions}, relationship: {self.relationships} ",
             ),
         )
         message_text = event_message.model_dump_json()

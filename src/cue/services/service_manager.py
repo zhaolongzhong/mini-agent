@@ -1,4 +1,5 @@
 import json
+import uuid
 import asyncio
 import logging
 import platform
@@ -6,8 +7,10 @@ from typing import Callable, Optional, Awaitable
 
 import aiohttp
 from aiohttp import ClientResponseError, ClientConnectionError
+from pydantic import BaseModel
 
 from ..config import get_settings
+from ..schemas import FeatureFlag, RunMetadata, CompletionResponse
 from .transport import (
     AioHTTPTransport,
     AioHTTPWebSocketTransport,
@@ -17,8 +20,7 @@ from .message_client import MessageClient
 from .assistant_client import AssistantClient
 from .websocket_manager import WebSocketManager
 from .conversation_client import ConversationClient
-from ..schemas.feature_flag import FeatureFlag
-from ..schemas.event_message import EventMessage
+from ..schemas.event_message import EventMessage, MessagePayload, EventMessageType
 
 logger = logging.getLogger(__name__)
 
@@ -28,31 +30,39 @@ class ServiceManager:
 
     def __init__(
         self,
+        run_metadata: RunMetadata,
         feature_flag: FeatureFlag,
-        mode: str,
         base_url: str,
         session: aiohttp.ClientSession,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
     ):
+        self.run_metadata = run_metadata
         self.feature_flag = feature_flag
-        self.mode = mode
         self.base_url = base_url
-        client_id_prefix = self.mode
         self.access_token = get_settings().ACCESS_TOKEN
-        self.assistant_id = "" if self.mode == "client" else "default_assistant_id"
-        self.client_id = f"cl_{client_id_prefix}_default_client_id"
+        self.client_id = self.run_metadata.id
+        self.user_id: Optional[str] = None
+        self.assistant_id: Optional[str] = "default_assistant_id"
         self.is_server_available = False
         if platform.system() != "Darwin" and "http://localhost" in self.base_url:
             self.base_url = self.base_url.replace("http://localhost", "http://host.docker.internal")
         self._session = session
         self.on_message = on_message
+        self.recipient: Optional[str] = None  # either user id or assistant runner id
+        if self.run_metadata.mode != "client":
+            if self.assistant_id:
+                self.runner_id = self.assistant_id
+            else:
+                self.runner_id = self.run_metadata.id
+        else:
+            self.runner_id: Optional[str] = None
 
-        self._http = AioHTTPTransport(self.base_url, self._session)
+        self._http = AioHTTPTransport(base_url=self.base_url, access_token=self.access_token, session=self._session)
         self._ws = AioHTTPWebSocketTransport(
             ws_url=self.base_url.replace("http", "ws") + "/ws",
             client_id=self.client_id,
             access_token=self.access_token,
-            assistant_id=self.assistant_id,
+            runner_id=self.runner_id if self.run_metadata.mode != "client" else None,
             session=self._session,
         )
 
@@ -79,15 +89,21 @@ class ServiceManager:
     @classmethod
     async def create(
         cls,
+        run_metadata: RunMetadata,
         feature_flag: Optional[FeatureFlag] = FeatureFlag(),
-        mode: Optional[str] = "cli",
         base_url: Optional[str] = None,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
     ):
         settings = get_settings()
         base_url = base_url or settings.API_URL
         session = aiohttp.ClientSession()
-        return cls(feature_flag, mode, base_url, session, on_message)
+        return cls(
+            run_metadata=run_metadata,
+            feature_flag=feature_flag,
+            base_url=base_url,
+            session=session,
+            on_message=on_message,
+        )
 
     async def close(self) -> None:
         """Close all connections"""
@@ -121,8 +137,41 @@ class ServiceManager:
             return
         await self._ws_manager.send_message(message)
 
+    async def send_message_to_assistant(self, message: str) -> None:
+        websocket_request_id = str(uuid.uuid4())
+        msg = EventMessage(
+            type=EventMessageType.USER,
+            payload=MessagePayload(
+                message=message,
+                recipient="all",
+                websocket_request_id=websocket_request_id,
+                metadata={"author": {"role": "user"}, "recipient": self.assistant_id},
+            ),
+            websocket_request_id=websocket_request_id,
+        )
+        await self.broadcast(msg.model_dump_json())
+
+    async def send_message_to_user(self, message: CompletionResponse) -> None:
+        msg = EventMessage(
+            type=EventMessageType.ASSISTANT,
+            payload=MessagePayload(
+                message=message.get_text(),
+                sender=self.run_metadata.id,
+                recipient="",  # empty or user id
+                payload=message.response.model_dump()
+                if message.response and isinstance(message.response, BaseModel)
+                else None,
+                websocket_request_id=str(uuid.uuid4()),
+                metadata={"author": {"role": "assistant", "name": self.assistant_id}},
+            ),
+            websocket_request_id=str(uuid.uuid4()),
+        )
+        await self.broadcast(msg.model_dump_json())
+
     async def _handle_client_connect(self, message: EventMessage) -> None:
-        logger.info(f"Client {message.payload.client_id} event: {message}")
+        if message.type == EventMessageType.CLIENT_CONNECT:
+            self.user_id = message.payload.user_id
+        logger.info(f"Client connect event {message.payload.client_id} event: {message.model_dump_json(indent=4)}")
 
     async def _handle_ping(self, message: EventMessage) -> None:
         logger.debug(f"Received ping message: {message}")
@@ -179,7 +228,8 @@ class ServiceManager:
             raise
 
     async def _create_default_assistant(self):
-        assistant_id = await self.assistants.create_default_assistant()
-        self.memories.set_default_assistant_id(assistant_id)
-        conversation_id = await self.conversations.create_default_conversation()
-        self.messages.set_default_conversation_id(conversation_id)
+        if "localhost" in self.base_url:
+            assistant_id = await self.assistants.create_default_assistant()
+            self.memories.set_default_assistant_id(assistant_id)
+            conversation_id = await self.conversations.create_default_conversation()
+            self.messages.set_default_conversation_id(conversation_id)

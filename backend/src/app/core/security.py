@@ -47,26 +47,3 @@ def generate_random_password(length: int = 12) -> str:
             and any(c in string.punctuation for c in password)
         ):
             return password
-
-
-def create_assistant_token(settings: Settings, user_id: str, assistant_id: str, expires_delta: timedelta = None) -> str:
-    """
-    Create a JWT token for assistant access
-
-    Args:
-        settings: Application settings containing SECRET_KEY
-        user_id: ID of the user
-        assistant_id: ID of the assistant
-        expires_delta: Optional custom expiration time
-    """
-    expire = datetime.now(timezone.utc) + (
-        expires_delta if expires_delta else timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-
-    to_encode = {
-        "sub": str(user_id),
-        "aid": str(assistant_id),
-        "exp": expire,
-        "iat": datetime.now(timezone.utc),
-    }
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
