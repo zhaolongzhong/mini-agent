@@ -20,7 +20,7 @@ from .message_client import MessageClient
 from .assistant_client import AssistantClient
 from .websocket_manager import WebSocketManager
 from .conversation_client import ConversationClient
-from ..schemas.event_message import EventMessage, MessagePayload, EventMessageType
+from ..schemas.event_message import EventMessage, MessagePayload, EventMessageType, ClientEventPayload
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,7 @@ class ServiceManager:
             message_handlers={
                 "client_disconnect": self._handle_client_connect,
                 "client_connect": self._handle_client_connect,
+                "client_status": self._handle_client_connect,
                 "ping": self._handle_ping,
                 "pong": self._handle_pong,
                 "generic": self._handle_generic,
@@ -168,9 +169,24 @@ class ServiceManager:
         )
         await self.broadcast(msg.model_dump_json())
 
+    async def broadcast_client_status(self) -> None:
+        msg = EventMessage(
+            type=EventMessageType.CLIENT_STATUS,
+            client_id=self.client_id,
+            payload=ClientEventPayload(
+                client_id=self.client_id,
+                sender="",
+                recipient="",
+                payload={"runner_id": self.runner_id, "assistant_id": self.assistant_id},
+            ),
+        )
+        await self.broadcast(msg.model_dump_json())
+
     async def _handle_client_connect(self, message: EventMessage) -> None:
-        if message.type == EventMessageType.CLIENT_CONNECT:
+        if message.type.value == EventMessageType.CLIENT_CONNECT:
             self.user_id = message.payload.user_id
+            await self.broadcast_client_status()
+
         logger.info(f"Client connect event {message.payload.client_id} event: {message.model_dump_json(indent=4)}")
 
     async def _handle_ping(self, message: EventMessage) -> None:
@@ -178,6 +194,7 @@ class ServiceManager:
 
     async def _handle_pong(self, message: EventMessage) -> None:
         logger.debug(f"Received pong message: {message}.")
+        self._ws.handle_pong(message=message)
 
     async def _handle_generic(self, message: EventMessage) -> None:
         logger.debug(f"Handling generic message: {message}")

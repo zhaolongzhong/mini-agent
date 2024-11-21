@@ -82,6 +82,8 @@ async def websocket_endpoint(
                         payload=PingPongEventPayload(type=EventMessageType.PONG),
                     )
                     await connection_manager.send_personal_message(response.model_dump_json(), session_id)
+                elif event_type == EventMessageType.CLIENT_STATUS:
+                    await connection_manager.send_message(message=event_message)
                 elif event_type in (EventMessageType.USER, EventMessageType.ASSISTANT):
                     results = await connection_manager.send_message(message=event_message)
                     success = True

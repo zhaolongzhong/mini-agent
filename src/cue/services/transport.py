@@ -7,6 +7,8 @@ import aiohttp
 from httpx import HTTPError
 from aiohttp.client_ws import ClientWSTimeout
 
+from .heartbeat import WebSocketHeartbeat
+
 logger = logging.getLogger(__name__)
 
 
@@ -101,6 +103,7 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self._connected = False
+        self.heartbeat = WebSocketHeartbeat(self)
 
     async def connect(self) -> None:
         """Establish WebSocket connection with retry logic and proper error handling"""
@@ -129,6 +132,7 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
 
                 self._connected = True
                 logger.info(f"WebSocket connection established for client {self.client_id}")
+                await self.heartbeat.start()
                 return
 
             except aiohttp.ClientResponseError as e:
@@ -157,6 +161,7 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
         """Safely close the WebSocket connection"""
         if self.ws and not self.ws.closed:
             try:
+                await self.heartbeat.stop()
                 await self.ws.close()
                 self._connected = False
                 logger.info(f"WebSocket connection closed for client {self.client_id}")
@@ -182,3 +187,6 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
         except Exception as e:
             logger.error(f"Error receiving message: {str(e)}")
             raise WebSocketConnectionError(f"Failed to receive message: {str(e)}")
+
+    def handle_pong(self, message: Any):
+        self.heartbeat.pong_received()

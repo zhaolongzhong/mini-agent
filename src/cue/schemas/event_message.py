@@ -10,6 +10,7 @@ class EventMessageType(str, Enum):
     ASSISTANT = "assistant"
     CLIENT_CONNECT = "client_connect"
     CLIENT_DISCONNECT = "client_disconnect"
+    CLIENT_STATUS = "client_status"
     PING = "ping"
     PONG = "pong"
     ERROR = "error"
@@ -21,6 +22,7 @@ class MessagePayloadBase(BaseModel):
     recipient: Optional[str] = Field(None, description="Recipient identifier")
     websocket_request_id: Optional[str] = Field(None, description="Request tracking ID")
     metadata: Optional[dict] = Field(None, description="Metadata related to the message")
+    payload: Optional[dict] = None
 
     model_config = ConfigDict(frozen=True)
 
@@ -31,7 +33,6 @@ class GenericMessagePayload(MessagePayloadBase):
 
 class MessagePayload(MessagePayloadBase):
     user_id: Optional[str] = None
-    payload: Optional[dict] = None
 
 
 class ClientEventPayload(MessagePayloadBase):
