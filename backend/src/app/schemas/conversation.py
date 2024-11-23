@@ -5,7 +5,7 @@ from pydantic import Field, BaseModel
 
 
 class Metadata(BaseModel):
-    pass
+    is_primary: bool | None = False
 
 
 # Shared properties
@@ -16,6 +16,7 @@ class ConversationBase(BaseModel):
 
 class ConversationCreate(BaseModel):
     title: str | None = None
+    assistant_id: str | None = None
     metadata: Metadata | None = None
 
 

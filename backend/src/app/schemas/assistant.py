@@ -1,11 +1,17 @@
 import uuid
+from typing import Optional
 from datetime import datetime
 
 from pydantic import Field, BaseModel
 
 
+class Metadata(BaseModel):
+    is_primary: bool = False
+
+
 class AssistantBase(BaseModel):
     name: str
+    metadata: Optional[Metadata] = None
 
 
 class AssistantCreate(AssistantBase):

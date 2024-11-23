@@ -14,6 +14,7 @@ default_model = ChatModel.GPT_4O_MINI.id
 
 main_agent = AgentConfig(
     id="main",
+    name="main",
     is_primary=True,
     description="Is main task executor and coordinator.",
     instruction="You are primary assistant.",
@@ -28,6 +29,7 @@ main_agent = AgentConfig(
 
 agent_o = AgentConfig(
     id="agent_o",
+    name="agent_o",
     description="Is very good at readoning, analyzing problems, be able to deep dive on a topic.",
     instruction="You are an expert AI assistant with advanced reasoning capabilities.",
     model=ChatModel.O1_MINI.id,
@@ -42,14 +44,6 @@ agent_claude = AgentConfig(
     model=ChatModel.CLAUDE_3_5_SONNET_20241022.id,
     tools=[Tool.Edit],
     api_key=get_settings().ANTHROPIC_API_KEY,
-)
-
-system_operator = AgentConfig(
-    id="system_operator",
-    description="Is system operations specialist, be able to run python code or script, and execute bash command.",
-    instruction="You are able to read file, write content to file, run python code or script, and execute bash command.",
-    model=ChatModel.GPT_4O.id,
-    tools=[Tool.Edit, Tool.Python, Tool.Bash],
 )
 
 browse_agent = AgentConfig(
@@ -83,10 +77,9 @@ class AgentProvider:
     def __init__(self, config_file: Optional[Path] = None):
         self.config_file = config_file
         self._default_configs = {
-            "main": main_agent,
-            "agent_o": agent_o,
+            main_agent.id: main_agent,
+            agent_o.id: agent_o,
             # "agent_claude": agent_claude,
-            # "system_operator": system_operator,
             # "browse_agent": browse_agent,
             # "email_manager": email_agent,
             # "google_drive_manager": drive_agent,
@@ -169,6 +162,7 @@ class AgentProvider:
 
         return AgentConfig(
             id=config_dict.get("id"),
+            client_id=config_dict.get("client_id", None),
             name=config_dict.get("name", "default"),
             description=config_dict.get("description"),
             instruction=config_dict.get("instruction"),
@@ -178,7 +172,7 @@ class AgentProvider:
             is_primary=config_dict.get("is_primary", False),
             temperature=config_dict.get("temperature", 0.7),
             max_tokens=config_dict.get("max_tokens", 1000),
-            feature_flag=FeatureFlag(enable_services=config_dict.get("enable_external_memory", False)),
+            feature_flag=FeatureFlag(**config_dict.get("feature_flag", {})),
         )
 
     @staticmethod

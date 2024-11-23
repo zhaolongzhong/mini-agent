@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import Boolean, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.crud_base import CRUDBaseAsync
@@ -10,7 +10,7 @@ from app.utils.id_generator import generate_id
 class CRUDAssistant(CRUDBaseAsync[Assistant, AssistantCreate, AssistantUpdate]):
     async def create_with_id(self, db: AsyncSession, *, obj_in: AssistantCreate) -> Assistant:
         obj_in_data = obj_in.model_dump(exclude_none=True, exclude_unset=True)
-        db_obj = self.model(**obj_in_data, id=generate_id(prefix="ast_"))
+        db_obj = self.model(**obj_in_data, id=generate_id(prefix="asst_"))
 
         db.add(db_obj)
         await db.commit()
@@ -32,6 +32,14 @@ class CRUDAssistant(CRUDBaseAsync[Assistant, AssistantCreate, AssistantUpdate]):
         Returns None if no assistant with the given name exists.
         """
         stmt = select(self.model).where(self.model.name == name)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_primary(self, db: AsyncSession) -> Assistant | None:
+        """
+        Get primary assistant.
+        """
+        stmt = select(self.model).where(self.model.metadata["is_primary"].astext.cast(Boolean) is True)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 

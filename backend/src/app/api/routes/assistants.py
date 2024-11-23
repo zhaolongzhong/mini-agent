@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import Depends, APIRouter, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,10 +35,14 @@ async def create_assistant(
     Create new assistant. If assistant with same name exists, return it.
     """
     try:
-        obj_in.name = obj_in.name.lower()
         existing_assistant = await crud.assistant.get_by_name(db=db, name=obj_in.name)
         if existing_assistant:
             return existing_assistant
+
+        if obj_in.metadata and obj_in.metadata.is_primary:
+            primary = await crud.assistant.get_primary(db=db)
+            if primary:
+                return primary
 
         assistant = await crud.assistant.create_with_id(db=db, obj_in=obj_in)
         return assistant
@@ -101,3 +105,21 @@ async def delete_assistant(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+
+@router.get("/{assistant_id}/conversations", response_model=list[schemas.Conversation])
+async def read_conversations_by_assistant_id(
+    *,
+    db: AsyncSession = Depends(deps.get_async_db),
+    assistant_id: str,
+    is_primary: Optional[bool] = None,
+    skip: int = 0,
+    limit: int = 50,
+) -> Any:
+    """
+    Retrieve conversations.
+    """
+    conversations = await crud.conversation.get_conversations_by_assistant_id(
+        db=db, assistant_id=assistant_id, is_primary=is_primary, skip=skip, limit=limit
+    )
+    return conversations

@@ -51,10 +51,25 @@ async def create_conversation(
     """
     Create new conversation.
     """
-    obj_in.title = obj_in.title.lower()
     existing_obj = await crud.conversation.get_by_title(db=db, title=obj_in.title)
     if existing_obj:
-        return existing_obj
+        return existing_obj[0]
+
+    if not obj_in.assistant_id:
+        assistant = await crud.assistant.get_primary(db=db)
+        if not assistant:
+            obj_create = schemas.AssistantCreate(name=obj_in.title, metadata=schemas.AssistantMetadata(is_primary=True))
+            assistant = await crud.assistant.create_with_id(
+                db=db,
+                obj_in=obj_create,
+            )
+        obj_in.assistant_id = assistant.id
+    if obj_in.metadata and obj_in.metadata.is_primary:
+        conversation = await crud.conversation.get_conversations_by_assistant_id(
+            db=db, assistant_id=obj_in.assistant_id, is_primary=True
+        )
+        if conversation:
+            return conversation
     conversation = await crud.conversation.create_with_id(db=db, obj_in=obj_in)
     return conversation
 

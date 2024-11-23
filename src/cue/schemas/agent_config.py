@@ -9,6 +9,7 @@ from .feature_flag import FeatureFlag
 class AgentConfig(BaseModel):
     id: Optional[str] = "default_id"
     name: Optional[str] = "default_name"
+    client_id: Optional[str] = "default_client"
     is_primary: Optional[bool] = False
     feedback_path: Optional[Path] = None
     project_context_path: Optional[str] = None

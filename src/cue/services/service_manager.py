@@ -10,7 +10,7 @@ from aiohttp import ClientResponseError, ClientConnectionError
 from pydantic import BaseModel
 
 from ..config import get_settings
-from ..schemas import FeatureFlag, RunMetadata, CompletionResponse
+from ..schemas import AgentConfig, FeatureFlag, RunMetadata, CompletionResponse
 from .transport import (
     AioHTTPTransport,
     AioHTTPWebSocketTransport,
@@ -35,27 +35,26 @@ class ServiceManager:
         base_url: str,
         session: aiohttp.ClientSession,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
+        agent: Optional[AgentConfig] = None,
     ):
         self.run_metadata = run_metadata
         self.feature_flag = feature_flag
         self.base_url = base_url
         self.access_token = get_settings().ACCESS_TOKEN
-        self.client_id = self.run_metadata.id
+        self.agent = agent
+        self.assistant_id: Optional[str] = agent.id if agent else None
+        self.client_id: Optional[str] = agent.client_id if agent else run_metadata.id
         self.user_id: Optional[str] = None
-        self.assistant_id: Optional[str] = "default_assistant_id"
         self.is_server_available = False
         if platform.system() != "Darwin" and "http://localhost" in self.base_url:
             self.base_url = self.base_url.replace("http://localhost", "http://host.docker.internal")
         self._session = session
         self.on_message = on_message
         self.recipient: Optional[str] = None  # either user id or assistant runner id
+        self.runner_id: Optional[str] = None
         if self.run_metadata.mode != "client":
-            if self.assistant_id:
-                self.runner_id = self.assistant_id
-            else:
-                self.runner_id = self.run_metadata.id
-        else:
-            self.runner_id: Optional[str] = None
+            # it will be used as participant so we can find the websocket session of this client by using this id
+            self.runner_id = self.client_id
 
         self._http = AioHTTPTransport(base_url=self.base_url, access_token=self.access_token, session=self._session)
         self._ws = AioHTTPWebSocketTransport(
@@ -94,17 +93,33 @@ class ServiceManager:
         feature_flag: Optional[FeatureFlag] = FeatureFlag(),
         base_url: Optional[str] = None,
         on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
+        agent: Optional[AgentConfig] = None,
     ):
         settings = get_settings()
         base_url = base_url or settings.API_URL
         session = aiohttp.ClientSession()
-        return cls(
+        service_manager = cls(
             run_metadata=run_metadata,
             feature_flag=feature_flag,
             base_url=base_url,
             session=session,
             on_message=on_message,
+            agent=agent,
         )
+        await service_manager.initialize()
+        return service_manager
+
+    async def initialize(self) -> None:
+        try:
+            self.is_server_available = await self._check_server_availability()
+            self._http.is_server_available = self.is_server_available
+            if not self.is_server_available:
+                return
+        except Exception as e:
+            logger.error(f"Server availability check failed: {e}")
+            return
+        if self.feature_flag.enable_storage:
+            await self._create_default_assistant(self.agent.name)
 
     async def close(self) -> None:
         """Close all connections"""
@@ -115,18 +130,10 @@ class ServiceManager:
     async def connect(self) -> None:
         """Establish connection to the service"""
 
-        try:
-            self.is_server_available = await self._check_server_availability()
-            self._http.is_server_available = self.is_server_available
-            if not self.is_server_available:
-                return
-        except Exception as e:
-            logger.error(f"Server availability check failed: {e}")
+        if not self.is_server_available:
+            logger.error("Server is not available.")
             return
         await self._ws_manager.connect()
-
-        if self.feature_flag.enable_storage:
-            await self._create_default_assistant()
 
     async def disconnect(self) -> None:
         """Close all connections"""
@@ -170,6 +177,7 @@ class ServiceManager:
         await self.broadcast(msg.model_dump_json())
 
     async def broadcast_client_status(self) -> None:
+        logger.debug("broadcast client status")
         msg = EventMessage(
             type=EventMessageType.CLIENT_STATUS,
             client_id=self.client_id,
@@ -244,8 +252,10 @@ class ServiceManager:
             logger.error(f"Unexpected error during health check: {e}")
             raise
 
-    async def _create_default_assistant(self):
-        assistant_id = await self.assistants.create_default_assistant()
-        self.memories.set_default_assistant_id(assistant_id)
-        conversation_id = await self.conversations.create_default_conversation()
+    async def _create_default_assistant(self, name: Optional[str] = None):
+        self.assistant_id = await self.assistants.create_default_assistant(name)
+        if not self.assistant_id:
+            raise
+        self.memories.set_default_assistant_id(self.assistant_id)
+        conversation_id = await self.conversations.create_default_conversation(self.assistant_id)
         self.messages.set_default_conversation_id(conversation_id)

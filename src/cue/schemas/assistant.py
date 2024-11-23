@@ -1,4 +1,5 @@
 import uuid
+from typing import Optional
 from datetime import datetime
 
 from pydantic import Field, BaseModel
@@ -6,6 +7,7 @@ from pydantic import Field, BaseModel
 
 class AssistantBase(BaseModel):
     name: str
+    is_primary: Optional[bool] = False
 
 
 class AssistantCreate(AssistantBase):

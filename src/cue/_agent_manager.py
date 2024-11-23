@@ -59,6 +59,7 @@ class AgentManager:
                 run_metadata=self.run_metadata,
                 feature_flag=feature_flag,
                 on_message=self.handle_message,
+                agent=self.primary_agent.config,
             )
             await self.service_manager.connect()
 

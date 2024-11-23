@@ -213,7 +213,8 @@ class DynamicContextManager:
             if self.feature_flag.enable_storage and not skip_persistence:
                 if isinstance(message, (CompletionResponse, ToolResponseWrapper, MessageParam)):
                     try:
-                        persisted_message = await self.message_manager.persist_message(message.to_message_create())
+                        message_create = message.to_message_create()
+                        persisted_message = await self.message_manager.persist_message(message_create)
                         if persisted_message:
                             msg_id = persisted_message.id
                     except Exception as e:

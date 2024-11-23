@@ -20,6 +20,7 @@ class AssistantClient(ResourceClient):
     async def create(self, assistant: AssistantCreate) -> Assistant:
         response = await self._http.request("POST", "/assistants", data=assistant.model_dump())
         if not response:
+            logger.error("Create assistant failed")
             return
         return Assistant(**response)
 
@@ -34,9 +35,11 @@ class AssistantClient(ResourceClient):
     async def delete(self, assistant_id: str) -> None:
         await self._http.request("DELETE", f"/assistants/{assistant_id}")
 
-    async def create_default_assistant(self) -> Optional[str]:
-        """Create a default assistant to persist memories across multiple conversation"""
-        assistant = await self.create(AssistantCreate(name="default"))
+    async def create_default_assistant(self, name: Optional[str] = "default") -> Optional[str]:
+        """
+        Create a default assistant to persist memories across multiple conversation
+        """
+        assistant = await self.create(AssistantCreate(name=name, is_primary=True))
         if not assistant:
             return
         self._default_assistant_id = assistant.id

@@ -1,3 +1,5 @@
+import os
+import asyncio
 import logging
 from typing import Callable, AsyncGenerator
 
@@ -16,38 +18,63 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+base_url = os.environ.get("TEST_BASE_URL", "http://test")
+
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """
+    Create an instance of the default event loop for each test case.
+    Reference: https://github.com/pytest-dev/pytest-asyncio/discussions/587
+    """
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    loop.close()
+
 
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db() -> AsyncGenerator:
-    async with AsyncSessionLocal() as session:
-        yield session
-        await session.rollback()
+@pytest_asyncio.fixture
+async def db() -> AsyncGenerator[AsyncSession, None]:
+    try:
+        async with AsyncSessionLocal() as session:
+            yield session
+            await session.rollback()
+    except Exception as e:
+        logger.error(f"Database session error: {e}")
+        raise
+    finally:
         await session.close()
 
 
-@pytest.fixture()
-def override_get_db(db: AsyncSession) -> Callable:
-    # Reference: https://rogulski.it/blog/sqlalchemy-14-async-orm-with-fastapi/
+@pytest_asyncio.fixture
+async def override_get_db(db: AsyncSession) -> AsyncGenerator[Callable, None]:
     async def _override_get_db():
-        yield db
+        try:
+            yield db
+        except Exception as e:
+            logger.error(f"Override get_db error: {e}")
+            raise
 
-    return _override_get_db
+    yield _override_get_db
 
 
-@pytest.fixture()
-def main_app(override_get_db: Callable) -> FastAPI:
-    # from src.app.main import app
-
+@pytest_asyncio.fixture
+async def main_app(override_get_db: Callable) -> AsyncGenerator[FastAPI, None]:
     app.dependency_overrides[deps.get_async_db] = override_get_db
-    return app
+    yield app
+    app.dependency_overrides.clear()  # Clear overrides after test
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture
 async def async_client(main_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
-    async with AsyncClient(transport=ASGITransport(app=main_app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=main_app),
+        base_url=base_url,
+    ) as client:
         yield client

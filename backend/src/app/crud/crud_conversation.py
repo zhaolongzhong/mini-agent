@@ -1,6 +1,7 @@
 from typing import List
+from typing_extensions import Optional
 
-from sqlalchemy import desc, func, select, update
+from sqlalchemy import Boolean, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..crud.crud_base import CRUDBaseAsync
@@ -43,10 +44,38 @@ class CRUDConversation(CRUDBaseAsync[Conversation, ConversationCreate, Conversat
         await db.execute(stmt)
         await db.commit()
 
-    async def get_by_title(self, db: AsyncSession, title: str) -> Conversation | None:
-        stmt = select(self.model).where(self.model.title == title)
+    async def get_by_title(
+        self, db: AsyncSession, title: str, assistant_id: Optional[str] = None
+    ) -> Conversation | None:
+        stmt = select(self.model)
+
+        if assistant_id:
+            stmt = stmt.where(self.model.assistant_id == assistant_id)
+
+        stmt = stmt.where(self.model.title == title)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_by_assistant_id(self, db: AsyncSession, assistant_id: str) -> list[Conversation] | None:
+        stmt = select(self.model).where(self.model.assistant_id == assistant_id)
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_conversations_by_assistant_id(
+        self,
+        db: AsyncSession,
+        assistant_id: str,
+        is_primary: Optional[bool] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Conversation]:
+        stmt = select(self.model).where(self.model.assistant_id == assistant_id)
+        if is_primary is not None:
+            stmt = stmt.where(self.model.metadata["is_primary"].astext.cast(Boolean) == is_primary)
+        stmt = stmt.offset(skip).limit(limit)
+
+        result = await db.execute(stmt)
+        return result.scalars().all()
 
 
 conversation = CRUDConversation(Conversation)

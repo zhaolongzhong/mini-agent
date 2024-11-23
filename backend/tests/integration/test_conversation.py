@@ -9,11 +9,11 @@ from httpx import AsyncClient
 async def test_create_conversation(async_client: AsyncClient):
     conversation_data = {
         "title": f"test_conversation_{uuid.uuid4().hex[:8]}",
-        "metadata": {"test": "data"},
+        "metadata": {"is_primary": True},
     }
 
-    response = await async_client.post("/api/v1/conversations/", json=conversation_data)
+    response = await async_client.post("/api/v1/conversations", json=conversation_data)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == conversation_data["title"].lower()
-    assert "id" in data
+    assert data["metadata"]["is_primary"] == conversation_data["metadata"]["is_primary"]

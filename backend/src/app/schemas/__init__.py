@@ -6,12 +6,8 @@ from .message import (
     MessageCreate,
     MessageUpdate,
 )
-from .assistant import Assistant, AssistantCreate, AssistantUpdate
-from .conversation import (
-    Conversation,
-    ConversationCreate,
-    ConversationUpdate,
-)
+from .assistant import Metadata as AssistantMetadata, Assistant, AssistantCreate, AssistantUpdate
+from .conversation import Metadata as ConversationMetadata, Conversation, ConversationCreate, ConversationUpdate
 from .assistant_memory import (
     RelevantMemory,
     AssistantMemory,
@@ -30,6 +26,7 @@ __all__ = [
     "Assistant",
     "AssistantCreate",
     "AssistantUpdate",
+    "AssistantMetadata",
     "AssistantMemory",
     "AssistantMemoryCreate",
     "AssistantMemoryUpdate",
@@ -40,6 +37,7 @@ __all__ = [
     "Conversation",
     "ConversationCreate",
     "ConversationUpdate",
+    "ConversationMetadata",
     "Message",
     "MessageCreate",
     "MessageUpdate",

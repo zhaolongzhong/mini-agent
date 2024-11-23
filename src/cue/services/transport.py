@@ -59,6 +59,7 @@ class AioHTTPTransport(HTTPTransport):
         self, method: str, endpoint: str, data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None
     ) -> Any:
         if not self.is_server_available:
+            logger.error("Server is not available.")
             return
         url = f"{self.base_url}{endpoint}"
         try:
