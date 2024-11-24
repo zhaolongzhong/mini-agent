@@ -54,7 +54,9 @@ class CompletionResponse:
         response: Optional[Any] = None,
         error: Optional[Any] = None,
         metadata: Optional[Any] = None,
+        msg_id: Optional[str] = None,
     ):
+        self.msg_id = msg_id
         self.author = author
         self.model = model
         self.response = response
@@ -180,7 +182,7 @@ class CompletionResponse:
 
     def __str__(self):
         response = self.response.model_dump() if self.response else None
-        return f"Text: {self.get_text()}, Tools: {self.get_tool_calls()}, Response: {response}"
+        return f"msg_id: {self.msg_id}, Text: {self.get_text()}, Tools: {self.get_tool_calls()}, Response: {response}"
 
     def to_params(self):
         response = self.response

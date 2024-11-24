@@ -48,7 +48,9 @@ class AgentLoop:
                     new_message = self.user_message_queue.get_nowait()
                     logger.debug(f"Received new user message during run: {new_message}")
                     new_user_message = MessageParam(role="user", content=new_message)
-                    await agent.add_message(new_user_message)
+                    message = await agent.add_message(new_user_message)
+                    if callback and message:
+                        await callback(response)
                 except asyncio.QueueEmpty:
                     break
 
@@ -69,21 +71,22 @@ class AgentLoop:
                 logger.exception(f"Error during agent run: {e}")
                 break
 
-            if callback:
-                await callback(response)
-
             author = Author(role="assistant", name="")
             if not isinstance(response, CompletionResponse):
                 if response.error:
                     logger.error(response.error.model_dump())
-                    await agent.add_message(response)
+                    message = await agent.add_message(response)
+                    if callback and message:
+                        await callback(response)
                     continue
                 else:
                     raise Exception(f"Unexpected response: {response}")
 
             tool_calls = response.get_tool_calls()
             if not tool_calls:
-                await agent.add_message(response)
+                message = await agent.add_message(response)
+                if callback and message:
+                    await callback(message)
                 if agent.config.is_primary:
                     DebugUtils.log_chat({"assistant": response.get_text()}, "agent_loop")
                     return response
@@ -101,6 +104,15 @@ class AgentLoop:
             if text_content:
                 DebugUtils.log_chat({"assistant": text_content}, "agent_loop")
 
+            if agent.config.feature_flag.enable_storage:
+                # persist tool use message and update msg id
+                persisted_message = await agent.persist_message(response)
+                if persisted_message:
+                    response.msg_id = persisted_message.msg_id
+
+            if callback and response:
+                await callback(response)
+
             tool_result = await agent.client.process_tools_with_timeout(
                 tool_manager=tool_manager,
                 tool_calls=tool_calls,
@@ -110,7 +122,9 @@ class AgentLoop:
 
             if isinstance(tool_result, ToolResponseWrapper):
                 # Add tool call and tool result pair
-                await agent.add_messages([response, tool_result])
+                messages = await agent.add_messages([response, tool_result])
+                if callback and messages:
+                    await callback(messages[-1])
                 # Handle explicit transfer request
                 agent_transfer = tool_result.agent_transfer
                 if agent_transfer:

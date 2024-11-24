@@ -3,14 +3,14 @@ import uuid
 import asyncio
 import logging
 import platform
-from typing import Callable, Optional, Awaitable
+from typing import Union, Callable, Optional, Awaitable
 
 import aiohttp
 from aiohttp import ClientResponseError, ClientConnectionError
 from pydantic import BaseModel
 
 from ..config import get_settings
-from ..schemas import AgentConfig, FeatureFlag, RunMetadata, CompletionResponse
+from ..schemas import AgentConfig, FeatureFlag, RunMetadata, MessageParam, CompletionResponse, ToolResponseWrapper
 from .transport import (
     AioHTTPTransport,
     AioHTTPWebSocketTransport,
@@ -159,18 +159,31 @@ class ServiceManager:
         )
         await self.broadcast(msg.model_dump_json())
 
-    async def send_message_to_user(self, message: CompletionResponse) -> None:
+    async def send_message_to_user(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
+        payload = None
+        role = "assistant"
+        name = self.assistant_id
+
+        if isinstance(message, ToolResponseWrapper):
+            payload = message.model_dump(exclude_none=True)
+        elif isinstance(message, CompletionResponse):
+            if isinstance(message.response, BaseModel):
+                payload = message.response.model_dump(exclude_none=True)
+        elif isinstance(message, MessageParam):
+            role = message.role
+            name = message.name
+
+        logger.debug(f"inx send_message_to_user message.msg_id: {message.msg_id}")
         msg = EventMessage(
             type=EventMessageType.ASSISTANT,
             payload=MessagePayload(
                 message=message.get_text(),
                 sender=self.run_metadata.id,
                 recipient="",  # empty or user id
-                payload=message.response.model_dump()
-                if message.response and isinstance(message.response, BaseModel)
-                else None,
+                payload=payload,
                 websocket_request_id=str(uuid.uuid4()),
-                metadata={"author": {"role": "assistant", "name": self.assistant_id}},
+                metadata={"author": {"role": role, "name": name}},
+                msg_id=message.msg_id,
             ),
             websocket_request_id=str(uuid.uuid4()),
         )

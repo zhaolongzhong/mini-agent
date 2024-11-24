@@ -22,6 +22,7 @@ from .schemas import (
     ToolCallToolUseBlock,
 )
 from .services import ServiceManager
+from .context.message import MessageManager
 from ._agent_summarizer import ContentSummarizer
 from .memory.memory_manager import DynamicMemoryManager
 from .system_message_builder import SystemMessageBuilder
@@ -67,9 +68,10 @@ class Agent:
         self.service_manager: Optional[ServiceManager] = None
         self.system_context: Optional[str] = None  # memories and project context
         self.system_message_param: Optional[str] = None
+        self.message_manager: MessageManager = MessageManager()
 
     def set_service_manager(self, service_manager: ServiceManager):
-        self.context.set_service_manager(service_manager)
+        self.message_manager.set_service_manager(service_manager)
 
     def get_system_message(self) -> MessageParam:
         self.system_message_builder.set_conversation_context(self.conversation_context)
@@ -115,18 +117,35 @@ class Agent:
         self.system_message_param = self.get_system_message()
         try:
             await self.update_context()
-            await self.context.initialize()
+            if self.config.feature_flag.enable_storage:
+                messages = await self.message_manager.get_messages_asc(limit=10)
+                if messages:
+                    logger.debug(f"initial messages: {len(messages)}")
+                    self.context.clear_messages()
+                    await self.add_messages(messages)
         except Exception as e:
             logger.error(f"Ran into error when initialize: {e}")
 
         self.summarizer.update_context(self.system_context)
         self.has_initialized = True
 
-    async def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
-        await self.add_messages([message])
+    async def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]):
+        messages = await self.add_messages([message])
+        if messages:
+            return messages[0]
 
-    async def add_messages(self, messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam]]) -> None:
+    async def add_messages(self, messages: List[Union[CompletionResponse, ToolResponseWrapper, MessageParam]]) -> list:
         try:
+            if self.config.feature_flag.enable_storage:
+                messages_with_id = []
+                for message in messages.copy():
+                    update_message = message
+                    if not message.msg_id:
+                        update_message = await self.persist_message(message)
+                    else:
+                        logger.debug(f"Message is already persisted: {message.msg_id}")
+                    messages_with_id.append(update_message)
+                messages = messages_with_id
             has_truncated_history = await self.context.add_messages(messages)
             if has_truncated_history:
                 """Only update context when there are truncated messages to make the most of prompt caching"""
@@ -138,6 +157,19 @@ class Agent:
             self.token_stats["context_window"] = self.context.get_context_stats()
         except Exception as e:
             logger.error(f"Ran into error when add messages: {e}")
+        return messages
+
+    async def persist_message(
+        self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]
+    ) -> Union[CompletionResponse, ToolResponseWrapper, MessageParam]:
+        if not self.config.feature_flag.enable_storage:
+            return message
+        try:
+            message_with_id = await self.message_manager.persist_message(message)
+            return message_with_id
+        except Exception as e:
+            logger.error(f"Ran into error when persist message: {e}")
+        return message
 
     def snapshot(self) -> str:
         """Take a snapshot of current message list and save to a file"""

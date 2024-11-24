@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, Dict, List, Callable, Optional
+from typing import Any, Dict, List, Union, Callable, Optional
 
 from .utils import DebugUtils, console_utils
 from ._agent import Agent
@@ -102,15 +102,17 @@ class AgentManager:
             self.run_metadata = run_metadata
         self.active_agent = self._agents[active_agent_id]
         self.active_agent.set_service_manager(self.service_manager)
-        # Directly add message to the agent's message history
-        if message:
-            user_message = MessageParam(role="user", content=message, model=self.active_agent.config.model)
-            await self.active_agent.add_message(user_message)
-        logger.debug(f"run - queued message for agent {active_agent_id}: {message}")
-
         # Start execute_run if not already running
         if not callback:
             callback = self.handle_response
+        # Directly add message to the agent's message history
+        if message:
+            user_message = MessageParam(role="user", content=message, model=self.active_agent.config.model)
+            message = await self.active_agent.add_message(user_message)
+            logger.debug(f"inx user message: {message}")
+            await callback(message)
+        logger.debug(f"run - queued message for agent {active_agent_id}: {message}")
+
         if self.run_metadata.mode == "runner":
             # in runner mode, it should be called once
             if not self.execute_run_task or self.execute_run_task.done():
@@ -146,22 +148,25 @@ class AgentManager:
             CompletionResponse: The final response from the last active agent
         """
         logger.debug(f"execute_run loop started. run_metadata: {self.run_metadata.model_dump_json(indent=4)}")
-        while True:
-            response = await self.agent_loop.run(
-                agent=self.active_agent,
-                run_metadata=self.run_metadata,
-                callback=callback,
-                prompt_callback=self.prompt_callback,
-                tool_manager=self.tool_manager,
-            )
-            if isinstance(response, AgentTransfer):
-                if response.run_metadata:
-                    logger.debug(
-                        f"handle tansfer to {response.to_agent_id}, run metadata: {self.run_metadata.model_dump_json(indent=4)}"
-                    )
-                await self._handle_transfer(response)
-                continue
-            return response
+        try:
+            while True:
+                response = await self.agent_loop.run(
+                    agent=self.active_agent,
+                    run_metadata=self.run_metadata,
+                    callback=callback,
+                    prompt_callback=self.prompt_callback,
+                    tool_manager=self.tool_manager,
+                )
+                if isinstance(response, AgentTransfer):
+                    if response.run_metadata:
+                        logger.debug(
+                            f"handle tansfer to {response.to_agent_id}, run metadata: {self.run_metadata.model_dump_json(indent=4)}"
+                        )
+                    await self._handle_transfer(response)
+                    continue
+                return response
+        except Exception as e:
+            logger.error(f"Ran into error for agent loop: {e}")
 
     async def stop_run(self):
         """Signal the execute_run loop to stop gracefully."""
@@ -269,7 +274,7 @@ class AgentManager:
                 f"Skip handle_message current_client_id {current_client_id}: {event.model_dump_json(indent=4)}"
             )
 
-    async def handle_response(self, response: CompletionResponse):
+    async def handle_response(self, response: Union[CompletionResponse, MessageParam]):
         self.console_utils.print_msg(f"{response.get_text()}")
         await self.broadcast_response(response)
 

@@ -1,8 +1,10 @@
 import logging
-from typing import Optional
+from typing import Union, Optional
 
 from ..schemas import Message, MessageParam, MessageCreate
 from ..services.service_manager import ServiceManager
+from ..schemas.completion_respone import CompletionResponse
+from ..schemas.tool_response_wrapper import ToolResponseWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,28 @@ class MessageManager:
     def set_service_manager(self, service_manager: ServiceManager):
         self.service_manager = service_manager
 
-    async def persist_message(self, message_create: MessageCreate) -> Optional[Message]:
+    async def persist_message(
+        self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]
+    ) -> Union[CompletionResponse, ToolResponseWrapper, MessageParam]:
+        if not isinstance(message, (CompletionResponse, ToolResponseWrapper, MessageParam)):
+            logger.error("Unexpect message type to persist")
+            return message
+        if message.msg_id:
+            logger.error(f"Message is already persisted with id: {message.msg_id}")
+            return message
+
+        try:
+            message_create = message.to_message_create()
+            persisted_message = await self._persist_message(message_create)
+            if persisted_message:
+                msg_id = persisted_message.id
+                message.msg_id = msg_id
+                return message
+        except Exception as e:
+            logger.error(f"Ran into error when persist message: {e}")
+        return message
+
+    async def _persist_message(self, message_create: MessageCreate) -> Optional[Message]:
         """
         Persist a new message to storage.
 

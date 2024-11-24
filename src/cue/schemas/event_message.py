@@ -33,6 +33,7 @@ class GenericMessagePayload(MessagePayloadBase):
 
 class MessagePayload(MessagePayloadBase):
     user_id: Optional[str] = None
+    msg_id: Optional[str] = None
 
 
 class ClientEventPayload(MessagePayloadBase):

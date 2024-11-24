@@ -24,12 +24,23 @@ class AgentTransfer(BaseModel):
 
 
 class ToolResponseWrapper(BaseModel):
+    msg_id: Optional[str] = Field(
+        None,
+        description="Unique identifier for the message in persistence layer",
+    )
     author: Optional[Author] = None
     tool_messages: Optional[List[dict]] = None
     tool_result_message: Optional[dict] = None
     agent_transfer: Optional[AgentTransfer] = None
     base64_images: list = None
     model: str
+
+    def get_text(self) -> str:
+        if "claude" in self.model:
+            content = Content(content=self.tool_result_message)
+        else:
+            content = Content(content=self.tool_messages)
+        return content.get_text()
 
     def to_message_create(self) -> MessageCreate:
         if "claude" in self.model:

@@ -39,6 +39,16 @@ class Content(BaseModel):
         ..., description="Message content in various formats"
     )
 
+    def get_text(self) -> str:
+        if isinstance(self.content, str):
+            return self.content
+        elif isinstance(self.content, dict):
+            return str(self.content)
+        elif isinstance(self.content, list):
+            return str(self.content)
+        else:
+            raise Exception("Unexpected content type")
+
 
 class Metadata(BaseModel):
     """Message metadata including model information and original payload.

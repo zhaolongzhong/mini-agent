@@ -51,10 +51,6 @@ async def create_conversation(
     """
     Create new conversation.
     """
-    existing_obj = await crud.conversation.get_by_title(db=db, title=obj_in.title)
-    if existing_obj:
-        return existing_obj[0]
-
     if not obj_in.assistant_id:
         assistant = await crud.assistant.get_primary(db=db)
         if not assistant:

@@ -5,10 +5,8 @@ from typing import Any, Union, Optional
 from pydantic import BaseModel
 
 from ..utils import DebugUtils, TokenCounter
-from .message import MessageManager
 from ..schemas import FeatureFlag, MessageParam, CompletionResponse, ToolResponseWrapper
 from .._agent_summarizer import ContentSummarizer
-from ..services.service_manager import ServiceManager
 from ..utils.mesage_params_utils import has_tool_calls, is_tool_result
 
 logger = logging.getLogger(__name__)
@@ -50,20 +48,6 @@ class DynamicContextManager:
         self.last_removal_tokens = 0  # Track tokens at last removal
         self.messages_since_removal = 0  # Track messages added since last removal
         self.summaries_content: Optional[str] = None
-        self.message_manager: MessageManager = MessageManager()
-
-    def set_service_manager(self, service_manager: ServiceManager):
-        self.service_manager = service_manager
-        self.message_manager.set_service_manager(service_manager)
-
-    async def initialize(self):
-        logger.debug("initialize")
-        if self.feature_flag.enable_storage:
-            messages = await self.message_manager.get_messages_asc(limit=10)
-            if messages:
-                self.clear_messages()
-                await self.add_messages(messages, skip_persistence=True)
-        logger.debug(f"initial messages: {len(self.messages)}")
 
     def _get_batch_remove_size(self) -> int:
         total = self._get_total_tokens()
@@ -182,7 +166,6 @@ class DynamicContextManager:
     async def add_messages(
         self,
         new_messages: list[Union[CompletionResponse, ToolResponseWrapper, MessageParam, dict[str, Any], BaseModel]],
-        skip_persistence: Optional[bool] = False,
     ) -> bool:
         """Add new messages to the conversation history and manage the sliding window token limit.
 
@@ -193,9 +176,6 @@ class DynamicContextManager:
         Args:
             new_messages: A list of messages to add. Can contain CompletionResponse,
                 ToolResponseWrapper, MessageParam, dict, or BaseModel instances.
-            skip_persistence: If True, skips saving messages to database (used when messages
-                are loaded from DB). Defaults to False.
-
         Returns:
             bool: True if any messages were removed due to token limit management,
                 False if all messages were retained.
@@ -209,16 +189,7 @@ class DynamicContextManager:
 
         original_size = len(self.messages)
         for message in new_messages:
-            msg_id = None
-            if self.feature_flag.enable_storage and not skip_persistence:
-                if isinstance(message, (CompletionResponse, ToolResponseWrapper, MessageParam)):
-                    try:
-                        message_create = message.to_message_create()
-                        persisted_message = await self.message_manager.persist_message(message_create)
-                        if persisted_message:
-                            msg_id = persisted_message.id
-                    except Exception as e:
-                        logger.error(f"Ran into error when persist message: {e}")
+            msg_id = message.get("msg_id", None) if isinstance(message, dict) else message.msg_id
             message_dict = self._prepare_message_dict(message, msg_id)
 
             if isinstance(message_dict, list):

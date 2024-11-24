@@ -34,6 +34,9 @@ class MessageParam(BaseModel):
         description="Unique identifier for the message in persistence layer",
     )
 
+    def get_text(self) -> str:
+        return str(self.content)
+
     def to_message_create(self) -> MessageCreate:
         author = Author(role=self.role)
         content = Content(content=self.content)
