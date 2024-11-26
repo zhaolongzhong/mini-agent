@@ -58,7 +58,7 @@ class AgentManager:
             self.service_manager = await ServiceManager.create(
                 run_metadata=self.run_metadata,
                 feature_flag=feature_flag,
-                on_message=self.handle_message,
+                on_message_received=self.on_message_received,
                 agent=self.primary_agent.config,
             )
             await self.service_manager.connect()
@@ -109,7 +109,6 @@ class AgentManager:
         if message:
             user_message = MessageParam(role="user", content=message, model=self.active_agent.config.model)
             message = await self.active_agent.add_message(user_message)
-            logger.debug(f"inx user message: {message}")
             await callback(message)
         logger.debug(f"run - queued message for agent {active_agent_id}: {message}")
 
@@ -244,10 +243,12 @@ class AgentManager:
         logger.debug(f"broadcast user message: {user_input}")
         await self.service_manager.send_message_to_assistant(user_input)
 
-    async def handle_message(self, event: EventMessage) -> None:
+    async def on_message_received(self, event: EventMessage) -> None:
         """Receive message from websocket"""
         current_client_id = self.service_manager.client_id
         if event.type == EventMessageType.USER and event.client_id != current_client_id:
+            # Anthropic uses "user" role for tool result.
+            # We only use USER type only when the user sends the message directly, not tool result message
             if isinstance(event.payload, MessagePayload):
                 user_message = event.payload.message
                 self.console_utils.print_msg(user_message, "user")

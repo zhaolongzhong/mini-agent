@@ -237,10 +237,13 @@ class CompletionResponse:
                 message = response.choices[0].message
                 author = Author(role=message.role)
                 metadata = Metadata(model=response.model, payload=response.model_dump())
-                if message.content:
+                if message.tool_calls:
+                    content = Content(
+                        content=message.content if message.content else "",
+                        tool_calls=[item.model_dump() for item in message.tool_calls],
+                    )
+                elif message.content:
                     content = Content(content=message.content)
-                elif message.tool_calls:
-                    content = Content(content=[item.model_dump() for item in message.tool_calls])
                 else:
                     raise Exception(f"Unhandled message: {message}")
 

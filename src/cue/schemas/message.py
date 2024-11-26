@@ -39,6 +39,8 @@ class Content(BaseModel):
         ..., description="Message content in various formats"
     )
 
+    tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="tool calls")
+
     def get_text(self) -> str:
         if isinstance(self.content, str):
             return self.content

@@ -32,20 +32,27 @@ class ToolResponseWrapper(BaseModel):
     tool_messages: Optional[List[dict]] = None
     tool_result_message: Optional[dict] = None
     agent_transfer: Optional[AgentTransfer] = None
-    base64_images: list = None
+    base64_images: Optional[list] = None
     model: str
 
     def get_text(self) -> str:
+        text = ""
         if "claude" in self.model:
-            content = Content(content=self.tool_result_message)
+            contents = self.tool_result_message.get("content", [])
+            for content in contents:
+                text += f"{content.get('content', '')}\n"
         else:
-            content = Content(content=self.tool_messages)
-        return content.get_text()
+            for message in self.tool_messages:
+                if message.get("content", ""):
+                    text += f"{message.get('text', '')}\n"
+
+        return text.strip()
 
     def to_message_create(self) -> MessageCreate:
         if "claude" in self.model:
             author = Author(role="user")
-            content = Content(content=self.tool_result_message)
+            # tool_result_message = {"role": "user", "content": tool_results}
+            content = Content(content=self.tool_result_message["content"])
             metadata = Metadata(model=self.model)
             return MessageCreate(author=author, content=content, metadata=metadata)
         else:

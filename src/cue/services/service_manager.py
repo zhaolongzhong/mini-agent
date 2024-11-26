@@ -34,7 +34,7 @@ class ServiceManager:
         feature_flag: FeatureFlag,
         base_url: str,
         session: aiohttp.ClientSession,
-        on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
+        on_message_received: Callable[[dict[str, any]], Awaitable[None]] = None,
         agent: Optional[AgentConfig] = None,
     ):
         self.run_metadata = run_metadata
@@ -49,7 +49,7 @@ class ServiceManager:
         if platform.system() != "Darwin" and "http://localhost" in self.base_url:
             self.base_url = self.base_url.replace("http://localhost", "http://host.docker.internal")
         self._session = session
-        self.on_message = on_message
+        self.on_message_received = on_message_received
         self.recipient: Optional[str] = None  # either user id or assistant runner id
         self.runner_id: Optional[str] = None
         if self.run_metadata.mode != "client":
@@ -92,7 +92,7 @@ class ServiceManager:
         run_metadata: RunMetadata,
         feature_flag: Optional[FeatureFlag] = FeatureFlag(),
         base_url: Optional[str] = None,
-        on_message: Callable[[dict[str, any]], Awaitable[None]] = None,
+        on_message_received: Callable[[dict[str, any]], Awaitable[None]] = None,
         agent: Optional[AgentConfig] = None,
     ):
         settings = get_settings()
@@ -103,7 +103,7 @@ class ServiceManager:
             feature_flag=feature_flag,
             base_url=base_url,
             session=session,
-            on_message=on_message,
+            on_message_received=on_message_received,
             agent=agent,
         )
         await service_manager.initialize()
@@ -162,27 +162,36 @@ class ServiceManager:
     async def send_message_to_user(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]) -> None:
         payload = None
         role = "assistant"
-        name = self.assistant_id
+        name = None
+        model = None
 
         if isinstance(message, ToolResponseWrapper):
-            payload = message.model_dump(exclude_none=True)
+            role = "tool" if message.tool_messages else "user"
+            name = message.author.name
+            payload = message.model_dump(exclude=None, exclude_unset=True, exclude_defaults=True)
+            model = message.model
         elif isinstance(message, CompletionResponse):
             if isinstance(message.response, BaseModel):
                 payload = message.response.model_dump(exclude_none=True)
+            name = self.assistant_id
+            model = message.model
         elif isinstance(message, MessageParam):
             role = message.role
             name = message.name
 
-        logger.debug(f"inx send_message_to_user message.msg_id: {message.msg_id}")
+        author = {"role": role}
+        if name:
+            author["name"] = name
+
         msg = EventMessage(
             type=EventMessageType.ASSISTANT,
             payload=MessagePayload(
                 message=message.get_text(),
-                sender=self.run_metadata.id,
+                sender=self.runner_id,
                 recipient="",  # empty or user id
                 payload=payload,
                 websocket_request_id=str(uuid.uuid4()),
-                metadata={"author": {"role": role, "name": name}},
+                metadata={"author": author, "model": model},
                 msg_id=message.msg_id,
             ),
             websocket_request_id=str(uuid.uuid4()),
@@ -221,9 +230,9 @@ class ServiceManager:
         logger.debug(f"Handling generic message: {message}")
 
     async def _handle_message(self, message: EventMessage) -> None:
-        if self.on_message:
+        if self.on_message_received:
             try:
-                await self.on_message(message)
+                await self.on_message_received(message)
             except Exception as e:
                 # Catch any other errors in on_message handling
                 logger.error(f"Error in on_message handling: {e}. Message content: {message.model_dump_json(indent=4)}")
