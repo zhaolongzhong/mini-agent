@@ -150,7 +150,7 @@ class AgentProvider:
 
         tools = []
         tool_names = config_dict.get("tools", [])
-        tool_map = {t.name.lower(): t for t in Tool}
+        tool_map = {t.value.lower(): t for t in Tool}
         for tool_name in tool_names:
             tool_key = tool_name.lower()
             if tool_key in tool_map:
