@@ -97,9 +97,10 @@ class AgentManager:
         run_metadata: RunMetadata,
         callback: Optional[Callable[[CompletionResponse], Any]] = None,
     ) -> Optional[CompletionResponse]:
-        """Queue a message for processing with optional callback."""
+        """Start a run triggered by user."""
         if run_metadata:
             self.run_metadata = run_metadata
+        self.run_metadata.current_turn = 0  # reset current turn since it's user input
         self.active_agent = self._agents[active_agent_id]
         self.active_agent.set_service_manager(self.service_manager)
         # Start execute_run if not already running
