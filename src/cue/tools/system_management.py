@@ -23,8 +23,6 @@ class SystemManagement:
 
         if self.control_file:
             logger.info(f"Using control file: {self.control_file}")
-        else:
-            logger.debug("No control file found")
 
     def _find_control_file(self) -> Optional[Path]:
         """
