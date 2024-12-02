@@ -121,6 +121,7 @@ class AgentProvider:
                 try:
                     # Convert dict to AgentConfig
                     agent_config = self._create_agent_config(agent_dict)
+                    logger.debug(f"Load agent id: {agent_config.id}, name: {agent_config.name}")
                     if not agent_config.id:
                         agent_config.id = self._get_agent_id(agent_config)
                     configs.append(agent_config)

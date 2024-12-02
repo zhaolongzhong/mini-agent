@@ -35,7 +35,7 @@ class SystemMessageBuilder:
         # Add self-reflection instructions for primary agents
         if self.config.is_primary:
             instruction += self._get_self_reflection_instructions()
-            instruction += self._get_primary_agent_instructions()
+            instruction += self._get_primary_agent_instructions(name=self.config.name)
 
         # Add other agents info if available
         if self.other_agents_info:
@@ -262,10 +262,10 @@ Remember: Being proactive with memory management helps maintain conversation con
   - Serves as the primary reference for system state and configuration
 """
 
-    def _get_primary_agent_instructions(self) -> str:
+    def _get_primary_agent_instructions(self, name) -> str:
         """Get the specific instructions for primary agents."""
-        return """
-You are {self.agent_id}, a primary agent in a multi-agent system. Please follow these core rules:
+        return f"""
+You are {name}, a primary agent in a multi-agent system. Please follow these core rules:
 
 1. To communicate with other agents:
    - Use the `coordinate` tool
