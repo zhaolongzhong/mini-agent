@@ -14,6 +14,7 @@ from .bash_tool import BashTool
 from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
 from .run_script import PythonRunner
+from .project import ProjectTool
 from .utils.function_utils import get_definition_by_model
 from .utils.function_to_json import function_to_json
 
@@ -31,6 +32,7 @@ class Tool(Enum):
     Memory = MemoryTool.name
     Coordinate = CoordinateTool.name
     Restart = RestartTool.name
+    Project = ProjectTool.name
 
 
 class ToolManager:
@@ -42,11 +44,11 @@ class ToolManager:
             Tool.Browse.value: BrowseTool(),
             Tool.Email.value: EmailTool(),
             Tool.Drive.value: GoogleDriveTool(),
-            Tool.Drive.value: GoogleDriveTool(),
             Tool.Image.value: ReadImageTool(),
             Tool.Memory.value: MemoryTool(memory_service),
             Tool.Coordinate.value: CoordinateTool(),
             Tool.Restart.value: RestartTool(),
+            Tool.Project.value: ProjectTool(),
         }
         self._definition_cache: Dict[str, dict] = {}
 
