@@ -16,6 +16,7 @@ from .completion_request import CompletionRequest
 from .completion_respone import CompletionResponse, ToolCallToolUseBlock
 from .conversation_context import ConversationContext
 from .tool_response_wrapper import AgentTransfer, ToolResponseWrapper
+from .personality import PersonalityConfig
 
 __all__ = [
     "AgentConfig",
@@ -47,6 +48,7 @@ __all__ = [
     "MessageCreate",
     "MessageUpdate",
     "MessageParam",
+    "PersonalityConfig",
     "RunMetadata",
     "RunUsage",
     "RunUsageAndLimits",

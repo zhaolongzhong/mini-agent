@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .config import get_settings
 from .schemas import AgentConfig, FeatureFlag
+from .schemas.personality import PersonalityConfig
 from .tools._tool import Tool
 from .llm.llm_model import ChatModel
 
@@ -74,8 +75,17 @@ drive_agent = AgentConfig(
 class AgentProvider:
     """Provides access to agent configurations and manages agent creation."""
 
+    DEFAULT_CONFIG_PATHS = [
+        Path(__file__).parent / "default/agents.json",  # Package default
+        Path.home() / ".config/cue/agents.json",
+        Path.home() / ".cue/agents.json",
+        Path("/etc/cue/agents.json"),
+        Path("temp/agent_dev.json"),  # For development
+    ]
+
     def __init__(self, config_file: Optional[Path] = None):
-        self.config_file = config_file
+        self.config_file = self._find_config_file(config_file)
+        self._personality_templates = {}
         self._default_configs = {
             main_agent.id: main_agent,
             agent_o.id: agent_o,
@@ -110,20 +120,48 @@ class AgentProvider:
         primary_id = self.find_primary_agent_id(list(configs.values()))
         return configs.get(primary_id)
 
+    def _find_config_file(self, config_file: Optional[Path] = None) -> Optional[Path]:
+        """Find the first available config file from specified or default locations."""
+        if config_file and config_file.exists():
+            return config_file
+            
+        for path in self.DEFAULT_CONFIG_PATHS:
+            if path.exists():
+                logger.info(f"Found agent config file at: {path}")
+                return path
+                
+        logger.warning("No agent config file found in default locations")
+        return None
+
     def _load_custom_configs(self) -> List[AgentConfig]:
         """Load custom agent configurations from file and convert to AgentConfig objects."""
+        if not self.config_file:
+            return []
+            
         try:
             with open(self.config_file, encoding="utf-8") as f:
-                agents_data = json.load(f)
+                config_data = json.load(f)
 
+            # Load personality templates if present
+            self._personality_templates = config_data.get("personality_templates", {})
+            
             configs = []
-            for agent_dict in agents_data.get("agents", []):
+            for agent_dict in config_data.get("agents", []):
                 try:
                     # Convert dict to AgentConfig
                     agent_config = self._create_agent_config(agent_dict)
                     logger.debug(f"Load agent id: {agent_config.id}, name: {agent_config.name}")
                     if not agent_config.id:
                         agent_config.id = self._get_agent_id(agent_config)
+                        
+                    # Apply personality template if specified
+                    if template_name := agent_dict.get("personality_template"):
+                        if template := self._personality_templates.get(template_name):
+                            agent_config.personality = self._create_personality_config({
+                                **template,
+                                **(agent_dict.get("personality", {}))  # Override with custom personality settings
+                            })
+                            
                     configs.append(agent_config)
                 except ValueError as e:
                     logger.error(f"Error creating agent config: {e}")
@@ -185,6 +223,14 @@ class AgentProvider:
             agent_id = name.lower().replace(" ", "_") if name else None
             config.id = agent_id
         return agent_id
+
+    def _create_personality_config(self, personality_dict: Dict) -> PersonalityConfig:
+        """Create a PersonalityConfig from a dictionary, with validation."""
+        try:
+            return PersonalityConfig(**personality_dict)
+        except ValueError as e:
+            logger.error(f"Error creating personality config: {e}")
+            return PersonalityConfig()  # Return default config on error
 
     @staticmethod
     def find_primary_agent_id(configs: list[AgentConfig]) -> str:

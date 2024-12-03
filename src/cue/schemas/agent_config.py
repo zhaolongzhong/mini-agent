@@ -1,9 +1,10 @@
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from pathlib import Path
 
 from pydantic import Field, BaseModel
 
 from .feature_flag import FeatureFlag
+from .personality import PersonalityConfig
 
 
 class AgentConfig(BaseModel):
@@ -29,3 +30,7 @@ class AgentConfig(BaseModel):
     conversation_id: Optional[str] = None
     enable_services: bool = False
     feature_flag: FeatureFlag = Field(default_factory=FeatureFlag)
+    personality: Optional[PersonalityConfig] = Field(
+        default=None,
+        description="Configuration for agent's personality and behavioral characteristics"
+    )

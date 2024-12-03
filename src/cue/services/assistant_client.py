@@ -4,6 +4,8 @@ from typing import List, Optional
 from ..schemas import (
     Assistant,
     AssistantCreate,
+    AssistantUpdate,
+    Metadata,
 )
 from .transport import HTTPTransport, ResourceClient, WebSocketTransport
 
@@ -34,6 +36,20 @@ class AssistantClient(ResourceClient):
 
     async def delete(self, assistant_id: str) -> None:
         await self._http.request("DELETE", f"/assistants/{assistant_id}")
+
+    async def update(self, assistant_id: Optional[str] = None, *, metadata: Optional[Metadata] = None) -> Assistant:
+        """Update assistant metadata"""
+        if assistant_id is None:
+            assistant_id = self._default_assistant_id
+        if assistant_id is None:
+            raise ValueError("No assistant_id provided and no default assistant set")
+        
+        data = {}
+        if metadata is not None:
+            data["metadata"] = metadata.model_dump()
+        
+        response = await self._http.request("PATCH", f"/assistants/{assistant_id}", data=data)
+        return Assistant(**response)
 
     async def create_default_assistant(self, name: Optional[str] = "default") -> Optional[str]:
         """

@@ -9,7 +9,8 @@ from .email import EmailTool
 from .browse import BrowseTool
 from .memory import MemoryTool
 from .restart import RestartTool
-from ..services import MemoryClient
+from .system_learn import SystemLearnTool
+from ..services import MemoryClient, AssistantClient
 from .bash_tool import BashTool
 from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
@@ -31,10 +32,11 @@ class Tool(Enum):
     Memory = MemoryTool.name
     Coordinate = CoordinateTool.name
     Restart = RestartTool.name
+    SystemLearn = SystemLearnTool.name
 
 
 class ToolManager:
-    def __init__(self, memory_service: Optional[MemoryClient] = None):
+    def __init__(self, memory_service: Optional[MemoryClient] = None, assistant_service: Optional[AssistantClient] = None):
         self.tools: Dict[str, BaseTool] = {
             Tool.Bash.value: BashTool(),
             Tool.Edit.value: EditTool(),
@@ -42,11 +44,11 @@ class ToolManager:
             Tool.Browse.value: BrowseTool(),
             Tool.Email.value: EmailTool(),
             Tool.Drive.value: GoogleDriveTool(),
-            Tool.Drive.value: GoogleDriveTool(),
             Tool.Image.value: ReadImageTool(),
             Tool.Memory.value: MemoryTool(memory_service),
             Tool.Coordinate.value: CoordinateTool(),
             Tool.Restart.value: RestartTool(),
+            Tool.SystemLearn.value: SystemLearnTool(assistant_service),
         }
         self._definition_cache: Dict[str, dict] = {}
 
