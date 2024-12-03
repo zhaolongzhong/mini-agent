@@ -10,6 +10,7 @@ from .browse import BrowseTool
 from .memory import MemoryTool
 from .restart import RestartTool
 from .system_learn import SystemLearnTool
+from .project import ProjectTool
 from ..services import MemoryClient, AssistantClient
 from .bash_tool import BashTool
 from .coordinate import CoordinateTool
@@ -33,6 +34,7 @@ class Tool(Enum):
     Coordinate = CoordinateTool.name
     Restart = RestartTool.name
     SystemLearn = SystemLearnTool.name
+    Project = "project"  # Will be updated once ProjectTool is imported
 
 
 class ToolManager:
@@ -49,6 +51,7 @@ class ToolManager:
             Tool.Coordinate.value: CoordinateTool(),
             Tool.Restart.value: RestartTool(),
             Tool.SystemLearn.value: SystemLearnTool(assistant_service),
+            Tool.Project.value: ProjectTool(),
         }
         self._definition_cache: Dict[str, dict] = {}
 
