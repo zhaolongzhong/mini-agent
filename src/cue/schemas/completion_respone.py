@@ -189,6 +189,12 @@ class CompletionResponse:
         error = self.error
         if "claude" in self.model:
             if isinstance(response, (AnthropicMessage, PromptCachingBetaMessage)):
+                content = self._response_to_anthropic_params(response)
+                # Server can retrun empty content or array like `"content": []`
+                # Check for empty content (None, empty array, or empty string)
+                # If there is empty content, there will be 400 error like "all messages must have non-empty content except for the optional final assistant message"
+                if not content or (isinstance(content, list) and len(content) == 0) or content == "":
+                    return "EMPTY"
                 return BetaMessageParam(role="assistant", content=self._response_to_anthropic_params(response))
             elif isinstance(self.error, ErrorResponse):
                 return BetaMessageParam(role="assistant", content=error.model_dump_json())
