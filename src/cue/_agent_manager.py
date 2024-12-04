@@ -14,7 +14,7 @@ from .schemas import (
 )
 from .services import ServiceManager
 from ._agent_loop import AgentLoop
-from .tools._tool import ToolManager
+from .tools._tool import ToolManager, MCPServerManager
 from .schemas.feature_flag import FeatureFlag
 from .schemas.event_message import (
     EventMessage,
@@ -45,10 +45,14 @@ class AgentManager:
         self.user_message_queue: asyncio.Queue[str] = asyncio.Queue()
         self.execute_run_task: Optional[asyncio.Task] = None
         self.stop_run_event: asyncio.Event = asyncio.Event()
+        self.mcp: MCPServerManager = None
 
-    async def initialize(self, run_metadata: Optional[RunMetadata] = RunMetadata()):
+    async def initialize(
+        self, run_metadata: Optional[RunMetadata] = RunMetadata(), mcp: Optional[MCPServerManager] = None
+    ):
         logger.debug(f"initialize mode: {run_metadata.mode}")
         self.run_metadata = run_metadata
+        self.mcp = mcp
         if self.primary_agent:
             feature_flag = self.primary_agent.config.feature_flag
         else:
@@ -74,8 +78,8 @@ class AgentManager:
         cleanup_tasks = []
         for agent_id in list(self._agents.keys()):
             try:
-                if hasattr(self._agents[agent_id], "cleanup"):
-                    cleanup_tasks.append(asyncio.create_task(self._agents[agent_id].cleanup()))
+                if hasattr(self._agents[agent_id], "clean_up"):
+                    cleanup_tasks.append(asyncio.create_task(self._agents[agent_id].clean_up()))
             except Exception as e:
                 logger.error(f"Error cleaning up agent {agent_id}: {e}")
 
@@ -88,7 +92,7 @@ class AgentManager:
     async def initialize_run(self):
         if not self.tool_manager:
             memory_client = self.service_manager.memories if self.service_manager else None
-            self.tool_manager = ToolManager(memory_client)
+            self.tool_manager = ToolManager(memory_client, mcp=self.mcp)
 
     async def start_run(
         self,

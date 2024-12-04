@@ -3,6 +3,7 @@ import asyncio
 import logging
 from typing import List, Optional
 
+from mcp.types import CallToolResult
 from anthropic.types import ToolUseBlock
 from openai.types.chat import (
     ChatCompletionMessageToolCall as ToolCall,
@@ -74,7 +75,7 @@ class LLMClient(LLMRequest):
             else:
                 raise ValueError(f"Unsupported tool call type: {type(tool_call)}")
 
-            if tool_name not in tool_manager.tools and tool_name:
+            if not tool_manager.has_tool(tool_name):
                 error_message = f"Tool '{tool_name}' not found. The name can be only one of those names: {tool_manager.tools.keys()}."
                 logger.error(f"{error_message}, tool_call: {tool_call}")
                 tool_name = tool_name.replace(".", "")
@@ -87,25 +88,50 @@ class LLMClient(LLMRequest):
                 )
                 continue
 
-            tool_func = tool_manager.tools[tool_name]
-            task = asyncio.create_task(self.run_tool(tool_func, **kwargs))
-            tasks.append((task, tool_id, tool_name))
+            if result := tool_manager.mcp.find_tool(tool_name):
+                server_name, _tool_info = result
+                task = asyncio.create_task(
+                    tool_manager.mcp.call_tool(server_name=server_name, tool_name=tool_name, arguments=kwargs)
+                )
+                tasks.append((task, tool_id, tool_name))
+            else:
+                tool_func = tool_manager.tools[tool_name]
+                task = asyncio.create_task(self.run_tool(tool_func, **kwargs))
+                tasks.append((task, tool_id, tool_name))
 
         base64_images = []
         agent_transfer = None
         for task, tool_id, tool_name in tasks:
             try:
                 tool_result: ToolResult = await asyncio.wait_for(task, timeout=timeout)
-                base64_image = tool_result.base64_image
-                if base64_image:
-                    base64_images.append(base64_image)
+                if isinstance(tool_result, ToolResult):
+                    agent_transfer = tool_result.agent_transfer
+                    if agent_transfer:
+                        # if we have transfer tool use, ignore other tools
+                        break
 
-                tool_results.append(self.create_success_response(tool_id, tool_result, tool_name))
+                    base64_image = tool_result.base64_image
+                    if base64_image:
+                        base64_images.append(base64_image)
 
-                agent_transfer = tool_result.agent_transfer
-                if agent_transfer:
-                    # if we have transfer tool use, ignore other tools
-                    break
+                    tool_results.append(self.create_success_response(tool_id, tool_result, tool_name))
+                elif isinstance(tool_result, CallToolResult):
+                    # convert CallToolResult to ToolResult
+                    content_list = tool_result.content  # a list
+                    output = ""
+                    data = ""
+                    for content in content_list:
+                        if content.type == "text":
+                            output += "\n" if output else "" + content.text
+                        elif content.type == "image":
+                            data = content.data
+                    if tool_result.isError:
+                        tool_result = ToolResult(output=None, error=output)
+                    else:
+                        tool_result = ToolResult(output=output, base64_image=data)
+
+                    tool_results.append(self.create_success_response(tool_id, tool_result, tool_name))
+
             except asyncio.TimeoutError:
                 error_message = f"Timeout while calling tool <{tool_name}> after {timeout}s."
                 logger.error(error_message)

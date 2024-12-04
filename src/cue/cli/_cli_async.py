@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import signal
 import asyncio
 import logging
 import argparse
@@ -18,6 +19,7 @@ from ..utils.logs import setup_logging
 from ._cli_command import CliCommand, parse_command
 from .._agent_manager import AgentManager
 from .._agent_provider import AgentProvider
+from ..tools.mcp_manager import MCPServerManager
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -82,7 +84,7 @@ class CLI:
             for config in self.agent_provider.get_configs().values()
         }
 
-    async def setup(self):
+    async def setup(self, mcp: MCPServerManager):
         """Asynchronous initialization."""
         logger.debug(f"setup run mode: {self.mode}")
         # Get the current running loop
@@ -115,7 +117,7 @@ class CLI:
             self.agent_manager.active_agent = self.agent_manager.primary_agent
 
         # Initialize the agent manager
-        await self.agent_manager.initialize(self.run_metadata)
+        await self.agent_manager.initialize(self.run_metadata, mcp)
 
         # Trigger bootstrap sequence for primary agent in CLI mode
         # if self.mode == "cli" and self.agent_manager.primary_agent:
@@ -149,10 +151,10 @@ class CLI:
         """Handles prompts from the AgentManager by asking the user via the CLI."""
         return await self._get_user_input_async(prompt)
 
-    async def run(self):
+    async def run(self, mcp: MCPServerManager):
         """Main run loop for the CLI."""
         try:
-            await self.setup()
+            await self.setup(mcp=mcp)
 
             self.logger.debug("Running the CLI. Commands: 'exit'/'quit' to exit, 'snapshot'/'-s' to save context")
 
@@ -239,7 +241,7 @@ class CLI:
             self.logger.exception(f"An error occurred: {e}")
             raise
         finally:
-            await self.cleanup()
+            await self.clean_up()
 
     async def send_message(self, user_input) -> None:
         try:
@@ -254,7 +256,7 @@ class CLI:
         except Exception as e:
             self.console_utils.print_error_msg(f"Error during run: {str(e)}")
 
-    async def cleanup(self):
+    async def clean_up(self):
         """Clean up resources."""
         self.logger.info("Cleaning up the agent manager...")
         try:
@@ -293,39 +295,30 @@ def _parse_args():
     return parser.parse_args()
 
 
-async def main(cli_instance: CLI):
-    try:
-        await cli_instance.run()
-    except KeyboardInterrupt:
-        cli_instance.logger.info("Detected keyboard interrupt. Cleaning up...")
-    finally:
-        await cli_instance.agent_manager.clean_up()
-        cli_instance.logger.info("Cleanup complete.")
-
-
-def async_main():
+async def async_main():
     args = _parse_args()
 
     if len(sys.argv) == 1:
         print("No arguments provided. Use -h for help.")
-        sys.exit(1)
+        return 1
 
     if args.version:
         from .. import __version__
 
         print(f"version {__version__}")
-        return
+        return 0
 
     if args.config:
         cli_temp = CLI()
         for _id, config in cli_temp.configs.items():
             print(json.dumps(config.model_dump(), indent=4, default=str))
         print(f"active agent: {cli_temp.active_agent_id}")
-        return
+        return 0
 
+    # Configure logging
     if args.log_level:
         logger.setLevel(getattr(logging, args.log_level.upper(), logging.DEBUG))
-        logging.getLogger("httpx").setLevel(getattr(logging, logging.WARN, logging.WARN))
+        logging.getLogger("httpx").setLevel(logging.WARN)
 
     if args.log_file:
         file_handler = logging.FileHandler(args.log_file, encoding="utf-8")
@@ -337,17 +330,80 @@ def async_main():
         file_handler.setLevel(logging.DEBUG if logger.level <= logging.DEBUG else logger.level)
         logger.addHandler(file_handler)
 
-    cli = CLI(args=args)
-
+    mcp = None
     try:
-        asyncio.run(main(cli))
+        # Initialize MCP
+        mcp = MCPServerManager()
+        await mcp.connect()
+        cli = CLI(args=args)
+
+        # Create manager task but don't await it yet
+        manager_task = asyncio.create_task(mcp.run())
+
+        try:
+            await cli.run(mcp=mcp)
+
+        except asyncio.CancelledError:
+            logger.info("Main loop cancelled, initiating cleanup")
+            # Request clean shutdown
+            mcp.request_shutdown()
+            # Wait for manager task to complete
+            await manager_task
+            await cli.clean_up
+            raise
+
     except KeyboardInterrupt:
-        sys.stderr.write("\nKeyboard interrupt detected. Exiting...\n")
-        sys.exit(1)
+        logger.info("Keyboard interrupt detected, initiating cleanup")
+        if mcp:
+            mcp.request_shutdown()
+            if "manager_task" in locals():
+                await manager_task
+        return 130
+
     except Exception as e:
         logger.exception(f"Unexpected error: {e}")
+        return 1
+
+    finally:
+        if mcp:
+            try:
+                # Give cleanup a chance to complete
+                await asyncio.shield(mcp.disconnect())
+                logger.info("Cleanup completed")
+            except Exception as e:
+                logger.error(f"Error during cleanup: {e}")
+        await cli.clean_up
+
+
+def main():
+    """Entry point with proper signal handling"""
+    if sys.platform != "win32":
+        # Set up signal handlers for graceful shutdown
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        def handle_signal(sig):
+            loop.stop()
+            tasks = [t for t in asyncio.all_tasks(loop) if t is not asyncio.current_task(loop)]
+            for task in tasks:
+                task.cancel()
+
+            loop.remove_signal_handler(signal.SIGTERM)
+            loop.remove_signal_handler(signal.SIGINT)
+
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, lambda s=sig: handle_signal(s))
+
+    try:
+        exit_code = asyncio.run(async_main())
+        sys.exit(exit_code)
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt in main")
+        sys.exit(130)
+    except Exception:
+        logger.exception("Fatal error in main")
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    async_main()
+    main()

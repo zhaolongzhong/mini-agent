@@ -9,6 +9,7 @@ from .bash_tool import BashTool
 from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
 from .run_script import PythonRunner
+from .mcp_manager import MCPServerManager
 
 __all__ = [
     "Tool",
@@ -27,4 +28,5 @@ __all__ = [
     "ReadImageTool",
     "MemoryTool",
     "CoordinateTool",
+    "MCPServerManager",
 ]

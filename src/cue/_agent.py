@@ -111,8 +111,17 @@ class Agent:
         logger.debug(f"initialize ... \n{self.config.model_dump_json(indent=4)}")
         if not self.tool_manager:
             self.tool_manager = tool_manager
+
+        await tool_manager.initialize()
+
         if not self.tool_json and self.config.tools:
-            self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, self.config.tools)
+            tools = self.config.tools.copy()
+
+            self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, tools)
+            # Add mcp tools if there is any
+            mcp_tools = self.tool_manager.get_mcp_tools(model=self.config.model)
+            if mcp_tools:
+                self.tool_json.extend(mcp_tools)
             self.token_stats["tool"] = self.token_counter.count_dict_tokens(self.tool_json)
         self.system_message_param = self.get_system_message()
         try:
@@ -128,6 +137,10 @@ class Agent:
 
         self.summarizer.update_context(self.system_context)
         self.has_initialized = True
+
+    async def clean_up(self):
+        if self.tool_manager:
+            await self.tool_manager.clean_up()
 
     async def add_message(self, message: Union[CompletionResponse, ToolResponseWrapper, MessageParam]):
         messages = await self.add_messages([message])
