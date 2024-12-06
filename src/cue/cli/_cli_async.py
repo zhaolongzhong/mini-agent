@@ -331,6 +331,7 @@ async def async_main():
         logger.addHandler(file_handler)
 
     mcp = None
+    cli = None
     try:
         # Initialize MCP
         mcp = MCPServerManager()
@@ -372,7 +373,8 @@ async def async_main():
                 logger.info("Cleanup completed")
             except Exception as e:
                 logger.error(f"Error during cleanup: {e}")
-        await cli.clean_up
+        if cli:
+            await cli.clean_up
 
 
 def main():

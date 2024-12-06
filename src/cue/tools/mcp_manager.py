@@ -124,17 +124,25 @@ class MCPServerManager:
 
     def _load_config(self) -> Dict[str, StdioServerParameters]:
         if not os.path.exists(self.config_path):
-            raise FileNotFoundError(f"Config file not found: {self.config_path}")
+            self.logger.warning(f"Config file not found: {self.config_path}")
+            return {}
 
-        with open(self.config_path) as f:
-            config_data = json.load(f)
+        try:
+            with open(self.config_path) as f:
+                config_data = json.load(f)
 
-        server_configs = {}
-        for server_name, config in config_data.get("mcpServers", {}).items():
-            server_configs[server_name] = StdioServerParameters(
-                command=config["command"], args=config["args"], env=config.get("env")
-            )
-        return server_configs
+            server_configs = {}
+            for server_name, config in config_data.get("mcpServers", {}).items():
+                server_configs[server_name] = StdioServerParameters(
+                    command=config["command"], args=config["args"], env=config.get("env")
+                )
+            return server_configs
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse config file {self.config_path}: {e}")
+            return {}
+        except Exception as e:
+            self.logger.error(f"Error loading config file {self.config_path}: {e}")
+            return {}
 
     def get_available_servers(self) -> list[str]:
         return list(self.servers.keys())
