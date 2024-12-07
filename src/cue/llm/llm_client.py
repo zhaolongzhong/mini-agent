@@ -5,10 +5,7 @@ from typing import List, Optional
 
 from mcp.types import CallToolResult
 from anthropic.types import ToolUseBlock
-from openai.types.chat import (
-    ChatCompletionMessageToolCall as ToolCall,
-    ChatCompletionToolMessageParam as ToolMessageParam,
-)
+from openai.types.chat import ChatCompletionMessageToolCall as ToolCall
 from anthropic.types.beta import BetaTextBlockParam, BetaImageBlockParam, BetaToolResultBlockParam
 
 from ..tools import ToolResult, ToolManager
@@ -213,10 +210,9 @@ class LLMClient(LLMRequest):
 
             # ChatCompletionToolMessageParam
             tool_message_param = {
-                "tool_call_id": tool_id,
-                "name": tool_name,
                 "role": "tool",
                 "content": tool_result_content,
+                "tool_call_id": tool_id,
             }
             return tool_message_param
 
@@ -227,7 +223,12 @@ class LLMClient(LLMRequest):
             )
             return result_param
         else:
-            return ToolMessageParam(tool_call_id=tool_id, name=tool_name, role="tool", content=error_message)
+            tool_message_param = {
+                "role": "tool",
+                "content": error_message,
+                "tool_call_id": tool_id,
+            }
+            return tool_message_param
 
 
 def _maybe_prepend_system_tool_result(result: ToolResult, result_text: str):

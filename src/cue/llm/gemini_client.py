@@ -1,151 +1,139 @@
 import os
+import json
 import logging
-from typing import Dict, List, Optional
-from pathlib import Path
 
 import openai
-import google.auth
-import google.auth.transport.requests
-from google.oauth2 import service_account
+from pydantic import BaseModel
+from openai.types.chat.chat_completion import ChatCompletion
 
-from ..tools import ToolManager
-from ..schemas import AgentConfig, RunMetadata, ErrorResponse
-from .base_client import BaseClient
+from ..utils import DebugUtils, TokenCounter, generate_id
+from ..schemas import AgentConfig, ErrorResponse, CompletionRequest, CompletionResponse
 from .llm_request import LLMRequest
+from .system_prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
-_tag = ""
 
-
-def create_gemini_api_key() -> str:
-    # https://cloud.google.com/vertex-ai/docs/start/cloud-environment
-    service_account_key_file = os.getenv("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY_FILE")
-    service_account_key_file = f"credentials/{service_account_key_file}"
-    service_account_key_file = Path(__file__).parent.parent.parent.parent / service_account_key_file
-    SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
-    creds = service_account.Credentials.from_service_account_file(service_account_key_file, scopes=SCOPES)
-    # Refresh the access token
-    # https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library#openai-python
-    auth_req = google.auth.transport.requests.Request()
-    creds.refresh(auth_req)
-    logger.debug(f"create_gemini_api_key token: {creds.token[0:8]}...{creds.token[-4:]}")
-    return creds.token
-
-
-def create_client(api_key: str) -> openai.OpenAI:
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
-    LOCATION = "us-west1"  # https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations
-    # https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library#supported_models
-    client = openai.AsyncOpenAI(
-        base_url=f"https://{LOCATION}-aiplatform.googleapis.com/v1beta1/projects/{project_id}/locations/{LOCATION}/endpoints/openapi",
-        api_key=api_key,
-    )
-    return client
-
-
-class GeminiClient(LLMRequest, BaseClient):
+class GeminiClient(LLMRequest):
     def __init__(
         self,
         config: AgentConfig,
     ):
-        api_key = config.api_key or create_gemini_api_key()
+        api_key = config.api_key or os.environ.get("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("API key is missing in both config and settings.")
-        self.client = create_client(api_key)
-        self.confi = config
-        self.model = config.model
-        self.tools = config.tools
-        self.tool_manager = ToolManager()
-        if len(self.tools) > 0:
-            self.tool_json = self.tool_manager.get_tool_definitions(self.model, self.tools)
-        else:
-            self.tool_json = None
-
-        logger.debug(
-            f"[GeminiClient] initialized with model: {self.model}, tools: {[tool.name for tool in self.tools]} {self.config.id}"
+        self.client = openai.AsyncOpenAI(
+            api_key=api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
+        self.config = config
+        self.model = config.model
+        logger.debug(f"[GeminiClient] initialized with model: {self.model} {self.config.id}")
 
-    async def _send_completion_request(
-        self,
-        messages: List[Dict],
-    ):
-        length = len(messages)
-        for idx, message in enumerate(messages):
-            logger.debug(f"{_tag}send_completion_request message ({idx + 1}/{length}): {message.model_dump()}")
+    async def send_completion_request(self, request: CompletionRequest) -> CompletionResponse:
+        self.tool_json = request.tool_json
+        response = None
+        error = None
         try:
-            if self.tool_json and len(self.tool_json) > 0:
+            messages = [
+                msg.model_dump(exclude_none=True, exclude_unset=True) if isinstance(msg, BaseModel) else msg
+                for msg in request.messages
+            ]
+            DebugUtils.debug_print_messages(messages, tag=f"{self.config.id} send_completion_request")
+
+            system_prompt = (
+                f"{SYSTEM_PROMPT}{' ' + request.system_prompt_suffix if request.system_prompt_suffix else ''}"
+            )
+
+            system_context_tokens = 0
+            if request.system_context:
+                system_context = {"role": "assistant", "content": request.system_context.strip()}
+                system_context_tokens = TokenCounter.count_token(str(system_context))
+                messages.insert(0, system_context)
+
+            system_message = {"role": "system", "content": system_prompt}
+            system_message_tokens = TokenCounter.count_token(str(system_message))
+            tool_tokens = TokenCounter.count_token(str(request.tool_json))
+            message_tokens = TokenCounter.count_token(str(messages))
+            input_tokens = {
+                "system_tokens": system_message_tokens,
+                "system_context_tokens": system_context_tokens,
+                "tool_tokens": tool_tokens,
+                "message_tokens": message_tokens,
+            }
+            logger.debug(
+                f"{self.config.model_dump_json(indent=4)} input_tokens: {json.dumps(input_tokens, indent=4)} \nsystem_message: \n{json.dumps(system_message, indent=4)}"
+                f"\ntools_json: {json.dumps(request.tool_json, indent=4)}"
+            )
+            messages.insert(0, system_message)
+            DebugUtils.take_snapshot(messages=messages, suffix=f"{request.model}_pre_request")
+            if self.tool_json:
                 response = await self.client.chat.completions.create(
-                    model=f"google/{self.model}",
-                    messages=[
-                        msg.model_dump(exclude={"tool_calls"})
-                        if hasattr(msg, "tool_calls") and not msg.tool_calls
-                        else msg.model_dump()
-                        for msg in messages
-                    ],
-                    max_tokens=2048,
-                    temperature=0.8,
-                    tool_choice="auto",
+                    messages=messages,
+                    model=self.model,
+                    max_completion_tokens=request.max_tokens,
+                    temperature=request.temperature,
+                    response_format=request.response_format,
+                    tool_choice=request.tool_choice,
                     tools=self.tool_json,
+                    # parallel_tool_calls=request.parallel_tool_calls, # not support
                 )
             else:
                 response = await self.client.chat.completions.create(
-                    model=f"google/{self.model}",
-                    messages=[
-                        msg.model_dump(exclude={"tool_calls"})
-                        if hasattr(msg, "tool_calls") and not msg.tool_calls
-                        else msg.model_dump()
-                        for msg in messages
-                    ],
-                    max_tokens=2048,
-                    temperature=0.8,
+                    messages=messages,
+                    model=self.model,
+                    max_completion_tokens=request.max_tokens,
+                    temperature=request.temperature,
+                    response_format=request.response_format,
                 )
-            logger.debug(f"usage: {response.usage.model_dump()}")
-            return response
+            self.replace_tool_call_ids(response, request.model)
+
         except openai.APIConnectionError as e:
-            return ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
+            error = ErrorResponse(message=f"The server could not be reached. {e.__cause__}")
         except openai.RateLimitError as e:
-            return ErrorResponse(
+            error = ErrorResponse(
                 message=f"A 429 status code was received; we should back off a bit. {e.response}",
                 code=str(e.status_code),
             )
         except openai.APIStatusError as e:
             message = f"Another non-200-range status code was received. {e.response}, {e.response.text}"
-            logger.error(f"{message}")
-            return ErrorResponse(
+            DebugUtils.debug_print_messages(messages=messages, tag=f"{self.config.id} send_completion_request")
+            error = ErrorResponse(
                 message=message,
                 code=str(e.status_code),
             )
         except Exception as e:
-            return ErrorResponse(
+            error = ErrorResponse(
                 message=f"Exception: {e}",
             )
+        if error:
+            logger.error(error.model_dump())
+        return CompletionResponse(author=request.author, response=response, model=self.model, error=error)
 
-    async def send_completion_request(
-        self,
-        messages: list[dict],
-        metadata: RunMetadata,
-    ) -> Optional[dict]:
-        logger.debug(f"Metadata: {metadata.model_dump_json()}")
+    def replace_tool_call_ids(self, response_data: ChatCompletion, model: str) -> None:
+        """
+        Replace tool call IDs in the response to:
+        1) Ensure uniqueness by generating new IDs from the server if duplicates exist.
+        2) Shorten IDs to save tokens (length optimization may be adjusted).
+        """
+        for choice in response_data.choices:
+            message = choice.message
+            tool_calls = message.tool_calls
+            if tool_calls:
+                for tool_call in tool_calls:
+                    tool_call.id = self.generate_tool_id()
+                    if "." in tool_call.function.name:
+                        logger.error(f"Received tool name that contains dot: {tool_call}")
+                        name = tool_call.function.name.replace(".", "")
+                        tool_call.function.name = name
 
-        if metadata.current_turn >= metadata.max_turns:
-            response = input(f"Maximum depth of {metadata.max_turns} reached. Continue?" " (y/n): ")
-            if response.lower() in ["y", "yes"]:
-                metadata.current_turn = 0
-            else:
-                return None
+    def generate_tool_id(self) -> str:
+        """Generate a short tool call ID for session-scoped uniqueness.
 
-        response = await self._send_completion_request(messages)
-        if isinstance(response, ErrorResponse):
-            return response
+        Uses 4-char random suffix since unique IDs only needed within
+        a single session's context window
 
-        tool_calls = response.choices[0].message.tool_calls
-        if tool_calls is None:
-            return response  # return original response
-
-        metadata = RunMetadata(
-            user_messages=metadata.user_messages,
-            current_turn=metadata.current_turn + 1,
-        )
-
-        return await self.send_completion_request(messages=messages, metadata=metadata)
+        Returns:
+            String like: 'call_a1b2'
+        """
+        tool_call_id = generate_id(prefix="call_", length=4)
+        return tool_call_id

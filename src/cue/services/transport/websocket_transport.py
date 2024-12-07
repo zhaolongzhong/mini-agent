@@ -190,9 +190,9 @@ class AioHTTPWebSocketTransport(WebSocketTransport):
         """Send a protocol-level ping and await pong"""
         try:
             pong_waiter = self.ws.ping()  # Initiates a ping and returns a future for the pong
-            logger.debug("Ping")
+            # logger.debug("Ping")
             await asyncio.wait_for(pong_waiter, timeout=self.heartbeat.heartbeat_timeout)
-            logger.debug("Pong")
+            # logger.debug("Pong")
             self.heartbeat.pong_received()
         except asyncio.TimeoutError:
             logger.error("Protocol-level pong not received within timeout")

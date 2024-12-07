@@ -17,7 +17,7 @@ class ProjectContextManager:
 
     def update_context(self) -> None:
         """Load project context."""
-        if self.path is None:
+        if not self.path:
             logger.debug("No project context path provided")
             return None
         try:

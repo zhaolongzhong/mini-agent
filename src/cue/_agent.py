@@ -280,7 +280,6 @@ class Agent:
         response = await self.client.send_completion_request(completion_request)
         usage_dict = record_usage(response)
         self.token_stats["actual_usage"] = usage_dict
-        # todo: recordd
         record_usage_details(self.token_stats)
         logger.debug(f"metrics: {json.dumps(self.metrics, indent=4)}")
         logger.debug(f"{self.id} response: {response}")

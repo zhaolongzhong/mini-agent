@@ -275,4 +275,4 @@ class CompletionResponse:
         return res
 
     def _response_to_chat_completion_params(self, response: ChatCompletion):
-        return cast(ChatCompletionAssistantMessageParam, response.choices[0].message.model_dump())
+        return cast(ChatCompletionAssistantMessageParam, response.choices[0].message.model_dump(exclude_none=True))
