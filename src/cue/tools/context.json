@@ -1,0 +1,35 @@
+{
+    "type": "function",
+    "function": {
+        "name": "context",
+        "description": "Manage system, project and environment contexts",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "Context operation to perform",
+                    "enum": ["view", "update", "query", "create"]
+                },
+                "context_type": {
+                    "type": "string",
+                    "description": "Type of context to manage",
+                    "enum": ["system", "project", "env"]
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Path within context (e.g., 'capabilities/tools')"
+                },
+                "content": {
+                    "type": "object",
+                    "description": "Content for create/update operations"
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Query string for searching context"
+                }
+            },
+            "required": ["command", "context_type"]
+        }
+    }
+}
