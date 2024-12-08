@@ -101,6 +101,7 @@ class GitHubProjectTool(BaseTool):
         item_id: Optional[str] = None,
         title: Optional[str] = None,
         body: Optional[str] = None,
+        status: Optional[str] = None,
         query: Optional[str] = None,
         **kwargs,
     ) -> ToolResult:
@@ -122,6 +123,7 @@ class GitHubProjectTool(BaseTool):
                 Example: "PVTI_lAHOADKj2c4Ag2eizgVXKCg"
             title (Optional[str]): Item title. Required for create, optional for update.
             body (Optional[str]): Item body content. Optional for create and update.
+            status (Optional[str]): Item status. Optional for update.
             query (Optional[str]): Search query string. Required for search command.
             **kwargs: Additional keyword arguments (unused)
 
@@ -192,6 +194,7 @@ class GitHubProjectTool(BaseTool):
                         item_id=item_id,
                         title=update_title,  # Always provide title
                         body=body,
+                        status=status,
                     )
                     return ToolResult(
                         output=f"Updated item in project {project_number}:\n{self._format_items([item], project_number)}"

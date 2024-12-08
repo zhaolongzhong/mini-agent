@@ -49,12 +49,17 @@ class GitHubProject:
         self.project_number = project_number
         self.owner = owner
         self._items_cache: Optional[Dict[str, ProjectItem]] = None
+        self._fields_cache: Optional[Dict[str, str]] = None  # name -> id mapping
+        
         # Get project ID during initialization
         cmd = ["project", "view", str(project_number), "--owner", owner, "--format", "json"]
         data = self._run_gh_cmd(cmd)
         self.project_id = data.get("id")
         if not self.project_id:
             raise ValueError(f"Could not find project with number {project_number}")
+            
+        # Initialize fields cache
+        self.refresh_fields_cache()
 
     def _run_gh_cmd(self, cmd: List[str]) -> dict:
         """Run GitHub CLI command and return JSON response.
@@ -80,6 +85,17 @@ class GitHubProject:
             error_msg = f"Failed to parse GitHub CLI response: {e}"
             logger.error(error_msg)
             raise Exception(error_msg)
+
+    def refresh_fields_cache(self) -> None:
+        """Refresh the cache of project fields."""
+        cmd = ["project", "field-list", str(self.project_number), "--owner", self.owner, "--format", "json"]
+        data = self._run_gh_cmd(cmd)
+        
+        self._fields_cache = {}
+        for field in data.get("fields", []):
+            self._fields_cache[field["name"]] = field["id"]
+            
+        logger.debug(f"Cached {len(self._fields_cache)} project fields")
 
     def refresh_cache(self) -> None:
         """Refresh the local cache of project items."""
@@ -169,9 +185,27 @@ class GitHubProject:
             self._run_gh_cmd(cmd)
             logger.info(f"Updated body for item {item_id}")
 
-        # Status updates would go here when GitHub CLI supports it
+        # Update status if provided
         if status:
-            logger.warning("Status updates not yet supported by GitHub CLI")
+            if not self._fields_cache:
+                self.refresh_fields_cache()
+            
+            status_field_id = self._fields_cache.get("Status")
+            if not status_field_id:
+                raise ValueError("Status field not found in project")
+
+            # Update status using field ID
+            cmd = [
+                "project",
+                "item-edit",
+                "--id", item_id,
+                "--field-id", status_field_id,
+                "--project-id", self.project_id,
+                "--text", status,
+                "--format", "json",
+            ]
+            self._run_gh_cmd(cmd)
+            logger.info(f"Updated status for item {item_id} to {status}")
 
         # Refresh cache and return updated item
         self.refresh_cache()
