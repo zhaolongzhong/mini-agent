@@ -191,7 +191,7 @@ class LLMClient(LLMRequest):
             # BetaToolResultBlockParam
             tool_result_block_param = {
                 "tool_use_id": tool_id,
-                "content": tool_result_content,
+                "content": str(tool_result_content),
                 "type": "tool_result",
                 "is_error": is_error,
             }
@@ -211,7 +211,7 @@ class LLMClient(LLMRequest):
             # ChatCompletionToolMessageParam
             tool_message_param = {
                 "role": "tool",
-                "content": tool_result_content,
+                "content": str(tool_result_content),
                 "tool_call_id": tool_id,
             }
             return tool_message_param
