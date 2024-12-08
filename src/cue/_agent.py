@@ -71,6 +71,7 @@ class Agent:
         self.message_manager: MessageManager = MessageManager()
 
     def set_service_manager(self, service_manager: ServiceManager):
+        self.service_manager = service_manager
         self.message_manager.set_service_manager(service_manager)
 
     def get_system_message(self) -> MessageParam:
@@ -114,15 +115,7 @@ class Agent:
 
         await tool_manager.initialize()
 
-        if not self.tool_json and self.config.tools:
-            tools = self.config.tools.copy()
-
-            self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, tools)
-            # Add mcp tools if there is any
-            mcp_tools = self.tool_manager.get_mcp_tools(model=self.config.model)
-            if mcp_tools:
-                self.tool_json.extend(mcp_tools)
-            self.token_stats["tool"] = self.token_counter.count_dict_tokens(self.tool_json)
+        self.update_tool_json()
         self.system_message_param = self.get_system_message()
         try:
             await self.update_context()
@@ -137,6 +130,17 @@ class Agent:
 
         self.summarizer.update_context(self.system_context)
         self.has_initialized = True
+
+    def update_tool_json(self):
+        if self.config.tools:
+            tools = self.config.tools.copy()
+
+            self.tool_json = self.tool_manager.get_tool_definitions(self.config.model, tools)
+            # Add mcp tools if there is any
+            mcp_tools = self.tool_manager.get_mcp_tools(model=self.config.model)
+            if mcp_tools:
+                self.tool_json.extend(mcp_tools)
+            self.token_stats["tool"] = self.token_counter.count_dict_tokens(self.tool_json)
 
     async def clean_up(self):
         if self.tool_manager:
@@ -267,6 +271,7 @@ class Agent:
         system_context = self.build_system_context()
         self.metadata.token_stats = self.token_stats
         self.metadata.metrics = self.metrics
+
         completion_request = CompletionRequest(
             author=Author(name=self.id, role="assistant") if not author else author,
             model=self.config.model,
@@ -312,3 +317,18 @@ class Agent:
         messages_content = ",".join(str(msg) for msg in messages)
 
         return messages_content
+
+    def handle_overwrite_model(self):
+        override_model = self.service_manager.get_overwrite_model() if self.service_manager else None
+        if override_model and override_model != self.client.model:
+            self.config = self.config.model_copy()
+            self.config.model = override_model
+            self.client = LLMClient(self.config)
+            self.update_tool_json()
+
+            self.context = DynamicContextManager(
+                model=self.config.model,
+                max_tokens=self.config.max_context_tokens,
+                feature_flag=self.config.feature_flag,
+                summarizer=self.summarizer,
+            )

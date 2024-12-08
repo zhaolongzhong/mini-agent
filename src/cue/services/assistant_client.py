@@ -6,6 +6,7 @@ from ..schemas import (
     AssistantCreate,
 )
 from .transport import HTTPTransport, ResourceClient, WebSocketTransport
+from ..schemas.assistant import Metadata
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class AssistantClient(ResourceClient):
         """
         Create a default assistant to persist memories across multiple conversation
         """
-        assistant = await self.create(AssistantCreate(name=name, is_primary=True))
+        assistant = await self.create(AssistantCreate(name=name, metadata=Metadata(is_primary=True)))
         if not assistant:
             return
         self._default_assistant_id = assistant.id

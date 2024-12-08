@@ -10,7 +10,15 @@ from aiohttp import ClientResponseError, ClientConnectionError
 from pydantic import BaseModel
 
 from ..config import get_settings
-from ..schemas import AgentConfig, FeatureFlag, RunMetadata, MessageParam, CompletionResponse, ToolResponseWrapper
+from ..schemas import (
+    Assistant,
+    AgentConfig,
+    FeatureFlag,
+    RunMetadata,
+    MessageParam,
+    CompletionResponse,
+    ToolResponseWrapper,
+)
 from .transport import (
     AioHTTPTransport,
     AioHTTPWebSocketTransport,
@@ -42,6 +50,7 @@ class ServiceManager:
         self.base_url = base_url
         self.access_token = get_settings().ACCESS_TOKEN
         self.agent = agent
+        self.overwrite_agent_config: Optional[AgentConfig] = None
         self.assistant_id: Optional[str] = agent.id if agent else None
         self.client_id: Optional[str] = agent.client_id if agent else run_metadata.id
         self.user_id: Optional[str] = None
@@ -119,7 +128,7 @@ class ServiceManager:
             logger.error(f"Server availability check failed: {e}")
             return
         if self.feature_flag.enable_storage:
-            await self._create_default_assistant(self.agent.name)
+            await self._prepare_conversation(self.agent)
 
     async def close(self) -> None:
         """Close all connections"""
@@ -274,10 +283,32 @@ class ServiceManager:
             logger.error(f"Unexpected error during health check: {e}")
             raise
 
-    async def _create_default_assistant(self, name: Optional[str] = None):
-        self.assistant_id = await self.assistants.create_default_assistant(name)
+    async def _prepare_conversation(self, agent: AgentConfig):
+        if not self.assistant_id:
+            self.assistant_id = await self.assistants.create_default_assistant(agent.name)
         if not self.assistant_id:
             raise
         self.memories.set_default_assistant_id(self.assistant_id)
         conversation_id = await self.conversations.create_default_conversation(self.assistant_id)
         self.messages.set_default_conversation_id(conversation_id)
+        await self._get_assistant(self.assistant_id)
+
+        logger.debug(f"_prepare_conversation: {json.dumps(self.get_conversation_metadata(), indent=4)}")
+
+    async def _get_assistant(self, id: str) -> Assistant:
+        assistant = await self.assistants.get(self.assistant_id)
+        if assistant.metadata and assistant.metadata.model:
+            self.overwrite_agent_config = AgentConfig(model=assistant.metadata.model)
+
+    def get_overwrite_model(self) -> Optional[str]:
+        if self.overwrite_agent_config:
+            return self.overwrite_agent_config.model
+        return None
+
+    def get_conversation_metadata(self) -> dict:
+        medadata = {
+            "assistant_id": self.assistant_id,
+            "conversation_id": self.messages.default_conversation_id,
+            "model": self.overwrite_agent_config.model if self.overwrite_agent_config else None,
+        }
+        return medadata

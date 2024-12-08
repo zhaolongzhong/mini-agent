@@ -5,9 +5,14 @@ from datetime import datetime
 from pydantic import Field, BaseModel
 
 
+class Metadata(BaseModel):
+    is_primary: Optional[bool] = None
+    model: Optional[str] = None
+
+
 class AssistantBase(BaseModel):
     name: str
-    is_primary: Optional[bool] = False
+    metadata: Metadata | None = None
 
 
 class AssistantCreate(AssistantBase):
