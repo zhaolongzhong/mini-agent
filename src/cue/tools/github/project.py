@@ -190,18 +190,45 @@ class GitHubProject:
             if not self._fields_cache:
                 self.refresh_fields_cache()
             
-            status_field_id = self._fields_cache.get("Status")
-            if not status_field_id:
+            # Get status field details
+            cmd = [
+                "project", 
+                "field-list",
+                str(self.project_number),
+                "--owner", self.owner,
+                "--format", "json"
+            ]
+            data = self._run_gh_cmd(cmd)
+            
+            # Find status field and its options
+            status_field = None
+            for field in data.get("fields", []):
+                if field["name"] == "Status":
+                    status_field = field
+                    break
+                    
+            if not status_field:
                 raise ValueError("Status field not found in project")
+                
+            # Find matching status option
+            status_option = None
+            for option in status_field.get("options", []):
+                if option["name"].lower() == status.lower():
+                    status_option = option
+                    break
+                    
+            if not status_option:
+                valid_options = [opt["name"] for opt in status_field.get("options", [])]
+                raise ValueError(f"Invalid status value. Valid options are: {', '.join(valid_options)}")
 
-            # Update status using field ID
+            # Update status using field ID and option ID
             cmd = [
                 "project",
                 "item-edit",
                 "--id", item_id,
-                "--field-id", status_field_id,
+                "--field-id", status_field["id"],
                 "--project-id", self.project_id,
-                "--text", status,
+                "--single-select-option-id", status_option["id"],
                 "--format", "json",
             ]
             self._run_gh_cmd(cmd)
