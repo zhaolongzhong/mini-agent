@@ -1,0 +1,38 @@
+{
+    "type": "function",
+    "function": {
+        "name": "github_project",
+        "description": "Manage GitHub project items and draft issues.\n * State is persistent across command calls\n * Supports list, create, update, search, and get operations\n * Uses PVTI_ IDs for user interactions, internally handles DI_ IDs for updates\n * Maintains efficient caching to reduce API calls\n * All operations require a project number\n \n Notes for using commands:\n * The *`list`* command shows all items with their PVTI_ IDs\n * The *`create`* command requires a title, body is optional\n * The *`update`* command accepts PVTI_ ID from list/search results and internally handles ID conversion\n * The *`search`* command requires a query string to search titles\n * The *`get`* command requires PVTI_ ID from list/search results\n \n ID Format Notes:\n * Use PVTI_ IDs shown in list/search results (e.g. PVTI_abc123) for all commands\n * The tool automatically handles DI_ IDs internally for updates\n * Use list command to find valid PVTI_ IDs for items",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "enum": ["list", "create", "update", "search", "get"],
+                    "description": "The operation to perform on the GitHub project."
+                },
+                "project_number": {
+                    "type": "integer",
+                    "description": "The GitHub project number to operate on."
+                },
+                "item_id": {
+                    "type": "string",
+                    "description": "Required for update and get commands. Provide the PVTI_ ID (e.g. PVTI_abc123) obtained from list/search results. The tool automatically handles DI_ ID conversion for updates internally. Use list command first to find valid PVTI_ IDs."
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Required for create command, optional for update. The title of the item."
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Optional for create and update commands. The body content of the item."
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Required for search command. The search query string to match against item titles."
+                }
+            },
+            "required": ["command", "project_number"]
+        }
+    }
+}
