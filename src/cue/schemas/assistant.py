@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+from typing import Union, Optional
 from datetime import datetime
 
 from pydantic import Field, BaseModel
@@ -8,6 +8,11 @@ from pydantic import Field, BaseModel
 class Metadata(BaseModel):
     is_primary: Optional[bool] = None
     model: Optional[str] = None
+    instruction: Optional[str] = None
+    description: Optional[str] = None
+    max_turns: Optional[int] = None
+    context: Optional[dict] = None
+    tools: Optional[list[Union[str, list]]] = None
 
 
 class AssistantBase(BaseModel):

@@ -62,7 +62,6 @@ async def run_task(args: argparse.Namespace, task_family: ToolTaskFamily, temp_d
         model=ChatModel.GPT_4O_MINI,
         temperature=0.8,
         max_tokens=2000,
-        conversation_id="",
         tools=[Tool.Edit, Tool.Bash],
     )
     manager = AgentManager()
