@@ -54,7 +54,7 @@ class LLMClient(LLMRequest):
         self,
         tool_manager: ToolManager,
         tool_calls: List[ToolCallToolUseBlock],
-        timeout: int = 30,
+        timeout: int = 60,
         author: Optional[Author] = None,
     ) -> ToolResponseWrapper:
         tool_results = []
@@ -85,7 +85,7 @@ class LLMClient(LLMRequest):
                 )
                 continue
 
-            if result := tool_manager.mcp.find_tool(tool_name):
+            if tool_manager.mcp is not None and (result := tool_manager.mcp.find_tool(tool_name)):
                 server_name, _tool_info = result
                 task = asyncio.create_task(
                     tool_manager.mcp.call_tool(server_name=server_name, tool_name=tool_name, arguments=kwargs)

@@ -65,7 +65,7 @@ class AgentLoop:
                     author=author,
                 )
             except asyncio.CancelledError:
-                logger.info("execute_run task was cancelled.")
+                logger.info("agent.run was cancelled.")
                 break
             except Exception as e:
                 logger.exception(f"Error during agent run: {e}")
@@ -116,7 +116,7 @@ class AgentLoop:
             tool_result = await agent.client.process_tools_with_timeout(
                 tool_manager=tool_manager,
                 tool_calls=tool_calls,
-                timeout=30,
+                timeout=60,
                 author=response.author,
             )
 
@@ -157,7 +157,7 @@ class AgentLoop:
             try:
                 await self.execute_run_task
             except asyncio.CancelledError:
-                logger.info("execute_run_task was cancelled.")
+                logger.info("stop execute_run_task was cancelled.")
             finally:
                 self.execute_run_task = None
                 self.stop_run_event.clear()

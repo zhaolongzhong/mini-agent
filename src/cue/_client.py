@@ -12,13 +12,15 @@ setup_logging()
 
 
 class AsyncCueClient:
-    def __init__(self):
+    def __init__(self, config_file_path: Optional[str] = None):
         self.logger = _logger
         self.agent_manager = AgentManager()
         self.agents: Dict[str, AgentConfig] = {}
         self.active_agent_id: Optional[str] = None
         self.run_metadata = RunMetadata()
-        self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
+        self.agent_provider = AgentProvider(
+            config_file=config_file_path if config_file_path else get_settings().AGENTS_CONFIG_FILE
+        )
 
     def _create_default_config(self) -> AgentConfig:
         return AgentConfig(
@@ -35,13 +37,12 @@ class AsyncCueClient:
 
     async def initialize(self, configs: Optional[List[AgentConfig]] = None):
         """Initialize the client with multiple agents."""
-        suffix = "multiple agents" if len(configs) > 1 else "a single agent"
-        self.logger.info(f"Initializing AsyncCueClient with {suffix}")
+        self.logger.info("Initializing AsyncCueClient")
 
         active_agent_id = None
         if not configs:
             configs_dict = self.agent_provider.get_configs()
-            configs = configs_dict
+            configs = configs_dict.values()
             active_agent_id = self.agent_provider.get_primary_agent().id
         else:
             active_agent_id = self.agent_provider.find_primary_agent_id(configs)
