@@ -102,6 +102,7 @@ class AgentProvider:
             logger.info("No agents found in config file, use default agents.")
             configs = self._default_configs.copy()
         self.configs = configs
+        logger.info(f"self.configs: {configs}")
         return configs
 
     def get_primary_agent(self) -> Optional[AgentConfig]:
@@ -161,6 +162,7 @@ class AgentProvider:
                     f"Unknown tool '{tool_name}', skipping. " f"Available tools: {', '.join(tool_map.keys())}"
                 )
 
+        logger.info(f"config_dict: {config_dict}")
         return AgentConfig(
             id=config_dict.get("id"),
             client_id=config_dict.get("client_id", None),
@@ -168,6 +170,8 @@ class AgentProvider:
             description=config_dict.get("description"),
             instruction=config_dict.get("instruction"),
             model=config_dict.get("model", "gpt-4o-mini"),
+            api_key=config_dict.get("api_key", None),
+            access_token=config_dict.get("access_token", None),
             project_context_path=config_dict.get("project_context_path"),
             tools=tools,
             is_primary=config_dict.get("is_primary", False),

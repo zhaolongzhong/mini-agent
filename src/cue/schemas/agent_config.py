@@ -19,6 +19,7 @@ class AgentConfig(BaseModel):
     instruction: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
+    access_token: Optional[str] = None
     temperature: Optional[float] = 0.8
     max_tokens: Optional[int] = 1000
     max_context_tokens: Optional[int] = 12000

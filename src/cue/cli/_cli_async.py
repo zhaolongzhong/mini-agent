@@ -34,6 +34,7 @@ class CLI:
         self.mode = self.determine_mode(args)
         self.runner_id = args.runner_id if hasattr(args, "runner_id") else "default"
         self.run_metadata: Optional[RunMetadata] = None
+        self.config_path = args.config_path if hasattr(args, "config_path") else None
 
     def determine_mode(self, args) -> str:
         """
@@ -105,8 +106,13 @@ class CLI:
         self.agent_manager = AgentManager(prompt_callback=self.handle_prompt, loop=self.loop)
 
         if self.run_metadata.mode != "client":
+            # Use custom config path if provided, otherwise use default from settings
+            config_file = self.config_path or get_settings().AGENTS_CONFIG_FILE
+            if self.config_path:
+                logger.info(f"Using custom config file: {self.config_path}")
+
             # Initialize other components
-            self.agent_provider = AgentProvider(get_settings().AGENTS_CONFIG_FILE)
+            self.agent_provider = AgentProvider(config_file)
             self.primary_agent_config = self.agent_provider.get_primary_agent()
 
             # Configure agents
@@ -284,6 +290,11 @@ def _parse_args():
         help="Run in runner mode, communicating via websocket without local interface.",
     )
     parser.add_argument("--runner-id", type=str, metavar="ID", help="Specify runner ID for the runner mode")
+    parser.add_argument(
+        "--config-path",
+        type=str,
+        help="Path to a custom cue.config.json file",
+    )
     parser.add_argument(
         "--log-level",
         type=str,

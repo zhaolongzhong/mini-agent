@@ -36,7 +36,10 @@ class Agent:
         self.config = config
         self.tool_manager: Optional[ToolManager] = None
         self.summarizer = ContentSummarizer(
-            AgentConfig(model="claude-3-5-haiku-20241022" if "claude" in config.model else "gpt-4o-mini")
+            AgentConfig(
+                model="claude-3-5-haiku-20241022" if "claude" in config.model else "gpt-4o-mini",
+                api_key=config.api_key,
+            )
         )
         self.memory_manager = DynamicMemoryManager(max_tokens=1000)
         self.project_context_manager = ProjectContextManager(path=self.config.project_context_path)
