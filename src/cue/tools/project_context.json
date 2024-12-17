@@ -1,0 +1,27 @@
+{
+    "type": "function",
+    "function": {
+        "name": "project_context",
+        "description": "Perform project context operations.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The project operation to perform: 'view' and 'update'",
+                    "enum": [
+                        "view",
+                        "update"
+                    ]
+                },
+                "new_content": {
+                    "type": "string",
+                    "description": "New content dict or string used for update command"
+                }
+            },
+            "required": [
+                "command"
+            ]
+        }
+    }
+}

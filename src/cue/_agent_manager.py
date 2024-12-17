@@ -91,8 +91,7 @@ class AgentManager:
 
     async def initialize_run(self):
         if not self.tool_manager:
-            memory_client = self.service_manager.memories if self.service_manager else None
-            self.tool_manager = ToolManager(memory_client, mcp=self.mcp)
+            self.tool_manager = ToolManager(service_manager=self.service_manager, mcp=self.mcp)
 
     async def start_run(
         self,

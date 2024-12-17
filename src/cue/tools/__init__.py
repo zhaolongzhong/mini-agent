@@ -10,6 +10,7 @@ from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
 from .run_script import PythonRunner
 from .mcp_manager import MCPServerManager
+from .project_context import ProjectContextTool
 
 __all__ = [
     "Tool",
@@ -29,4 +30,5 @@ __all__ = [
     "MemoryTool",
     "CoordinateTool",
     "MCPServerManager",
+    "ProjectContextTool",
 ]

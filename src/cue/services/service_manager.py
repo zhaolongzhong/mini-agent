@@ -286,6 +286,8 @@ class ServiceManager:
     async def _prepare_conversation(self, agent: AgentConfig):
         if not self.assistant_id:
             self.assistant_id = await self.assistants.create_default_assistant(agent.name)
+        else:
+            self.assistants._default_assistant_id = self.assistant_id
         if not self.assistant_id:
             raise
         self.memories.set_default_assistant_id(self.assistant_id)

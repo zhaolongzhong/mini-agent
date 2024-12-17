@@ -78,6 +78,7 @@ class Agent:
     def set_service_manager(self, service_manager: ServiceManager):
         self.service_manager = service_manager
         self.message_manager.set_service_manager(service_manager)
+        self.project_context_manager.set_service_manager(service_manager)
 
     def get_system_message(self) -> MessageParam:
         self.system_message_builder.set_conversation_context(self.conversation_context)
@@ -209,7 +210,7 @@ class Agent:
         logger.debug("update_context ...")
         self.system_context_manager.update_base_context()
         await self._update_recent_memories()
-        self.project_context_manager.update_context()
+        await self.project_context_manager.update_context()
 
     def build_system_context(self) -> str:
         """Build short time static system context"""

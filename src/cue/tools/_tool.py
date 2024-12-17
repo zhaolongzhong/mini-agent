@@ -9,13 +9,14 @@ from .email import EmailTool
 from .browse import BrowseTool
 from .memory import MemoryTool
 from .restart import RestartTool
-from ..services import MemoryClient
+from ..services import ServiceManager
 from .bash_tool import BashTool
 from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
 from .run_script import PythonRunner
 from .mcp_manager import MCPServerManager
 from .github_project import GitHubProjectTool
+from .project_context import ProjectContextTool
 from .utils.function_utils import get_definition_by_model
 from .utils.function_to_json import function_to_json
 
@@ -34,12 +35,13 @@ class Tool(Enum):
     Coordinate = CoordinateTool.name
     Restart = RestartTool.name
     GitHubProject = GitHubProjectTool.name
+    ProjectContextTool = ProjectContextTool.name
 
 
 class ToolManager:
     def __init__(
         self,
-        memory_service: Optional[MemoryClient] = None,
+        service_manager: Optional[ServiceManager] = None,
         mcp: Optional[MCPServerManager] = None,
     ):
         self.tools: Dict[str, BaseTool] = {
@@ -50,13 +52,16 @@ class ToolManager:
             Tool.Email.value: EmailTool(),
             Tool.Drive.value: GoogleDriveTool(),
             Tool.Image.value: ReadImageTool(),
-            Tool.Memory.value: MemoryTool(memory_service),
             Tool.Coordinate.value: CoordinateTool(),
             Tool.Restart.value: RestartTool(),
             Tool.GitHubProject.value: GitHubProjectTool(),
         }
+        self.service_manager = service_manager
+        if self.service_manager:
+            self.tools[Tool.Memory.value] = MemoryTool(self.service_manager.memories)
+            self.tools[Tool.ProjectContextTool.value] = ProjectContextTool(self.service_manager.assistants)
         self._definition_cache: Dict[str, dict] = {}
-        self.mcp = mcp
+        self.mcp = None  # disable for now
         self._mcp_tools_json = []
         self.mcp_tools_map: Dict[str, Dict[str, Any]] = {}
 

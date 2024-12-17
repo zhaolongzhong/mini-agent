@@ -2,7 +2,7 @@ from .user import User, UserCreate
 from .error import ErrorResponse
 from .token import Token
 from .message import Author, Content, Message, Metadata, AuthorRole, MessageChunk, MessageCreate, MessageUpdate
-from .assistant import Assistant, AssistantCreate
+from .assistant import Assistant, AssistantCreate, AssistantUpdate, AssistantMetadata
 from .run_usage import RunUsage, RunUsageAndLimits
 from .tool_call import AssistantMessage
 from .agent_config import AgentConfig
@@ -22,6 +22,8 @@ __all__ = [
     "AgentTransfer",
     "Assistant",
     "AssistantCreate",
+    "AssistantUpdate",
+    "AssistantMetadata",
     "AssistantMessage",
     "AssistantMemory",
     "AssistantMemoryCreate",

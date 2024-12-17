@@ -1,12 +1,13 @@
 import logging
-from typing import List, Optional
+from typing import List, Union, Optional
 
 from ..schemas import (
     Assistant,
     AssistantCreate,
+    AssistantUpdate,
+    AssistantMetadata,
 )
 from .transport import HTTPTransport, ResourceClient, WebSocketTransport
-from ..schemas.assistant import Metadata
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,17 @@ class AssistantClient(ResourceClient):
         response = await self._http.request("GET", f"/assistants/{assistant_id}")
         return Assistant(**response)
 
+    async def get_project_context(self) -> Optional[Union[dict, str]]:
+        response = await self._http.request("GET", f"/assistants/{self._default_assistant_id}")
+        asssistant = Assistant(**response)
+        return asssistant.metadata.context if asssistant.metadata else None
+
+    async def update(self, assistant: AssistantUpdate) -> Assistant:
+        response = await self._http.request(
+            "PUT", f"/assistants/{self._default_assistant_id}", data=assistant.model_dump()
+        )
+        return Assistant(**response)
+
     async def list(self, skip: int = 0, limit: int = 100) -> List[Assistant]:
         response = await self._http.request("GET", f"/assistants?skip={skip}&limit={limit}")
         return [Assistant(**asst) for asst in response]
@@ -40,7 +52,7 @@ class AssistantClient(ResourceClient):
         """
         Create a default assistant to persist memories across multiple conversation
         """
-        assistant = await self.create(AssistantCreate(name=name, metadata=Metadata(is_primary=True)))
+        assistant = await self.create(AssistantCreate(name=name, metadata=AssistantMetadata(is_primary=True)))
         if not assistant:
             return
         self._default_assistant_id = assistant.id

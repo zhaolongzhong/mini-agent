@@ -3,6 +3,7 @@ from pathlib import Path
 from typing_extensions import Optional
 
 from ..utils.token_counter import TokenCounter
+from ..services.service_manager import ServiceManager
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,21 @@ class ProjectContextManager:
         self.project_context: Optional[str] = None
         self.token_counter = TokenCounter()
         self.message_params: Optional[dict] = None
+        self.service_manager: Optional[ServiceManager] = None
 
-    def update_context(self) -> None:
+    def set_service_manager(self, service_manager: ServiceManager):
+        self.service_manager = service_manager
+
+    async def update_context(self) -> None:
         """Load project context."""
+        if self.service_manager:
+            context = await self.service_manager.assistants.get_project_context()
+            if context:
+                self.pre_context = self.project_context
+                self.project_context = str(context)
+                self.update_params()
+                return
+
         if not self.path:
             logger.debug("No project context path provided")
             return None
@@ -47,9 +60,10 @@ class ProjectContextManager:
             }
             self.pre_context = None
         else:
+            content_prefix = f"Project context path: {self.path} " if not self.service_manager else ""
             self.message_params = {
                 "role": "user",
-                "content": f"Project context path: {self.path} <project_context>\n{self.project_context}\n</project_context>{token_context}",
+                "content": f"{content_prefix}<project_context>\n{self.project_context}\n</project_context>{token_context}",
             }
             self.pre_context = self.message_params
 
