@@ -12,6 +12,7 @@ class AssistantMetadata(BaseModel):
     description: Optional[str] = None
     max_turns: Optional[int] = None
     context: Optional[Union[dict, str]] = None
+    system: Optional[Union[dict, str]] = None
     tools: Optional[list[Union[str, list]]] = None
 
 

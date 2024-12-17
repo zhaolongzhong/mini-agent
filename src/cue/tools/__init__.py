@@ -10,6 +10,7 @@ from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
 from .run_script import PythonRunner
 from .mcp_manager import MCPServerManager
+from .system_tool import SystemTool
 from .project_context import ProjectContextTool
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     "CoordinateTool",
     "MCPServerManager",
     "ProjectContextTool",
+    "SystemTool",
 ]

@@ -3,7 +3,8 @@ import logging
 from datetime import datetime
 from typing_extensions import Optional
 
-from cue.utils.token_counter import TokenCounter
+from ..utils.token_counter import TokenCounter
+from ..services.service_manager import ServiceManager
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +16,16 @@ class SystemContextManager:
         self.token_counter = TokenCounter()
         self.system_context_base: Optional[str] = None
         self.system_context = ""
+        self.service_manager: Optional[ServiceManager] = None
 
-    def update_base_context(self) -> None:
+    def set_service_manager(self, service_manager: ServiceManager):
+        self.service_manager = service_manager
+
+    async def update_base_context(self) -> None:
         self.system_context_base = self._get_time_context()
+        system_context = await self.service_manager.assistants.get_system_context()
+        if system_context:
+            self.system_context_base += f"<system_learning>{system_context}</system_learning>"
 
     def _get_time_context(self) -> str:
         return f"""

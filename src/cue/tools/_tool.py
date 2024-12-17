@@ -15,6 +15,7 @@ from .coordinate import CoordinateTool
 from .read_image import ReadImageTool
 from .run_script import PythonRunner
 from .mcp_manager import MCPServerManager
+from .system_tool import SystemTool
 from .github_project import GitHubProjectTool
 from .project_context import ProjectContextTool
 from .utils.function_utils import get_definition_by_model
@@ -36,6 +37,7 @@ class Tool(Enum):
     Restart = RestartTool.name
     GitHubProject = GitHubProjectTool.name
     ProjectContextTool = ProjectContextTool.name
+    SystemTool = SystemTool.name
 
 
 class ToolManager:
@@ -60,6 +62,7 @@ class ToolManager:
         if self.service_manager:
             self.tools[Tool.Memory.value] = MemoryTool(self.service_manager.memories)
             self.tools[Tool.ProjectContextTool.value] = ProjectContextTool(self.service_manager.assistants)
+            self.tools[Tool.SystemTool.value] = SystemTool(self.service_manager.assistants)
         self._definition_cache: Dict[str, dict] = {}
         self.mcp = None  # disable for now
         self._mcp_tools_json = []

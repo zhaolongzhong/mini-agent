@@ -35,6 +35,11 @@ class AssistantClient(ResourceClient):
         asssistant = Assistant(**response)
         return asssistant.metadata.context if asssistant.metadata else None
 
+    async def get_system_context(self) -> Optional[Union[dict, str]]:
+        response = await self._http.request("GET", f"/assistants/{self._default_assistant_id}")
+        asssistant = Assistant(**response)
+        return asssistant.metadata.system if asssistant.metadata else None
+
     async def update(self, assistant: AssistantUpdate) -> Assistant:
         response = await self._http.request(
             "PUT", f"/assistants/{self._default_assistant_id}", data=assistant.model_dump()

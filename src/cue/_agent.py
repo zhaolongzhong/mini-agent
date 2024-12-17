@@ -34,6 +34,16 @@ class Agent:
     def __init__(self, config: AgentConfig):
         self.id = config.id
         self.config = config
+        self.token_stats = {
+            "system": 0,
+            "tool": 0,
+            "project": 0,
+            "memories": 0,
+            "summaries": 0,
+            "messages": 0,
+            "actual_usage": {},
+        }
+        self.metrics = {"token_stats": self.token_stats}
         self.tool_manager: Optional[ToolManager] = None
         self.summarizer = ContentSummarizer(
             AgentConfig(
@@ -41,8 +51,9 @@ class Agent:
                 api_key=config.api_key,
             )
         )
-        self.memory_manager = DynamicMemoryManager(max_tokens=1000)
+        self.system_context_manager = SystemContextManager(metrics=self.metrics, token_stats=self.token_stats)
         self.project_context_manager = ProjectContextManager(path=self.config.project_context_path)
+        self.memory_manager = DynamicMemoryManager(max_tokens=1000)
         self.context = DynamicContextManager(
             model=self.config.model,
             max_tokens=config.max_context_tokens,
@@ -59,17 +70,6 @@ class Agent:
         self.setup_feedback()
         self.has_initialized: bool = False
         self.token_counter = TokenCounter()
-        self.token_stats = {
-            "system": 0,
-            "tool": 0,
-            "project": 0,
-            "memories": 0,
-            "summaries": 0,
-            "messages": 0,
-            "actual_usage": {},
-        }
-        self.metrics = {"token_stats": self.token_stats}
-        self.system_context_manager = SystemContextManager(metrics=self.metrics, token_stats=self.token_stats)
         self.service_manager: Optional[ServiceManager] = None
         self.system_context: Optional[str] = None  # memories and project context
         self.system_message_param: Optional[str] = None
@@ -77,6 +77,7 @@ class Agent:
 
     def set_service_manager(self, service_manager: ServiceManager):
         self.service_manager = service_manager
+        self.system_context_manager.set_service_manager(service_manager)
         self.message_manager.set_service_manager(service_manager)
         self.project_context_manager.set_service_manager(service_manager)
 
@@ -208,7 +209,7 @@ class Agent:
 
     async def update_context(self) -> None:
         logger.debug("update_context ...")
-        self.system_context_manager.update_base_context()
+        await self.system_context_manager.update_base_context()
         await self._update_recent_memories()
         await self.project_context_manager.update_context()
 
