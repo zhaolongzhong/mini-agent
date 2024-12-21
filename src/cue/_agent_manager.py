@@ -13,6 +13,7 @@ from .schemas import (
     ConversationContext,
 )
 from .services import ServiceManager
+from .tools.self_prompt import SelfPromptTimer
 from ._agent_loop import AgentLoop
 from .tools._tool import ToolManager, MCPServerManager
 from .schemas.feature_flag import FeatureFlag
@@ -46,6 +47,7 @@ class AgentManager:
         self.execute_run_task: Optional[asyncio.Task] = None
         self.stop_run_event: asyncio.Event = asyncio.Event()
         self.mcp: MCPServerManager = None
+        self.self_prompt_timer: Optional[SelfPromptTimer] = None
 
     async def initialize(
         self, run_metadata: Optional[RunMetadata] = RunMetadata(), mcp: Optional[MCPServerManager] = None
@@ -71,9 +73,21 @@ class AgentManager:
         self._update_other_agents_info()
         await self.initialize_run()
 
+        # Initialize self-prompt timer for the primary agent if enabled
+        if self.primary_agent and self.primary_agent.config.enable_self_prompt:
+            self.self_prompt_timer = SelfPromptTimer(
+                config=self.primary_agent.config,
+                prompt_callback=self._handle_self_prompt
+            )
+            self.self_prompt_timer.start()
+
     async def clean_up(self):
         if self.service_manager:
             await self.service_manager.close()
+
+        # Stop self-prompt timer if running
+        if self.self_prompt_timer:
+            self.self_prompt_timer.stop()
 
         cleanup_tasks = []
         for agent_id in list(self._agents.keys()):
@@ -334,3 +348,43 @@ class AgentManager:
             for agent in self._agents.values()
             if agent.id not in exclude
         ]
+
+    async def _handle_self_prompt(self) -> None:
+        """Handle the self-prompt event for the primary agent.
+        
+        This method is called by the SelfPromptTimer when it's time for a self-prompt.
+        It triggers a self-reflection and improvement cycle for the primary agent.
+        """
+        if not self.primary_agent:
+            logger.warning("No primary agent available for self-prompt")
+            return
+
+        try:
+            logger.info("Initiating self-prompt cycle")
+            # Create a self-prompt message
+            self_prompt_msg = MessageParam(
+                role="system",
+                content="Time for self-reflection. Review recent interactions, analyze patterns, and identify areas for improvement. Consider:\n"
+                       "1. Recent task performance and challenges\n"
+                       "2. Pattern recognition in interactions\n"
+                       "3. Tool usage effectiveness\n"
+                       "4. Knowledge gaps identified\n"
+                       "5. Potential improvements in reasoning or approach\n\n"
+                       "Please reflect and suggest concrete improvements."
+            )
+
+            # Add the message to the primary agent
+            await self.primary_agent.add_message(self_prompt_msg)
+
+            # Process the self-prompt through the agent loop
+            response = await self.agent_loop.run(
+                agent=self.primary_agent,
+                run_metadata=self.run_metadata,
+                tool_manager=self.tool_manager,
+                callback=None  # We don't broadcast self-prompt responses
+            )
+
+            logger.info(f"Self-prompt cycle completed: {response.get_text()}")
+
+        except Exception as e:
+            logger.error(f"Error during self-prompt cycle: {e}")

@@ -30,3 +30,7 @@ class AgentConfig(BaseModel):
     conversation_id: Optional[str] = None
     enable_services: bool = False
     feature_flag: FeatureFlag = Field(default_factory=FeatureFlag)
+    # Self-prompting configuration
+    enable_self_prompt: bool = False
+    self_prompt_interval: int = 3600  # Default interval in seconds (1 hour)
+    last_self_prompt_time: Optional[float] = None  # Unix timestamp of last self-prompt
