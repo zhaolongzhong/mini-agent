@@ -26,6 +26,7 @@ from .context.message import MessageManager
 from ._agent_summarizer import ContentSummarizer
 from .memory.memory_manager import DynamicMemoryManager
 from .system_message_builder import SystemMessageBuilder
+from .response_evaluator import ResponseEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ class Agent:
         self.system_context: Optional[str] = None  # memories and project context
         self.system_message_param: Optional[str] = None
         self.message_manager: MessageManager = MessageManager()
+        self.response_evaluator = ResponseEvaluator()
 
     def set_service_manager(self, service_manager: ServiceManager):
         self.service_manager = service_manager
@@ -290,6 +292,21 @@ class Agent:
         )
 
         response = await self.client.send_completion_request(completion_request)
+        
+        # Evaluate the response
+        evaluation_result = await self.response_evaluator.evaluate_response(response, run_metadata)
+        
+        if evaluation_result.should_continue:
+            logger.debug(f"Response needs improvement: {evaluation_result.reason}")
+            # Add the follow-up prompt to messages
+            if evaluation_result.suggested_prompt:
+                messages_dict.append({
+                    "role": "system",
+                    "content": evaluation_result.suggested_prompt
+                })
+                # Recursively call send_messages with updated messages
+                return await self.send_messages(messages_dict, run_metadata, author)
+        
         usage_dict = record_usage(response)
         self.token_stats["actual_usage"] = usage_dict
         record_usage_details(self.token_stats)
